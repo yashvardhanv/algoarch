@@ -9,7 +9,8 @@
     "build": "vite build --config web/vite.config.ts",
     "typecheck": "tsc -p web/tsconfig.json",
     "db:import": "node tools/content/import.js --reset",
-    "docs:widgets": "node tools/content/build-docs.js"
+    "docs:widgets": "node tools/content/build-docs.js",
+    "diagrams:sync": "node tools/content/sync-diagrams.js"
   },
   "keywords": [
     "dsa",

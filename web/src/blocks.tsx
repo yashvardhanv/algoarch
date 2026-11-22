@@ -8,6 +8,7 @@ import { Trace } from './Trace';
 import { Checklist } from './Checklist';
 import { Scorecard } from './Scorecard';
 import { FrameWidget } from './FrameWidget';
+import { Diagram } from './Diagram';
 
 export { Inlines };
 
@@ -95,6 +96,8 @@ function BlockView({ block }: { block: Block }) {
           <div className="rd-qa-body"><Blocks blocks={block.blocks} /></div>
         </details>
       );
+    case 'diagram':
+      return <Diagram scene={block.scene} title={block.title} caption={block.caption} />;
     case 'code_cell':
       return <CodeCell cell={block} />;
     case 'widget':

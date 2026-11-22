@@ -578,6 +578,23 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return sendJson(res, 400, { error: e.message }); }
   }
 
+  if (pathname === '/api/admin/diagrams' && req.method === 'GET') {
+    const lessonId = String(parsedUrl.query.lesson || '');
+    return sendJson(res, 200, { diagrams: repo.listDiagrams(lessonId) });
+  }
+  if (pathname === '/api/admin/diagrams' && req.method === 'POST') {
+    try {
+      const body = await parseBody(req);
+      return sendJson(res, 200, repo.saveDiagram(body));
+    } catch (e) { return sendJson(res, 400, { error: e.message }); }
+  }
+  if (pathname === '/api/admin/diagrams/delete' && req.method === 'POST') {
+    try {
+      const body = await parseBody(req);
+      return sendJson(res, 200, { deleted: repo.deleteDiagram(Number(body.id)) });
+    } catch (e) { return sendJson(res, 400, { error: e.message }); }
+  }
+
   if (pathname === '/api/admin/lessons' && req.method === 'GET') {
     try {
       const curriculum = repo.getCurriculum();

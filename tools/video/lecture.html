@@ -1,0 +1,364 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Lecture video renderer</title>
+<style>
+  html, body { margin: 0; background: #000; color: #ddd; font: 14px system-ui; }
+  canvas { width: 960px; height: 540px; display: block; }
+  #status { padding: 8px 12px; }
+</style>
+<canvas id="c" width="1920" height="1080"></canvas>
+<div id="status">idle</div>
+<script src="vendor/mp4-muxer.js"></script>
+<script>
+// Silent animated lecture video, rendered offline frame by frame with WebCodecs (H.264) and
+// muxed to MP4 in the browser. Content comes from lesson sy02. No audio track.
+const W = 1920, H = 1080, FPS = 30;
+const C = { bg: '#0d1013', panel: '#161b20', panel2: '#1d2329', line: '#2a3138', ink: '#e9edf0', ink2: '#aab3ba', ink3: '#7d8890', acc: '#f0793f', ok: '#4fb98a', bad: '#ec5b51', cool: '#5ea6d6', amb: '#dfa53a' };
+const SANS = '"Segoe UI", system-ui, -apple-system, sans-serif';
+const MONO = 'Consolas, "Cascadia Mono", "SF Mono", ui-monospace, monospace';
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = (t) => 1 - Math.pow(1 - clamp(t), 3);
+const seg = (lt, start, dur) => ease((lt - start) / dur);
+
+function text(s, x, y, o = {}) {
+  ctx.save();
+  ctx.globalAlpha *= o.alpha == null ? 1 : o.alpha;
+  ctx.font = `${o.weight || 400} ${o.size || 36}px ${o.mono ? MONO : SANS}`;
+  ctx.fillStyle = o.color || C.ink;
+  ctx.textAlign = o.align || 'left';
+  ctx.textBaseline = o.base || 'alphabetic';
+  ctx.fillText(s, x, y);
+  ctx.restore();
+}
+function wrap(s, maxW, font) {
+  ctx.save(); ctx.font = font;
+  const words = s.split(' '); const lines = []; let line = '';
+  for (const w of words) {
+    const t = line ? line + ' ' + w : w;
+    if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t;
+  }
+  if (line) lines.push(line);
+  ctx.restore();
+  return lines;
+}
+function rrect(x, y, w, h, r, fill, stroke, lw = 2) {
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, r);
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); }
+}
+const withAlpha = (a, fn) => { ctx.save(); ctx.globalAlpha *= clamp(a); fn(); ctx.restore(); };
+
+// ---------------------------------------------------------------- B-tree drawing
+function treeLayout(ox, oy, w) {
+  const root = [{ x: ox + w / 2, y: oy, w: 230, h: 64 }];
+  const mid = [1, 3, 5].map(k => ({ x: ox + (w * k) / 6, y: oy + 160, w: 200, h: 64 }));
+  const leaves = Array.from({ length: 9 }, (_, i) => ({ x: ox + (w * (i + 0.5)) / 9, y: oy + 320, w: 118, h: 56 }));
+  const heap = Array.from({ length: 9 }, (_, i) => ({ x: ox + (w * (i + 0.5)) / 9, y: oy + 480, w: 118, h: 56 }));
+  return { root, mid, leaves, heap };
+}
+function drawTree(L, p, hi) {
+  const lvl = (nodes, a, b, fill, label) => {
+    const k = seg(p, a, b - a);
+    withAlpha(k, () => {
+      nodes.forEach((n, i) => {
+        const on = hi && hi.has(label + i);
+        rrect(n.x - n.w / 2, n.y - n.h / 2 + (1 - k) * 16, n.w, n.h, 10, on ? '#3a2417' : fill, on ? C.acc : C.line, on ? 4 : 2);
+      });
+    });
+  };
+  // links first
+  const link = (a, b, k, on) => withAlpha(k, () => { ctx.beginPath(); ctx.moveTo(a.x, a.y + a.h / 2); ctx.lineTo(b.x, b.y - b.h / 2); ctx.lineWidth = on ? 4 : 2; ctx.strokeStyle = on ? C.acc : C.line; ctx.stroke(); });
+  L.mid.forEach((m, i) => link(L.root[0], m, seg(p, 0.15, 0.2), hi && hi.has('mid' + i)));
+  L.leaves.forEach((l, i) => link(L.mid[Math.floor(i / 3)], l, seg(p, 0.4, 0.2), hi && hi.has('leaf' + i)));
+  L.heap.forEach((h, i) => link(L.leaves[i], h, seg(p, 0.65, 0.2), hi && hi.has('heap' + i)));
+  lvl(L.root, 0, 0.2, C.panel2, 'root');
+  lvl(L.mid, 0.15, 0.4, C.panel2, 'mid');
+  lvl(L.leaves, 0.4, 0.65, C.panel, 'leaf');
+  lvl(L.heap, 0.65, 0.9, '#12181d', 'heap');
+}
+
+// ---------------------------------------------------------------- slides
+const slides = [];
+
+slides.push({
+  dur: 6, kicker: '', title: '', caption: '',
+  draw(lt) {
+    text('ALGOARCH  ·  SYSTEM DESIGN  ·  LECTURE 02', 160, 330, { size: 28, weight: 700, color: C.acc, alpha: seg(lt, 0.2, 0.5) });
+    const l1 = seg(lt, 0.5, 0.7), l2 = seg(lt, 0.8, 0.7);
+    text('Postgres: B-tree', 160, 470 + (1 - l1) * 40, { size: 128, weight: 800, alpha: l1 });
+    text('Internals & Indexes', 160, 610 + (1 - l2) * 40, { size: 128, weight: 800, alpha: l2 });
+    const bar = seg(lt, 1.3, 0.8);
+    ctx.fillStyle = C.acc; ctx.fillRect(160, 650, 220 * bar, 8);
+    text('From what is on the disk to why the planner ignored your index', 160, 740, { size: 40, color: C.ink2, alpha: seg(lt, 1.8, 0.7) });
+  }
+});
+
+slides.push({
+  dur: 11, kicker: '01 · THE GROUND FLOOR', title: 'Disk reads decide everything',
+  caption: 'Scale a RAM read to one second and a random SSD read takes about 17 minutes. A database\'s whole job is avoiding random disk reads.',
+  draw(lt) {
+    const rows = [
+      { label: 'RAM read', real: '100 ns', human: '1 second', v: 2, color: C.ok },
+      { label: 'Random SSD read', real: '100 µs', human: '≈ 17 minutes', v: 5, color: C.amb },
+      { label: 'Hard-disk seek', real: '10 ms', human: '≈ 1.2 days', v: 7, color: C.bad }
+    ];
+    rows.forEach((r, i) => {
+      const k = seg(lt, 0.8 + i * 1.6, 1.0);
+      const y = 360 + i * 150;
+      text(r.label, 160, y + 44, { size: 38, weight: 600, alpha: k });
+      text(r.real, 160, y + 84, { size: 28, color: C.ink3, alpha: k, mono: true });
+      withAlpha(k, () => { rrect(560, y, (r.v / 7) * 900 * k, 70, 8, r.color); });
+      text(r.human, 560 + (r.v / 7) * 900 * k + 24, y + 48, { size: 40, weight: 700, color: r.color, alpha: k });
+    });
+    text('bar length is logarithmic: each step is 1,000× slower', 560, 810, { size: 28, color: C.ink3, alpha: seg(lt, 5.5, 0.8) });
+  }
+});
+
+slides.push({
+  dur: 11, kicker: '02 · WHY INDEXES EXIST', title: 'Finding one row among 10 million',
+  caption: '10 million rows live in 100,000 pages. A sequential scan reads every page; a B-tree reaches the row in about four reads.',
+  draw(lt) {
+    const rows = [
+      { label: 'Sequential scan', n: 100000, text: '100,000 page reads', color: C.bad },
+      { label: 'Binary search (sorted table)', n: 17, text: '≈ 17', color: C.amb },
+      { label: 'B-tree index', n: 4, text: '≈ 4', color: C.ok }
+    ];
+    rows.forEach((r, i) => {
+      const k = seg(lt, 0.8 + i * 2.2, 1.4);
+      const y = 360 + i * 150;
+      text(r.label, 160, y + 46, { size: 38, weight: 600, alpha: seg(lt, 0.6 + i * 2.2, 0.6) });
+      const wpx = Math.max(8, (r.n / 100000) * 1000) * k;
+      withAlpha(seg(lt, 0.8 + i * 2.2, 0.3), () => rrect(700, y, wpx, 70, 8, r.color));
+      text(r.text, 700 + wpx + 24, y + 48, { size: 40, weight: 700, color: r.color, alpha: k });
+    });
+    text('Linear scale: the index bars are slivers. That is the point.', 700, 830, { size: 28, color: C.ink3, alpha: seg(lt, 7.5, 0.8) });
+  }
+});
+
+slides.push({
+  dur: 13, kicker: '03 · B-TREE INTERNALS', title: 'A directory of directories',
+  caption: 'Sorted (key, ctid) pairs are chopped into 8 KB pages. A directory of those pages is built, then a directory of the directory, until one page remains: the root.',
+  draw(lt) {
+    const L = treeLayout(300, 380, 1320);
+    const p = seg(lt, 0.4, 4.6);
+    const q = clamp((lt - 6.5) / 4.5);
+    const hi = new Set();
+    if (q > 0) hi.add('root0');
+    if (q > 0.25) { hi.add('mid1'); }
+    if (q > 0.5) { hi.add('leaf4'); }
+    if (q > 0.75) { hi.add('heap4'); }
+    drawTree(L, p, hi);
+    const names = [['root', L.root[0].y], ['internal pages', L.mid[0].y], ['leaf pages', L.leaves[0].y], ['heap (the table)', L.heap[0].y]];
+    names.forEach(([n, y], i) => text(n, 100, y + 8, { size: 26, color: C.ink3, alpha: seg(lt, 1 + i * 1.1, 0.6) }));
+    text('separator keys + child page numbers', 1700, L.mid[0].y + 8, { size: 26, color: C.ink3, align: 'right', alpha: seg(lt, 3.5, 0.6) });
+    text('key → ctid', 1760, L.leaves[0].y - 52, { size: 26, color: C.ink3, align: 'right', alpha: seg(lt, 4.2, 0.6) });
+    // descending dot
+    if (q > 0 && q < 1) {
+      const pts = [L.root[0], L.mid[1], L.leaves[4], L.heap[4]];
+      const f = q * 3, i = Math.min(2, Math.floor(f)), t = f - i;
+      const x = pts[i].x + (pts[i + 1].x - pts[i].x) * t, y = pts[i].y + (pts[i + 1].y - pts[i].y) * t;
+      ctx.beginPath(); ctx.arc(x, y, 12, 0, 7); ctx.fillStyle = C.acc; ctx.fill();
+    }
+    text('Each hop is one page read: 3 hops down, then the heap fetch', 960, 305, { size: 32, weight: 600, align: 'center', color: C.acc, alpha: seg(lt, 6.5, 0.6) });
+  }
+});
+
+slides.push({
+  dur: 13, kicker: '04 · COMPOSITE INDEXES', title: 'The leftmost prefix rule',
+  caption: 'An index on (a, b) sorts by a, then breaks ties with b. A query that skips the first column cannot use that order, so it cannot skip anything.',
+  draw(lt) {
+    const groups = [[10, 20, 30], [5, 25, 40], [5, 15, 99]];
+    const cw = 150, gap = 18, ggap = 56, x0 = (W - (9 * cw + 6 * gap + 2 * ggap)) / 2, y = 470;
+    text('index on (a, b)', 960, 380, { size: 30, color: C.ink3, align: 'center', mono: true, alpha: seg(lt, 0.4, 0.6) });
+    const phase1 = lt > 2.2 && lt < 7.6, phase2 = lt >= 7.6;
+    let ci = 0;
+    groups.forEach((g, gi) => {
+      g.forEach((b, bi) => {
+        const x = x0 + ci * (cw + gap) + gi * ggap;
+        const k = seg(lt, 0.6 + ci * 0.12, 0.5);
+        let fill = C.panel2, stroke = C.line, a = 1;
+        if (phase1) { const hit = gi === 1 && b > 20; fill = hit ? '#14352a' : C.panel2; stroke = hit ? C.ok : C.line; a = gi === 1 ? 1 : 0.28; }
+        if (phase2) {
+          const sweep = clamp((lt - 8.0) / 3.6) * 9 > ci;
+          const hit = b === 5;
+          fill = sweep ? (hit ? '#3a2a10' : '#33181a') : C.panel2; stroke = sweep ? (hit ? C.amb : C.bad) : C.line;
+        }
+        withAlpha(k * a, () => { rrect(x, y + (1 - k) * 20, cw, 76, 10, fill, stroke, 3); text(`(${gi + 1}, ${b})`, x + cw / 2, y + (1 - k) * 20 + 50, { size: 34, align: 'center', mono: true }); });
+        ci++;
+      });
+    });
+    if (phase1) {
+      text('WHERE a = 2 AND b > 20', 960, 700, { size: 46, weight: 700, align: 'center', mono: true, alpha: seg(lt, 2.4, 0.5) });
+      text('seek straight to a = 2, read only the answers', 960, 770, { size: 34, color: C.ok, align: 'center', alpha: seg(lt, 3.6, 0.6) });
+    }
+    if (phase2) {
+      text('WHERE b = 5', 960, 700, { size: 46, weight: 700, align: 'center', mono: true, alpha: seg(lt, 7.8, 0.5) });
+      text('b alone is not sorted: every entry must be visited', 960, 770, { size: 34, color: C.bad, align: 'center', alpha: seg(lt, 9.2, 0.6) });
+    }
+  }
+});
+
+slides.push({
+  dur: 10, kicker: '05 · COLUMN ORDER', title: 'Equality first, range last',
+  caption: 'Once a seek lands on a range, later columns cannot be used for seeking. Put equality columns first and the range column after them.',
+  draw(lt) {
+    text("WHERE tenant_id = 42 AND created_at > now() - interval '7 days'", 960, 360, { size: 34, align: 'center', mono: true, color: C.ink2, alpha: seg(lt, 0.3, 0.6) });
+    const cells = 36, cw = 44, gap = 8, x0 = (W - (cells * (cw + gap) - gap)) / 2;
+    const strip = (y, order, label, verdict, vcolor, startT) => {
+      const k = seg(lt, startT, 0.7);
+      text(label, 160, y - 28, { size: 34, weight: 700, mono: true, alpha: k });
+      for (let i = 0; i < cells; i++) {
+        const tenant = order === 'A' ? 41 + Math.floor(i / 12) : 41 + (i % 3);
+        const inWin = order === 'A' ? (i >= 18 && i < 24) : i >= 21;
+        const answer = inWin && tenant === 42;
+        const read = inWin;
+        const lit = seg(lt, startT + 1.2, 1.2) > i / cells;
+        const fill = lit && read ? (answer ? C.ok : C.bad) : (tenant === 42 ? '#2b3a46' : C.panel2);
+        withAlpha(k, () => rrect(x0 + i * (cw + gap), y, cw, 64, 6, fill));
+      }
+      text(verdict, 160, y + 112, { size: 32, weight: 600, color: vcolor, alpha: seg(lt, startT + 2.6, 0.6) });
+    };
+    strip(470, 'A', 'index (tenant_id, created_at)', 'reads 6 entries, all 6 are answers', C.ok, 0.8);
+    strip(740, 'B', 'index (created_at, tenant_id)', 'reads 15 entries, 10 are thrown away', C.bad, 4.2);
+    text('green = answer     red = read and discarded     blue = tenant 42', 960, 886, { size: 26, color: C.ink3, align: 'center', alpha: seg(lt, 2, 0.6) });
+  }
+});
+
+slides.push({
+  dur: 11, kicker: '06 · SCAN TYPES', title: 'Four ways to read rows',
+  caption: 'The planner prices each with page-read costs and table statistics. That is why the "smart" index plan can lose once about a quarter of the rows match.',
+  draw(lt) {
+    const cards = [
+      ['Seq Scan', 'Read every page in order. Fine when most rows match.', C.cool],
+      ['Index Scan', 'Follow each ctid. Rows come out sorted, but each fetch is a random read.', C.amb],
+      ['Bitmap Heap Scan', 'Flag the matching pages, then read them in physical order.', C.acc],
+      ['Index Only Scan', 'Answer from the index alone. No heap fetch at all.', C.ok]
+    ];
+    const cw = 400, gap = 36, x0 = (W - (4 * cw + 3 * gap)) / 2;
+    cards.forEach(([t, d, col], i) => {
+      const k = seg(lt, 0.6 + i * 1.3, 0.8);
+      const x = x0 + i * (cw + gap), y = 330 + (1 - k) * 30;
+      withAlpha(k, () => {
+        rrect(x, y, cw, 440, 14, C.panel, C.line);
+        ctx.fillStyle = col; ctx.fillRect(x, y, cw, 10);
+        text(t, x + 32, y + 90, { size: 40, weight: 700 });
+        wrap(d, cw - 64, `400 32px ${SANS}`).forEach((ln, j) => text(ln, x + 32, y + 160 + j * 46, { size: 32, color: C.ink2 }));
+      });
+    });
+  }
+});
+
+slides.push({
+  dur: 11, kicker: '07 · WHAT INDEXES COST', title: 'Every index taxes every write',
+  caption: 'One UPDATE touches the heap and every index on the table. A partial index keeps only the rows you query: 20,000 pending jobs, not 500 million.',
+  draw(lt) {
+    text('One small UPDATE, five indexes', 160, 340, { size: 36, weight: 700, alpha: seg(lt, 0.3, 0.6) });
+    for (let i = 0; i < 5; i++) {
+      const k = seg(lt, 0.8 + i * 0.5, 0.5);
+      const lit = seg(lt, 3.6 + i * 0.45, 0.3);
+      withAlpha(k, () => { rrect(160 + i * 160, 400, 140, 80, 10, lit > 0.5 ? '#3a2a10' : C.panel2, lit > 0.5 ? C.amb : C.line, 3); text('idx ' + (i + 1), 230 + i * 160, 450, { size: 30, align: 'center', mono: true }); });
+    }
+    withAlpha(seg(lt, 0.6, 0.6), () => { rrect(160, 520, 780, 80, 10, C.panel2, C.line, 3); text('heap: new row version, new ctid', 550, 572, { size: 30, align: 'center', mono: true }); });
+    text('= 6 writes for one change', 160, 680, { size: 40, weight: 700, color: C.amb, alpha: seg(lt, 6, 0.6) });
+    // partial index
+    const x = 1060;
+    text('Partial index', x, 340, { size: 36, weight: 700, alpha: seg(lt, 6.5, 0.6) });
+    text("CREATE INDEX ON jobs (created_at)", x, 410, { size: 28, mono: true, color: C.ink2, alpha: seg(lt, 6.8, 0.6) });
+    text("WHERE status = 'pending';", x, 450, { size: 28, mono: true, color: C.ink2, alpha: seg(lt, 6.8, 0.6) });
+    const k = seg(lt, 7.4, 1.0), k2 = seg(lt, 8.4, 0.8);
+    text('full index on status', x, 540, { size: 26, color: C.ink3, alpha: k });
+    withAlpha(k, () => rrect(x, 556, 700 * k, 50, 6, C.bad));
+    text('500,000,000 entries', x, 650, { size: 30, weight: 700, color: C.bad, alpha: k });
+    text('partial index', x, 720, { size: 26, color: C.ink3, alpha: k2 });
+    withAlpha(k2, () => rrect(x, 736, 8, 50, 3, C.ok));
+    text('20,000 entries', x + 24, 774, { size: 30, weight: 700, color: C.ok, alpha: k2 });
+  }
+});
+
+slides.push({
+  dur: 11, kicker: '08 · ANTI-PATTERNS', title: 'Indexes that silently stop working',
+  caption: 'The index exists and the query looks like it should use it, but wrapping the column or leading with a wildcard removes the sort order the seek depends on.',
+  draw(lt) {
+    const rows = [
+      ["WHERE lower(email) = 'a@b.com'", 'index on lower(email)'],
+      ["WHERE created_at::date = '2026-08-07'", 'compare created_at to a date range'],
+      ["WHERE name LIKE '%smith%'", 'needs a trigram index, not a B-tree'],
+      ['WHERE b = 5   -- index is (a, b)', 'lead with b, or add an index on (b)']
+    ];
+    text('predicate', 160, 340, { size: 26, color: C.ink3, alpha: seg(lt, 0.3, 0.5) });
+    text('can it seek?', 960, 340, { size: 26, color: C.ink3, alpha: seg(lt, 0.3, 0.5) });
+    text('fix', 1180, 340, { size: 26, color: C.ink3, alpha: seg(lt, 0.3, 0.5) });
+    rows.forEach(([q, fix], i) => {
+      const k = seg(lt, 0.8 + i * 2.2, 0.6), f = seg(lt, 1.8 + i * 2.2, 0.6);
+      const y = 400 + i * 120;
+      withAlpha(k, () => { rrect(140, y, 1640, 92, 12, C.panel, C.line); text(q, 170, y + 58, { size: 32, mono: true }); });
+      withAlpha(f, () => { rrect(960, y + 22, 120, 48, 24, '#3a1618', C.bad); text('no', 1020, y + 58, { size: 28, weight: 700, color: C.bad, align: 'center' }); text(fix, 1180, y + 58, { size: 30, color: C.ok }); });
+    });
+  }
+});
+
+slides.push({
+  dur: 7, kicker: '', title: '', caption: '',
+  draw(lt) {
+    text('Verify every claim', 960, 400, { size: 96, weight: 800, align: 'center', alpha: seg(lt, 0.3, 0.7) });
+    text('EXPLAIN (ANALYZE, BUFFERS)', 960, 530, { size: 56, mono: true, color: C.acc, align: 'center', alpha: seg(lt, 1.0, 0.7) });
+    text('The full lesson has 12 interactive benches: sliders for selectivity, fanout and column order.', 960, 680, { size: 36, color: C.ink2, align: 'center', alpha: seg(lt, 1.8, 0.7) });
+    text('AlgoArch  ·  System design  ·  Postgres I: Indexes & Scans', 960, 800, { size: 34, weight: 700, align: 'center', alpha: seg(lt, 2.6, 0.7) });
+  }
+});
+
+// ---------------------------------------------------------------- frame composition
+const total = slides.reduce((s, x) => s + x.dur, 0);
+const starts = []; slides.reduce((acc, s) => { starts.push(acc); return acc + s.dur; }, 0);
+
+function drawFrame(t) {
+  let si = slides.length - 1;
+  for (let i = 0; i < slides.length; i++) if (t < starts[i] + slides[i].dur) { si = i; break; }
+  const s = slides[si], lt = t - starts[si];
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
+  const fade = Math.min(1, lt / 0.35, (s.dur - lt) / 0.35);
+  ctx.save();
+  ctx.globalAlpha = clamp(fade);
+  if (s.kicker) {
+    text(s.kicker, 160, 150, { size: 26, weight: 700, color: C.acc });
+    text(s.title, 160, 235, { size: 72, weight: 800 });
+  }
+  s.draw(lt);
+  if (s.caption) {
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(0, 900, W, 180);
+    wrap(s.caption, 1500, `500 36px ${SANS}`).forEach((ln, i) => text(ln, 960, 965 + i * 52, { size: 36, align: 'center', color: C.ink, weight: 500 }));
+  }
+  ctx.restore();
+  // progress bar
+  ctx.fillStyle = C.acc; ctx.fillRect(0, H - 6, (t / total) * W, 6);
+}
+
+window.renderVideo = async function (opts = {}) {
+  const status = document.getElementById('status');
+  const frames = Math.round(total * FPS);
+  const muxer = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), video: { codec: 'avc', width: W, height: H }, fastStart: 'in-memory' });
+  const enc = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: (e) => { window.__err = String(e); } });
+  enc.configure({ codec: 'avc1.640028', width: W, height: H, bitrate: opts.bitrate || 3_000_000, framerate: FPS, bitrateMode: 'variable' });
+  for (let f = 0; f < frames; f++) {
+    drawFrame(f / FPS);
+    const vf = new VideoFrame(cv, { timestamp: Math.round((f * 1e6) / FPS), duration: Math.round(1e6 / FPS) });
+    enc.encode(vf, { keyFrame: f % 90 === 0 });
+    vf.close();
+    while (enc.encodeQueueSize > 8) await new Promise(r => enc.addEventListener('dequeue', r, { once: true }));
+    if (f % 60 === 0) status.textContent = `frame ${f}/${frames}`;
+  }
+  await enc.flush();
+  muxer.finalize();
+  const buf = muxer.target.buffer;
+  status.textContent = 'encoded ' + buf.byteLength + ' bytes';
+  return buf;
+};
+window.previewFrame = (t) => drawFrame(t);
+window.videoInfo = { total, frames: Math.round(total * FPS), slides: slides.length };
+drawFrame(0);
+</script>

@@ -7,7 +7,7 @@
 .rd-doc h1, .rd-title { font-size: var(--text-h1); margin-bottom: var(--s-sm); }
 .rd-lede { font-size: 1.25rem; line-height: 1.5; color: var(--ink-2); max-width: 62ch; margin: 0 0 var(--s-lg); }
 .rd-section { padding-top: var(--s-xl); scroll-margin-top: calc(var(--nav-h) + var(--s-md)); }
-.rd-section > :not(.rd-section-head):not(.rd-callout):not(.rd-card):not(.rd-code):not(.rd-table):not(.rd-widget):not(.rd-fwbox):not(.rd-qa):not(.rd-say) { max-width: 68ch; }
+.rd-section > :not(.rd-section-head):not(.rd-callout):not(.rd-card):not(.rd-code):not(.rd-table):not(.rd-widget):not(.rd-fwbox):not(.rd-dg):not(.rd-qa):not(.rd-say) { max-width: 68ch; }
 .rd-section-head { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: var(--s-xs); padding-top: var(--s-md); margin-bottom: var(--s-md); border-top: 1px solid var(--line); }
 .rd-section-num { font-size: var(--text-small); color: var(--ink-3); padding-top: 6px; font-variant-numeric: tabular-nums; }
 .rd-section h2 { font-size: var(--text-h2); }
@@ -195,3 +195,30 @@
 .rd-fw-ctl input[type="range"] { width: 140px; accent-color: var(--accent); }
 .rd-fw-ctl output { min-width: 3ch; font-variant-numeric: tabular-nums; color: var(--ink-2); }
 .rd-fw-ctl select { padding: var(--s-3xs) var(--s-xs); border: 1px solid var(--line-strong); border-radius: var(--r-inner); background: var(--paper); color: var(--ink); font: inherit; }
+
+/* lesson diagrams */
+.rd-dg { --dg-neutral: var(--ink); --dg-accent: var(--accent); --dg-ok: #216B4E; --dg-bad: var(--danger); --dg-cool: #1F5C86; --dg-warn: #A9700A; --dg-violet: #5B3E86;
+  margin: var(--s-lg) 0; padding: var(--s-md); border: 1px solid var(--line); border-radius: var(--r-outer); background: var(--paper); max-width: 100%; }
+:root[data-theme="dark"] .rd-dg { --dg-ok: #4FB98A; --dg-cool: #5EA6D6; --dg-warn: #DFA53A; --dg-violet: #A98BD6; }
+.rd-dg svg { display: block; width: 100%; height: auto; max-height: 70vh; }
+.rd-dg path { stroke-linecap: round; stroke-linejoin: round; }
+.rd-dg .dg-shape path, .rd-dg .dg-line path { stroke: var(--dg-c, var(--ink)); stroke-width: 2.2; }
+.rd-dg .dg-shape .dg-fill { fill: color-mix(in oklab, var(--dg-c, var(--ink)) 20%, transparent); }
+.rd-dg .dg-neutral { --dg-c: var(--dg-neutral); } .rd-dg .dg-accent { --dg-c: var(--dg-accent); } .rd-dg .dg-ok { --dg-c: var(--dg-ok); }
+.rd-dg .dg-bad { --dg-c: var(--dg-bad); } .rd-dg .dg-cool { --dg-c: var(--dg-cool); } .rd-dg .dg-warn { --dg-c: var(--dg-warn); } .rd-dg .dg-violet { --dg-c: var(--dg-violet); }
+.rd-dg .dashed path { stroke-dasharray: 8 7; }
+.rd-dg .faint { opacity: 0.45; }
+.rd-dg text { fill: var(--ink); font-family: var(--font-sans); font-weight: 500; }
+.rd-dg .dg-text text { fill: var(--dg-c, var(--ink)); }
+.rd-dg .dg-arrow-label text { paint-order: stroke; stroke: var(--paper); stroke-width: 5px; fill: var(--ink-2); }
+.rd-dg .dg-el { transition: opacity 0.35s ease; }
+.rd-dg .dg-el.hidden { opacity: 0; pointer-events: none; }
+.rd-dg .dg-el.dim { opacity: 0.5; }
+.rd-dg .dg-el.now .dg-shape path, .rd-dg .dg-el.now .dg-line path { stroke-dasharray: none; }
+.rd-dg figcaption { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-xs) var(--s-md); margin-top: var(--s-sm); font-size: var(--text-small); color: var(--ink-2); }
+.rd-dg-cap { display: grid; gap: var(--s-3xs); }
+.rd-dg-cap strong { color: var(--ink); }
+.rd-dg-steps { display: inline-flex; align-items: center; gap: var(--s-xs); }
+.rd-dg-count { font-variant-numeric: tabular-nums; color: var(--ink-3); }
+.rd-dg-step { flex-basis: 100%; margin: 0 !important; padding: var(--s-xs) var(--s-sm); background: var(--well); border-radius: var(--r-inner); color: var(--ink); }
+@media (prefers-reduced-motion: reduce) { .rd-dg .dg-el { transition: none; } }

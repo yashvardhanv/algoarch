@@ -147,3 +147,10 @@ Run tests with `npm test`.
 
 ## 📜 License
 MIT License. Created by Yashvardhan Vyas.
+
+### Lesson diagrams
+Diagrams are data, not images. A diagram is a small scene (shapes, text and arrows with semantic tones such as `cool`, `ok`, `warn`, and an optional step number) stored in the `lesson_diagrams` table and spliced into the lesson at a chosen section and block. The reader draws it itself in a hand-drawn style that follows the light/dark theme, with an optional "Walk through" that reveals it one step at a time. The AI mentor also sees each diagram's labels.
+
+- Author with Excalidraw (the Excalidraw MCP draws the elements) and save the elements plus metadata in `content/diagrams/<slug>.json`.
+- `npm run diagrams:sync` converts them (`tools/content/excalidraw.js`) and upserts by slug. Re-importing lessons never removes them.
+- Admins can also POST to `/api/admin/diagrams` (`lessonId`, `sectionAnchor`, `afterBlock`, `title`, `caption`, `scene`).

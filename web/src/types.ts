@@ -5,6 +5,8 @@ export type Inline =
   | { t: 'link'; href: string; c: Inline[] }
   | { t: 'strong' | 'em' | 'code' | 'kbd' | 'quote' | 'phrase' | 'sub' | 'sup'; c: Inline[] };
 
+import type { DiagramScene } from './Diagram';
+
 export interface ListItem { content: Inline[]; children: ListBlock[] }
 export interface ListBlock { type: 'list'; ordered: boolean; items: ListItem[] }
 
@@ -19,6 +21,7 @@ export type Block =
   | { type: 'quote'; content: Inline[] }
   | { type: 'card'; tone: 'neutral' | 'positive' | 'negative'; title: string | null; blocks: Block[] }
   | { type: 'qa'; summary: Inline[]; blocks: Block[] }
+  | { type: 'diagram'; id: number; title: string | null; caption: string | null; scene: DiagramScene }
   | { type: 'code_cell'; title: string; badge?: string | null; language: string; starter: string; tests?: string }
   | { type: 'widget'; kind: string; title: string | null; description: string | null; blocks: Block[]; ported: boolean; data?: any; archetype?: string; inputs?: { ranges: number; selects: number; buttons: number; texts: number } | null };
 

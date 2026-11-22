@@ -266,3 +266,20 @@ test('ported widgets carry their data: traces, checklists and the scorecard', as
   assert.equal(ds18.data.target, 21);
   assert.deepEqual(ds18.data.criticalAxes, [4, 5]);
 });
+
+test('diagram admin API: admins can add one, it shows up in the lesson, others get 403', async () => {
+  const scene = { v: 1, width: 300, height: 200, elements: [{ id: 'a', k: 'box', x: 20, y: 20, w: 120, h: 60, label: 'Hello', tone: 'cool', fill: true }] };
+  const user = await login('diagram-user@example.com');
+  const denied = await request('POST', '/api/admin/diagrams', { token: user, body: { lessonId: 'sy02', sectionAnchor: 's4', scene } });
+  assert.equal(denied.status, 403);
+  const admin = await login('yashji2117@gmail.com');
+  const bad = await request('POST', '/api/admin/diagrams', { token: admin, body: { lessonId: 'sy02', sectionAnchor: 's4', scene: { v: 1, width: 5, height: 5, elements: [{ id: 'x', k: 'iframe', x: 0, y: 0 }] } } });
+  assert.equal(bad.status, 400);
+  const ok = await request('POST', '/api/admin/diagrams', { token: admin, body: { slug: 'test-dg', lessonId: 'sy02', sectionAnchor: 's4', afterBlock: 0, title: 'Test diagram', scene } });
+  assert.equal(ok.status, 200);
+  const lesson = await request('GET', '/api/lessons/sy02', { token: user });
+  const s4 = lesson.json.document.sections.find(s => s.anchor === 's4');
+  assert.equal(s4.blocks[1].type, 'diagram');
+  assert.equal(s4.blocks[1].title, 'Test diagram');
+  await request('POST', '/api/admin/diagrams/delete', { token: admin, body: { id: ok.json.id } });
+});

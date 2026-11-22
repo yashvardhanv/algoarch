@@ -1,0 +1,214 @@
+{
+ "slug": "sy02-heap-vs-clustered",
+ "lessonId": "sy02",
+ "sectionAnchor": "s3",
+ "afterBlock": 5,
+ "title": "Where does the row live?",
+ "caption": "Two engines, two different paths from an index entry to the row.",
+ "steps": [
+  "Postgres: the index entry holds a ctid, a direct address into the heap.",
+  "InnoDB: the secondary index holds the primary key, so a second tree is searched.",
+  "The takeaway: in Postgres every index is secondary and points at a ctid."
+ ],
+ "elements": [
+  {
+   "type": "text",
+   "id": "t1",
+   "x": 40,
+   "y": 30,
+   "text": "PostgreSQL: heap-organized",
+   "fontSize": 20,
+   "strokeColor": "#1e1e1e",
+   "step": 1
+  },
+  {
+   "type": "rectangle",
+   "id": "b2",
+   "x": 40,
+   "y": 70,
+   "width": 230,
+   "height": 84,
+   "roundness": {
+    "type": 3
+   },
+   "strokeColor": "#4a9eed",
+   "backgroundColor": "#a5d8ff",
+   "fillStyle": "solid",
+   "strokeStyle": "solid",
+   "opacity": 100,
+   "label": {
+    "text": "Secondary index\n(key, ctid)",
+    "fontSize": 18
+   },
+   "step": 1
+  },
+  {
+   "type": "arrow",
+   "id": "a3",
+   "x": 270,
+   "y": 112,
+   "width": 180,
+   "height": 0,
+   "points": [
+    [
+     0,
+     0
+    ],
+    [
+     180,
+     0
+    ]
+   ],
+   "strokeColor": "#1e1e1e",
+   "strokeWidth": 2,
+   "strokeStyle": "solid",
+   "endArrowhead": "arrow",
+   "label": {
+    "text": "follow the ctid",
+    "fontSize": 16
+   },
+   "step": 1
+  },
+  {
+   "type": "rectangle",
+   "id": "b4",
+   "x": 450,
+   "y": 70,
+   "width": 230,
+   "height": 84,
+   "roundness": {
+    "type": 3
+   },
+   "strokeColor": "#f59e0b",
+   "backgroundColor": "#ffd8a8",
+   "fillStyle": "solid",
+   "strokeStyle": "solid",
+   "opacity": 100,
+   "label": {
+    "text": "Heap page\n(the whole row)",
+    "fontSize": 18
+   },
+   "step": 1
+  },
+  {
+   "type": "text",
+   "id": "t5",
+   "x": 720,
+   "y": 100,
+   "text": "1 index descent\n+ 1 heap fetch",
+   "fontSize": 18,
+   "strokeColor": "#22c55e",
+   "step": 1
+  },
+  {
+   "type": "text",
+   "id": "t6",
+   "x": 40,
+   "y": 220,
+   "text": "MySQL InnoDB: clustered",
+   "fontSize": 20,
+   "strokeColor": "#1e1e1e",
+   "step": 2
+  },
+  {
+   "type": "rectangle",
+   "id": "b7",
+   "x": 40,
+   "y": 260,
+   "width": 230,
+   "height": 84,
+   "roundness": {
+    "type": 3
+   },
+   "strokeColor": "#4a9eed",
+   "backgroundColor": "#a5d8ff",
+   "fillStyle": "solid",
+   "strokeStyle": "solid",
+   "opacity": 100,
+   "label": {
+    "text": "Secondary index\n(key, primary key)",
+    "fontSize": 18
+   },
+   "step": 2
+  },
+  {
+   "type": "arrow",
+   "id": "a8",
+   "x": 270,
+   "y": 302,
+   "width": 180,
+   "height": 0,
+   "points": [
+    [
+     0,
+     0
+    ],
+    [
+     180,
+     0
+    ]
+   ],
+   "strokeColor": "#1e1e1e",
+   "strokeWidth": 2,
+   "strokeStyle": "solid",
+   "endArrowhead": "arrow",
+   "label": {
+    "text": "search by PK",
+    "fontSize": 16
+   },
+   "step": 2
+  },
+  {
+   "type": "rectangle",
+   "id": "b9",
+   "x": 450,
+   "y": 260,
+   "width": 230,
+   "height": 84,
+   "roundness": {
+    "type": 3
+   },
+   "strokeColor": "#8b5cf6",
+   "backgroundColor": "#d0bfff",
+   "fillStyle": "solid",
+   "strokeStyle": "solid",
+   "opacity": 100,
+   "label": {
+    "text": "Primary-key B-tree\n(rows in the leaves)",
+    "fontSize": 18
+   },
+   "step": 2
+  },
+  {
+   "type": "text",
+   "id": "t10",
+   "x": 720,
+   "y": 290,
+   "text": "2 tree descents\nto reach the row",
+   "fontSize": 18,
+   "strokeColor": "#f59e0b",
+   "step": 2
+  },
+  {
+   "type": "rectangle",
+   "id": "b11",
+   "x": 40,
+   "y": 400,
+   "width": 640,
+   "height": 70,
+   "roundness": {
+    "type": 3
+   },
+   "strokeColor": "#f0793f",
+   "backgroundColor": "transparent",
+   "fillStyle": "solid",
+   "strokeStyle": "dashed",
+   "opacity": 100,
+   "label": {
+    "text": "Postgres: every index points at a physical address. InnoDB: the table IS the primary-key index.",
+    "fontSize": 18
+   },
+   "step": 3
+  }
+ ]
+}

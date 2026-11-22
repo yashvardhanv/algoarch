@@ -64,8 +64,43 @@ const MIGRATIONS = [
       INSERT INTO admin_emails (email, added_by, created_at)
         VALUES ('yashji2117@gmail.com', 'seed', datetime('now'));
     `
+  },
+  {
+    // Diagrams are authored separately from lesson documents so re-importing a lesson never drops them.
+    // No foreign key on purpose: the importer rebuilds tracks and lessons.
+    id: 3,
+    sql: `
+      CREATE TABLE lesson_diagrams (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        slug TEXT UNIQUE,
+        lesson_id TEXT NOT NULL,
+        section_anchor TEXT NOT NULL,
+        after_block INTEGER,
+        position INTEGER NOT NULL DEFAULT 0,
+        title TEXT,
+        caption TEXT,
+        scene TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_diagrams_lesson ON lesson_diagrams(lesson_id);
+    `
   }
 ];
+
+// Scenes are plain data (see web/src/Diagram.tsx for how they are drawn). Validate before storing.
+const TONES = new Set(['neutral', 'accent', 'ok', 'bad', 'cool', 'warn', 'violet']);
+const KINDS = new Set(['box', 'ellipse', 'diamond', 'text', 'arrow', 'line']);
+function validateScene(scene) {
+  if (!scene || scene.v !== 1 || !Array.isArray(scene.elements)) throw new Error('Scene must be {v:1, elements:[...]}');
+  if (!(scene.width > 0 && scene.height > 0 && scene.width < 5000 && scene.height < 5000)) throw new Error('Scene needs a width and height');
+  if (scene.elements.length > 300) throw new Error('Scene has too many elements');
+  for (const e of scene.elements) {
+    if (!KINDS.has(e.k)) throw new Error('Unknown element kind: ' + e.k);
+    if (e.tone && !TONES.has(e.tone)) throw new Error('Unknown tone: ' + e.tone);
+    if ((e.k === 'arrow' || e.k === 'line') ? !Array.isArray(e.pts) || e.pts.length < 2 : !Number.isFinite(e.x) || !Number.isFinite(e.y)) throw new Error('Element ' + (e.id || e.k) + ' has bad geometry');
+  }
+  return true;
+}
 
 function migrate(db) {
   db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (id INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)');
@@ -97,6 +132,22 @@ function lessonRow(r) {
     tags: parseJson(r.tags, []), companies: parseJson(r.companies, []), isNew: !!r.is_new,
     lab: r.lab_file || undefined, hasDocument: !!r.has_document
   };
+}
+
+// Splice stored diagrams into the lesson document as ordinary blocks.
+function withDiagrams(document, rows) {
+  if (!rows.length || !document.sections) return document;
+  const sections = document.sections.map(s => ({ ...s, blocks: [...s.blocks] }));
+  // insert from the back so earlier insertion points keep their meaning
+  for (const d of [...rows].reverse()) {
+    const s = sections.find(x => x.anchor === d.section_anchor);
+    if (!s) continue;
+    const block = { type: 'diagram', id: d.id, title: d.title || null, caption: d.caption || null, scene: parseJson(d.scene, null) };
+    if (!block.scene) continue;
+    const at = d.after_block == null ? s.blocks.length : Math.min(s.blocks.length, d.after_block + 1);
+    s.blocks.splice(at, 0, block);
+  }
+  return { ...document, sections };
 }
 
 function createRepo(db) {
@@ -141,11 +192,13 @@ function createRepo(db) {
       const lab = q.lab.get(id);
       const order = q.neighbours.all();
       const i = order.findIndex(x => x.id === id);
+      let document = doc ? { schemaVersion: doc.schema_version, ...parseJson(doc.document, {}) } : null;
+      if (document) document = withDiagrams(document, db.prepare('SELECT * FROM lesson_diagrams WHERE lesson_id = ? ORDER BY position, id').all(id));
       return {
         lesson: lessonRow(r),
         track,
         guide: guide ? guide.markdown : '',
-        document: doc ? { schemaVersion: doc.schema_version, ...parseJson(doc.document, {}) } : null,
+        document,
         lab: lab ? { fileName: lab.file_name, code: lab.code } : null,
         videos: q.videosByLesson.all(id).map(videoRow),
         articles: q.resources.all(r.track_id, 'article').map(x => parseJson(x.data, {})),
@@ -161,7 +214,9 @@ function createRepo(db) {
       if (!r) return null;
       const guide = q.guide.get(id);
       const doc = q.document.get(id);
-      const text = lessonToText({ title: r.title, document: doc ? parseJson(doc.document, null) : null, guide: guide ? guide.markdown : '' });
+      let text = lessonToText({ title: r.title, document: doc ? parseJson(doc.document, null) : null, guide: guide ? guide.markdown : '' });
+      const dg = this.getDiagramsText(id);
+      if (dg.length) text += '\n\n' + dg.join('\n');
       return { title: r.title, trackId: r.track_id, text };
     },
     getAdminLesson(id) {
@@ -197,6 +252,35 @@ function createRepo(db) {
       return { success: true, id, message: `Lesson ${id} published successfully.` };
     },
 
+    // ---- diagrams
+    listDiagrams(lessonId) {
+      return db.prepare('SELECT id, slug, lesson_id AS lessonId, section_anchor AS sectionAnchor, after_block AS afterBlock, position, title, caption, updated_at AS updatedAt FROM lesson_diagrams WHERE lesson_id = ? ORDER BY position, id').all(lessonId);
+    },
+    saveDiagram({ id, slug = null, lessonId, sectionAnchor, afterBlock = null, position = 0, title = null, caption = null, scene }) {
+      if (!id && slug) { const ex = db.prepare('SELECT id FROM lesson_diagrams WHERE slug = ?').get(slug); if (ex) id = ex.id; }
+      if (!db.prepare('SELECT 1 FROM lessons WHERE id = ?').get(lessonId)) throw new Error('Unknown lesson: ' + lessonId);
+      if (!sectionAnchor) throw new Error('sectionAnchor is required');
+      validateScene(scene);
+      const now = new Date().toISOString();
+      if (id) {
+        const r = db.prepare('UPDATE lesson_diagrams SET slug=COALESCE(?, slug), lesson_id=?, section_anchor=?, after_block=?, position=?, title=?, caption=?, scene=?, updated_at=? WHERE id=?')
+          .run(slug, lessonId, sectionAnchor, afterBlock, position, title, caption, JSON.stringify(scene), now, id);
+        if (!r.changes) throw new Error('Diagram not found');
+        return { id };
+      }
+      const r = db.prepare('INSERT INTO lesson_diagrams (slug, lesson_id, section_anchor, after_block, position, title, caption, scene, updated_at) VALUES (?,?,?,?,?,?,?,?,?)')
+        .run(slug, lessonId, sectionAnchor, afterBlock, position, title, caption, JSON.stringify(scene), now);
+      return { id: Number(r.lastInsertRowid) };
+    },
+    deleteDiagram(id) { return db.prepare('DELETE FROM lesson_diagrams WHERE id = ?').run(id).changes > 0; },
+    getDiagramsText(lessonId) {
+      return db.prepare('SELECT title, caption, scene FROM lesson_diagrams WHERE lesson_id = ?').all(lessonId).map(d => {
+        const sc = parseJson(d.scene, null) || { elements: [] };
+        const labels = sc.elements.map(e => e.label || (e.k === 'text' ? e.text : '')).filter(Boolean).join('; ');
+        return `Diagram: ${d.title || ''}. ${d.caption || ''} Labels: ${labels}`.trim();
+      });
+    },
+
     // ---- admin emails: only a verified sign-in with one of these addresses is an admin
     isAdminEmail(email) {
       if (!email) return false;
@@ -222,4 +306,4 @@ function createRepo(db) {
   };
 }
 
-module.exports = { openDb, createRepo, MIGRATIONS };
+module.exports = { openDb, createRepo, MIGRATIONS, validateScene };

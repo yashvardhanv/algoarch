@@ -1,0 +1,385 @@
+{
+ "slug": "sy02-leftmost-prefix",
+ "lessonId": "sy02",
+ "sectionAnchor": "s5",
+ "afterBlock": 10,
+ "title": "Why the first column matters",
+ "caption": "The same index, two queries: one can skip, one cannot.",
+ "steps": [
+  "The layout: entries are sorted by a, and ties are broken by b.",
+  "Filtering on a first lets the index seek straight to the block.",
+  "Filtering on b alone finds matches scattered across the whole index."
+ ],
+ "elements": [
+  {
+   "type": "text",
+   "id": "t1",
+   "x": 40,
+   "y": 20,
+   "text": "index on (a, b), sorted by a, then b",
+   "fontSize": 18,
+   "strokeColor": "#1e1e1e",
+   "step": 1
+  },
+  {
+   "type": "text",
+   "id": "t2",
+   "x": 140,
+   "y": 70,
+   "text": "a = 1",
+   "fontSize": 18,
+   "strokeColor": "#757575",
+   "step": 1
+  },
+  {
+   "type": "text",
+   "id": "t3",
+   "x": 458,
+   "y": 70,
+   "text": "a = 2",
+   "fontSize": 18,
+   "strokeColor": "#757575",
+   "step": 1
+  },
+  {
+   "type": "text",
+   "id": "t4",
+   "x": 776,
+   "y": 70,
+   "text": "a = 3",
+   "fontSize": 18,
+   "strokeColor": "#757575",
+   "step": 1
+  },
+  {
+   "type": "rectangle",
+   "id": "b5",
+   "x": 40,
+   "y": 110,
+   "width": 84,
+   "height": 48,
+   "roundness": {
+    "type": 3
+   },
+   "strokeColor": "#1e1e1e",
+   "backgroundColor": "transparent",
+   "fillStyle": "solid",
+   "strokeStyle": "solid",
+   "opacity": 100,
+   "label": {
+    "text": "(1, 10)",
+    "fontSize": 16
+   },
+   "step": 1
+  },
+  {
+   "type": "rectangle",
+   "id": "b6",
+   "x": 134,
+   "y": 110,
+   "width": 84,
+   "height": 48,
+   "roundness": {
+    "type": 3
+   },
+   "strokeColor": "#1e1e1e",
+   "backgroundColor": "transparent",
+   "fillStyle": "solid",
+   "strokeStyle": "solid",
+   "opacity": 100,
+   "label": {
+    "text": "(1, 20)",
+    "fontSize": 16
+   },
+   "step": 1
+  },
+  {
+   "type": "rectangle",
+   "id": "b7",
+   "x": 228,
+   "y": 110,
+   "width": 84,
+   "height": 48,
+   "roundness": {
+    "type": 3
+   },
+   "strokeColor": "#1e1e1e",
+   "backgroundColor": "transparent",
+   "fillStyle": "solid",
+   "strokeStyle": "solid",
+   "opacity": 100,
+   "label": {
+    "text": "(1, 30)",
+    "fontSize": 16
+   },
+   "step": 1
+  },
+  {
+   "type": "rectangle",
+   "id": "b8",
+   "x": 358,
+   "y": 110,
+   "width": 84,
+   "height": 48,
+   "roundness": {
+    "type": 3
+   },
+   "strokeColor": "#1e1e1e",
+   "backgroundColor": "transparent",
+   "fillStyle": "solid",
+   "strokeStyle": "solid",
+   "opacity": 100,
+   "label": {
+    "text": "(2, 5)",
+    "fontSize": 16
+   },
+   "step": 1
+  },
+  {
+   "type": "rectangle",
+   "id": "b9",
+   "x": 452,
+   "y": 110,
+   "width": 84,
+   "height": 48,
+   "roundness": {
+    "type": 3
+   },
+   "strokeColor": "#1e1e1e",
+   "backgroundColor": "transparent",
+   "fillStyle": "solid",
+   "strokeStyle": "solid",
+   "opacity": 100,
+   "label": {
+    "text": "(2, 25)",
+    "fontSize": 16
+   },
+   "step": 1
+  },
+  {
+   "type": "rectangle",
+   "id": "b10",
+   "x": 546,
+   "y": 110,
+   "width": 84,
+   "height": 48,
+   "roundness": {
+    "type": 3
+   },
+   "strokeColor": "#1e1e1e",
+   "backgroundColor": "transparent",
+   "fillStyle": "solid",
+   "strokeStyle": "solid",
+   "opacity": 100,
+   "label": {
+    "text": "(2, 40)",
+    "fontSize": 16
+   },
+   "step": 1
+  },
+  {
+   "type": "rectangle",
+   "id": "b11",
+   "x": 676,
+   "y": 110,
+   "width": 84,
+   "height": 48,
+   "roundness": {
+    "type": 3
+   },
+   "strokeColor": "#1e1e1e",
+   "backgroundColor": "transparent",
+   "fillStyle": "solid",
+   "strokeStyle": "solid",
+   "opacity": 100,
+   "label": {
+    "text": "(3, 5)",
+    "fontSize": 16
+   },
+   "step": 1
+  },
+  {
+   "type": "rectangle",
+   "id": "b12",
+   "x": 770,
+   "y": 110,
+   "width": 84,
+   "height": 48,
+   "roundness": {
+    "type": 3
+   },
+   "strokeColor": "#1e1e1e",
+   "backgroundColor": "transparent",
+   "fillStyle": "solid",
+   "strokeStyle": "solid",
+   "opacity": 100,
+   "label": {
+    "text": "(3, 15)",
+    "fontSize": 16
+   },
+   "step": 1
+  },
+  {
+   "type": "rectangle",
+   "id": "b13",
+   "x": 864,
+   "y": 110,
+   "width": 84,
+   "height": 48,
+   "roundness": {
+    "type": 3
+   },
+   "strokeColor": "#1e1e1e",
+   "backgroundColor": "transparent",
+   "fillStyle": "solid",
+   "strokeStyle": "solid",
+   "opacity": 100,
+   "label": {
+    "text": "(3, 99)",
+    "fontSize": 16
+   },
+   "step": 1
+  },
+  {
+   "type": "rectangle",
+   "id": "b14",
+   "x": 452,
+   "y": 110,
+   "width": 84,
+   "height": 48,
+   "roundness": {
+    "type": 3
+   },
+   "strokeColor": "#22c55e",
+   "backgroundColor": "#b2f2bb",
+   "fillStyle": "solid",
+   "strokeStyle": "solid",
+   "opacity": 100,
+   "label": {
+    "text": "(2, 25)",
+    "fontSize": 16
+   },
+   "step": 2
+  },
+  {
+   "type": "rectangle",
+   "id": "b15",
+   "x": 546,
+   "y": 110,
+   "width": 84,
+   "height": 48,
+   "roundness": {
+    "type": 3
+   },
+   "strokeColor": "#22c55e",
+   "backgroundColor": "#b2f2bb",
+   "fillStyle": "solid",
+   "strokeStyle": "solid",
+   "opacity": 100,
+   "label": {
+    "text": "(2, 40)",
+    "fontSize": 16
+   },
+   "step": 2
+  },
+  {
+   "type": "text",
+   "id": "t16",
+   "x": 40,
+   "y": 200,
+   "text": "WHERE a = 2 AND b > 20",
+   "fontSize": 20,
+   "strokeColor": "#1e1e1e",
+   "step": 2
+  },
+  {
+   "type": "text",
+   "id": "t17",
+   "x": 40,
+   "y": 232,
+   "text": "Seek to a = 2, then read only the matches.",
+   "fontSize": 18,
+   "strokeColor": "#22c55e",
+   "step": 2
+  },
+  {
+   "type": "rectangle",
+   "id": "b18",
+   "x": 30,
+   "y": 100,
+   "width": 888,
+   "height": 68,
+   "roundness": {
+    "type": 3
+   },
+   "strokeColor": "#ef4444",
+   "backgroundColor": "transparent",
+   "fillStyle": "solid",
+   "strokeStyle": "dashed",
+   "opacity": 100,
+   "step": 3
+  },
+  {
+   "type": "rectangle",
+   "id": "b19",
+   "x": 358,
+   "y": 110,
+   "width": 84,
+   "height": 48,
+   "roundness": {
+    "type": 3
+   },
+   "strokeColor": "#f59e0b",
+   "backgroundColor": "#ffd8a8",
+   "fillStyle": "solid",
+   "strokeStyle": "solid",
+   "opacity": 100,
+   "label": {
+    "text": "(2, 5)",
+    "fontSize": 16
+   },
+   "step": 3
+  },
+  {
+   "type": "rectangle",
+   "id": "b20",
+   "x": 676,
+   "y": 110,
+   "width": 84,
+   "height": 48,
+   "roundness": {
+    "type": 3
+   },
+   "strokeColor": "#f59e0b",
+   "backgroundColor": "#ffd8a8",
+   "fillStyle": "solid",
+   "strokeStyle": "solid",
+   "opacity": 100,
+   "label": {
+    "text": "(3, 5)",
+    "fontSize": 16
+   },
+   "step": 3
+  },
+  {
+   "type": "text",
+   "id": "t21",
+   "x": 40,
+   "y": 290,
+   "text": "WHERE b = 5",
+   "fontSize": 20,
+   "strokeColor": "#1e1e1e",
+   "step": 3
+  },
+  {
+   "type": "text",
+   "id": "t22",
+   "x": 40,
+   "y": 322,
+   "text": "The 5s are scattered: there is no contiguous block, so every entry is visited.",
+   "fontSize": 18,
+   "strokeColor": "#ef4444",
+   "step": 3
+  }
+ ]
+}

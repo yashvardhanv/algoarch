@@ -1,16 +1,17 @@
-node_modules/
-.env
-.env.local
-*.log
-.DS_Store
-Thumbs.db
-data/.auth_secret
-data/*.db
-data/*.db-wal
-data/*.db-shm
-public/reader/
 
 # recorded widget states and local user data
+*.log
+.DS_Store
+.env
+.env.local
+Thumbs.db
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/.auth_secret
 data/capture/
-data/users.json
 data/email_dispatch_log.json
+data/users.json
+node_modules/
+public/reader/
+tools/video/out/
