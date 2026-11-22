@@ -1098,7 +1098,6 @@ function updateUserUI(user) {
   if (modalStreakEl) modalStreakEl.textContent = user.streak || 1;
   if (emailInput && user.email) emailInput.value = user.email;
 
-  updateCreditsDisplay(user.credits);
 }
 
 // --------------------------------------------------------------------------
