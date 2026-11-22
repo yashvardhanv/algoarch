@@ -730,3 +730,5 @@ body.auth-locked .auth-gate { display: grid; }
 .admin-list button:disabled { opacity: 0.4; cursor: not-allowed; }
 .admin-add { display: flex; gap: var(--s-xs); }
 .admin-add input { flex: 1; min-width: 0; }
+
+.btn-auth-provider, .btn-auth-provider:hover { color: var(--ink); text-decoration: none; }
