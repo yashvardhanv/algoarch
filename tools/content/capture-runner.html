@@ -1,0 +1,35 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>capture runner</title>
+<body style="font:14px system-ui;padding:16px">
+<pre id="log">idle</pre>
+<script src="/__driver.js"></script>
+<script>
+  window.__progress = { done: 0, total: 0, current: '', errors: [], finished: false };
+  async function runOne(rel) {
+    const frame = document.createElement('iframe');
+    frame.style.cssText = 'position:fixed;left:0;top:0;width:1100px;height:900px;border:0;opacity:0;pointer-events:none';
+    document.body.appendChild(frame);
+    await new Promise((res) => { frame.onload = res; frame.src = '/' + rel; });
+    await new Promise(r => setTimeout(r, 400));
+    const result = await window.__captureDoc(frame.contentWindow, rel);
+    frame.remove();
+    const name = rel.replace(/\//g, '__').replace(/\.html$/, '');
+    await fetch('/save?name=' + encodeURIComponent(name), { method: 'POST', body: JSON.stringify({ page: rel, panels: result }) });
+    return result.length;
+  }
+  window.__runAll = async function (only, todo) {
+    window.__skip = new Set(await (await fetch('/__begin')).json());
+    const pages = await (await fetch('/__pages?todo=' + (todo ? 1 : 0))).json();
+    const list = only ? pages.filter(p => only.some(o => p.includes(o))) : pages;
+    window.__progress.total = list.length;
+    for (const rel of list) {
+      window.__progress.current = rel;
+      try { await runOne(rel); } catch (e) { window.__progress.errors.push(rel + ': ' + e.message); }
+      window.__progress.done++;
+      document.getElementById('log').textContent = JSON.stringify(window.__progress, null, 1);
+    }
+    await fetch('/save?name=_clean', { method: 'POST', body: '1' });
+    window.__progress.finished = true;
+  };
+</script>

@@ -7,6 +7,7 @@ import { Quiz } from './Quiz';
 import { Trace } from './Trace';
 import { Checklist } from './Checklist';
 import { Scorecard } from './Scorecard';
+import { FrameWidget } from './FrameWidget';
 
 export { Inlines };
 
@@ -102,6 +103,7 @@ function BlockView({ block }: { block: Block }) {
         if (block.kind === 'trace') return <Trace data={block.data} title={block.title} />;
         if (block.kind === 'checklist') return <Checklist data={block.data} title={block.title} />;
         if (block.kind === 'scorecard') return <Scorecard data={block.data} title={block.title} />;
+        if (block.kind === 'frames') return <FrameWidget data={block.data} title={block.title} />;
       }
       return (
         <div className="rd-widget">

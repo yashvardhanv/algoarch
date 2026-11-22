@@ -7,7 +7,7 @@
 .rd-doc h1, .rd-title { font-size: var(--text-h1); margin-bottom: var(--s-sm); }
 .rd-lede { font-size: 1.25rem; line-height: 1.5; color: var(--ink-2); max-width: 62ch; margin: 0 0 var(--s-lg); }
 .rd-section { padding-top: var(--s-xl); scroll-margin-top: calc(var(--nav-h) + var(--s-md)); }
-.rd-section > :not(.rd-section-head):not(.rd-callout):not(.rd-card):not(.rd-code):not(.rd-table):not(.rd-widget):not(.rd-qa):not(.rd-say) { max-width: 68ch; }
+.rd-section > :not(.rd-section-head):not(.rd-callout):not(.rd-card):not(.rd-code):not(.rd-table):not(.rd-widget):not(.rd-fwbox):not(.rd-qa):not(.rd-say) { max-width: 68ch; }
 .rd-section-head { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: var(--s-xs); padding-top: var(--s-md); margin-bottom: var(--s-md); border-top: 1px solid var(--line); }
 .rd-section-num { font-size: var(--text-small); color: var(--ink-3); padding-top: 6px; font-variant-numeric: tabular-nums; }
 .rd-section h2 { font-size: var(--text-h2); }
@@ -181,3 +181,17 @@
 .rd-rail-tick:hover { border-color: var(--accent); background: var(--accent-wash); }
 @media (max-width: 1240px) { .rd-rail { display: none; } }
 @media print { .rd-rail { display: none; } }
+
+/* recorded interactive panels */
+.rd-fwbox { margin: var(--s-md) 0; border: 1px solid var(--line); border-radius: var(--r-outer); overflow: hidden; max-width: 100%; }
+.rd-fw { padding: var(--s-md); overflow-x: auto; font-size: var(--text-small); color: var(--ink); }
+.rd-fw table { border-collapse: collapse; }
+.rd-fw td, .rd-fw th { padding: var(--s-2xs) var(--s-xs); text-align: left; }
+.rd-fw svg { max-width: 100%; height: auto; }
+.rd-fw [role="button"], .rd-fw button[type="button"] { cursor: pointer; }
+.rd-fw button[type="button"] { font: inherit; color: inherit; }
+.rd-fw-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-sm) var(--s-lg); padding: var(--s-xs) var(--s-md); border-top: 1px solid var(--line); background: var(--well); font-size: var(--text-small); }
+.rd-fw-ctl { display: inline-flex; align-items: center; gap: var(--s-xs); }
+.rd-fw-ctl input[type="range"] { width: 140px; accent-color: var(--accent); }
+.rd-fw-ctl output { min-width: 3ch; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.rd-fw-ctl select { padding: var(--s-3xs) var(--s-xs); border: 1px solid var(--line-strong); border-radius: var(--r-inner); background: var(--paper); color: var(--ink); font: inherit; }

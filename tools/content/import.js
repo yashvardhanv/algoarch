@@ -24,6 +24,9 @@ function sanitizeMarkdown(raw) {
     .replace(/\[([^\]]+)\]\([^)]+\.md\)/gi, '$1').replace(/^>\s*\n/gm, '').replace(/\n{3,}/g, '\n\n').trim();
 }
 
+// Recorded panel states from the original pages (see capture-driver.js); optional.
+const capIdx = args.indexOf('--capture');
+const CAPTURE_DIR = capIdx >= 0 ? path.resolve(args[capIdx + 1]) : path.join(DATA_DIR, 'capture');
 const readIf = (p) => (p && fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null);
 
 function main() {
@@ -67,7 +70,9 @@ function main() {
             const html = readIf(path.join(PROJECTS, l.visualPath));
             if (html == null) report.missingPages.push(l.id);
             else {
-              const doc = convertPage(html);
+              const capName = l.visualPath.replace(/\\/g, '/').replace(/\//g, '__').replace(/\.html$/, '');
+              const capRaw = readIf(path.join(CAPTURE_DIR, capName + '.json'));
+              const doc = convertPage(html, capRaw ? JSON.parse(capRaw) : null);
               const { stats, ...payload } = doc;
               insDoc.run(l.id, doc.schemaVersion, JSON.stringify(payload), now);
               report.documents++;

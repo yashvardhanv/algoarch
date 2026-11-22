@@ -1,6 +1,7 @@
 // Converts one lesson page (HTML) into a presentation-agnostic Lesson Document (schema v1).
 // Output contains only data: typed blocks + an inline AST. No HTML, no CSS classes, no scripts.
 const vm = require('vm');
+const { buildFramesData } = require('./frames');
 const { parse, find, findOne, textOf, hasClass } = require('./minidom');
 const { extractTraces, extractChecklist, extractScorecard } = require('./extract');
 
@@ -244,6 +245,17 @@ function classifyPanel(n, title) {
   return { archetype, inputs };
 }
 
+// Recorded panel states from the original page (capture-driver.js), matched by title in page order.
+let currentCapture = null;
+const normTitle = (s) => String(s || '').replace(/\s+/g, ' ').replace(/\u00a0/g, ' ').trim().toLowerCase();
+function takeCapture(title) {
+  if (!currentCapture) return null;
+  const want = normTitle(title);
+  const hit = currentCapture.find(p => !p._used && normTitle(p.title) === want);
+  if (hit) hit._used = true;
+  return hit || null;
+}
+
 function widget(n, kind, stats) {
   const bar = findOne(n, e => hasClass(e, 'panel-bar') || hasClass(e, 'drill-bar'));
   const note = findOne(n, e => hasClass(e, 'panel-note'));
@@ -255,7 +267,7 @@ function widget(n, kind, stats) {
   stats.widgets[kind] = (stats.widgets[kind] || 0) + 1;
   const quiz = kind === 'quiz' ? extractQuiz(currentHtml) : null;
   const cls = kind === 'simulation' ? classifyPanel(n, bar ? plain(bar) : '') : { archetype: kind, inputs: null };
-  const title = kind === 'quiz' ? 'Timed drill' : (bar ? plain(bar) : null);
+  let title = kind === 'quiz' ? 'Timed drill' : (bar ? plain(bar) : null);
   let outKind = kind, data = quiz, ported = !!quiz;
   if (cls.archetype === 'checklist') {
     const sc = /7 axes/.test(title || '') ? extractScorecard(currentHtml) : null;
@@ -267,6 +279,11 @@ function widget(n, kind, stats) {
       ported = true;
     }
   }
+  if (!ported && cls.archetype !== 'trace' && currentCapture) {
+    const cap = takeCapture(bar ? textOf(bar) : title);
+    const fd = cap ? buildFramesData(cap, currentScope) : null;
+    if (fd) { outKind = 'frames'; data = fd; ported = true; staticBlocks.length = 0; if (cap.label) title = cap.label; }
+  }
   return { type: 'widget', kind: outKind, archetype: cls.archetype, inputs: cls.inputs, title, description: note ? plain(note) : null, blocks: staticBlocks, ported, ...(data ? { data } : {}) };
 }
 
@@ -274,8 +291,11 @@ function widget(n, kind, stats) {
 let currentHtml = '';
 let traceMounts = new Map();
 let capturedTraces = new Map();
-function convertPage(html) {
+let currentScope = '';
+function convertPage(html, capture) {
   currentHtml = html;
+  currentScope = capture && capture.page ? capture.page.replace(/\.html$/, '').split('/').filter((x, i, a) => i !== a.length - 2).join('-').replace(/[^\w-]/g, '-') : '';
+  currentCapture = capture && Array.isArray(capture.panels) ? capture.panels.map(p => ({ ...p })) : null;
   traceMounts = new Map();
   capturedTraces = new Map(extractTraces(html).map(t => [String(t.mount).replace(/^#/, ''), t]));
   for (const m of html.matchAll(/DSA\.trace\(\s*\{\s*mount:\s*['"]#([\w-]+)['"]\s*,\s*title:\s*(['"])([\s\S]*?)\2/g)) traceMounts.set(m[1], m[3]);
