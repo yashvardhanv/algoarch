@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const DATA_DIR = path.join(__dirname, 'data');
+const DATA_DIR = process.env.ALGOARCH_DATA_DIR || path.join(__dirname, 'data');
 const USAGE_FILE = path.join(DATA_DIR, 'token_usage.json');
 
 // Standard Model Pricing (per 1,000,000 tokens USD)

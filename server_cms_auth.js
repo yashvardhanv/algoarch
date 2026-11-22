@@ -1,8 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const crypto = require('crypto');
 
-const DATA_DIR = path.join(__dirname, 'data');
+const DATA_DIR = process.env.ALGOARCH_DATA_DIR || path.join(__dirname, 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const CURRICULUM_FILE = path.join(DATA_DIR, 'curriculum.json');
 const NEW_LESSONS_DIR = path.join(DATA_DIR, 'new_lessons');
@@ -85,12 +86,12 @@ const SUBSCRIPTION_PLANS = {
   free: {
     id: 'free',
     name: 'Free Starter',
-    badge: 'Free Tier',
+    badge: 'Free',
     priceINR: 0,
     dailyAiLimit: 5,
     features: [
       'Access to all 100+ FAANG Curriculum Lessons',
-      '5 Real Gemini AI Technical Mentor Queries / Day',
+      '5 AI mentor queries a day',
       'Daily Study Streak Tracking & Email Reminders',
       'Community Drills & Homework Exercises'
     ]
@@ -98,31 +99,29 @@ const SUBSCRIPTION_PLANS = {
   pro: {
     id: 'pro',
     name: 'Pro Engineer',
-    badge: 'Pro ⚡',
+    badge: 'Pro',
     priceINR: 499,
     dailyAiLimit: 100,
     features: [
       'Everything in Free Starter',
-      '100 Real Gemini AI Technical Mentor Queries / Day',
-      'Monaco IDE Live Code Runner & Test Suites',
-      'Target Company Filters (Google, Meta, Amazon, Netflix, Apple, Uber)',
-      'Dynamic Study Schedule Generator (Grind 75 Style)',
-      'Priority AI Inference Latency (<1s Responses)'
+      '100 AI mentor queries a day',
+      'Interactive code runner',
+      'Company filters',
+      'Full study planner'
     ]
   },
   enterprise: {
     id: 'enterprise',
     name: 'Staff / Enterprise',
-    badge: 'Staff Elite 👑',
+    badge: 'Staff',
     priceINR: 1499,
     dailyAiLimit: 500,
     features: [
       'Everything in Pro Engineer',
-      '500 Real Gemini AI Technical Mentor Queries / Day',
-      'FAANG Hiring Rubric & Timed Mock Interview Simulator',
-      'Complete 100-Chapter Offline Lab Package Downloads',
-      'System Architecture Sandbox & Full CMS Studio',
-      'Direct Senior Staff Career Roadmap Consultation'
+      '500 AI mentor queries a day',
+      'Hiring rubric and mock scorecard',
+      'Offline lab package downloads',
+      'Admin content studio'
     ]
   }
 };
@@ -226,8 +225,159 @@ function getUserSubscription(userId) {
     dailyLimit: planConfig.dailyAiLimit,
     usedToday: user.dailyAiUsage || 0,
     remainingToday: Math.max(0, planConfig.dailyAiLimit - (user.dailyAiUsage || 0)),
-    plansAvailable: SUBSCRIPTION_PLANS
+    plansAvailable: SUBSCRIPTION_PLANS,
+    entitlements: getEntitlements(user.plan),
+    paymentMode: paymentMode()
   };
+}
+
+// --------------------------------------------------------------------------
+// Signed session tokens (HMAC-SHA256). Identity is derived ONLY from these,
+// never from a client-supplied userId.
+// --------------------------------------------------------------------------
+const AUTH_SECRET_FILE = path.join(DATA_DIR, '.auth_secret');
+function loadAuthSecret() {
+  if (process.env.AUTH_SECRET) return process.env.AUTH_SECRET;
+  try {
+    const s = fs.readFileSync(AUTH_SECRET_FILE, 'utf8').trim();
+    if (s) return s;
+  } catch (e) { /* generate below */ }
+  const generated = crypto.randomBytes(32).toString('hex');
+  try { fs.writeFileSync(AUTH_SECRET_FILE, generated, { mode: 0o600 }); } catch (e) { /* in-memory only */ }
+  return generated;
+}
+const AUTH_SECRET = loadAuthSecret();
+const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+function signToken(userId) {
+  const payload = Buffer.from(JSON.stringify({ u: userId, exp: Date.now() + TOKEN_TTL_MS })).toString('base64url');
+  const sig = crypto.createHmac('sha256', AUTH_SECRET).update(payload).digest('base64url');
+  return payload + '.' + sig;
+}
+
+function safeEqual(a, b) {
+  const ba = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  return ba.length === bb.length && crypto.timingSafeEqual(ba, bb);
+}
+
+function verifyToken(token) {
+  if (!token || typeof token !== 'string' || !token.includes('.')) return null;
+  const [payload, sig] = token.split('.');
+  const expected = crypto.createHmac('sha256', AUTH_SECRET).update(payload).digest('base64url');
+  if (!safeEqual(sig || '', expected)) return null;
+  try {
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (!data.u || !data.exp || data.exp < Date.now()) return null;
+    return data.u;
+  } catch (e) {
+    return null;
+  }
+}
+
+// --------------------------------------------------------------------------
+// Feature entitlements per plan (single source of truth, enforced server-side)
+// --------------------------------------------------------------------------
+const PLAN_RANK = { free: 0, pro: 1, enterprise: 2 };
+const FEATURE_MIN_PLAN = {
+  monacoRun: 'pro',
+  companyFilters: 'pro',
+  plannerFull: 'pro',
+  labDownload: 'pro',
+  rubric: 'enterprise',
+  labZip: 'enterprise'
+};
+
+function planHas(planId, feature) {
+  const min = FEATURE_MIN_PLAN[feature];
+  if (!min) return false;
+  return (PLAN_RANK[planId] ?? 0) >= PLAN_RANK[min];
+}
+
+function userHasFeature(userId, feature) {
+  const user = getUser(userId);
+  return !!user && planHas(user.plan, feature);
+}
+
+function getEntitlements(planId) {
+  const out = {};
+  for (const f of Object.keys(FEATURE_MIN_PLAN)) out[f] = planHas(planId, f);
+  return out;
+}
+
+// --------------------------------------------------------------------------
+// Payments: Razorpay Orders + signature verification. Plan upgrades only
+// happen after a verified payment (or explicit dev-only demo mode).
+// --------------------------------------------------------------------------
+const pendingOrders = new Map(); // orderId -> { userId, planId, amount, createdAt }
+
+function paymentMode() {
+  if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) return 'razorpay';
+  if (process.env.NODE_ENV !== 'production' && process.env.ALLOW_DEMO_UPGRADE !== 'false') return 'demo';
+  return 'disabled';
+}
+
+function razorpayRequest(method, apiPath, body) {
+  return new Promise((resolve, reject) => {
+    const payload = body ? JSON.stringify(body) : '';
+    const auth = Buffer.from(process.env.RAZORPAY_KEY_ID + ':' + process.env.RAZORPAY_KEY_SECRET).toString('base64');
+    const req = https.request({
+      hostname: 'api.razorpay.com',
+      path: apiPath,
+      method,
+      headers: {
+        'Authorization': 'Basic ' + auth,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload)
+      }
+    }, res => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          if (res.statusCode >= 400) return reject(new Error(parsed.error?.description || 'Razorpay error ' + res.statusCode));
+          resolve(parsed);
+        } catch (e) { reject(new Error('Invalid Razorpay response')); }
+      });
+    });
+    req.on('error', reject);
+    req.setTimeout(15000, () => req.destroy(new Error('Razorpay request timeout')));
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
+async function createPaymentOrder(userId, planId) {
+  const plan = SUBSCRIPTION_PLANS[planId];
+  if (!plan || plan.priceINR <= 0) throw new Error('Invalid paid plan');
+  const order = await razorpayRequest('POST', '/v1/orders', {
+    amount: plan.priceINR * 100,
+    currency: 'INR',
+    receipt: ('aa_' + Date.now()).slice(0, 40),
+    notes: { userId, planId }
+  });
+  pendingOrders.set(order.id, { userId, planId, amount: order.amount, createdAt: Date.now() });
+  for (const [id, o] of pendingOrders) if (Date.now() - o.createdAt > 3600000) pendingOrders.delete(id);
+  return { orderId: order.id, amount: order.amount, currency: order.currency, keyId: process.env.RAZORPAY_KEY_ID, planId };
+}
+
+function verifyPaymentAndUpgrade(userId, { orderId, paymentId, signature }) {
+  const pending = pendingOrders.get(orderId);
+  if (!pending || pending.userId !== userId) return { success: false, error: 'Unknown or mismatched order' };
+  const expected = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+    .update(orderId + '|' + paymentId).digest('hex');
+  if (!safeEqual(signature || '', expected)) return { success: false, error: 'Payment signature verification failed' };
+  pendingOrders.delete(orderId); // one-time use: prevents replay
+  const result = upgradeUserPlan(userId, pending.planId);
+  if (result.success) {
+    const users = loadUsers();
+    if (users[userId]) {
+      users[userId].lastPaymentId = paymentId;
+      saveUsers(users);
+    }
+  }
+  return result;
 }
 
 function loginUser({ provider = 'guest', email, name, avatar }) {
@@ -271,7 +421,7 @@ function loginUser({ provider = 'guest', email, name, avatar }) {
   
   normalizeUserPlan(users[safeId]);
   saveUsers(users);
-  return { user: users[safeId], token: safeId };
+  return { user: users[safeId], token: signToken(safeId) };
 }
 
 function syncProgress(userId, progressData) {
@@ -332,9 +482,15 @@ function addCredits(userId, amount = 10) {
 // --------------------------------------------------------------------------
 // Curriculum Search for Cross-Chapter Deep Linking
 // --------------------------------------------------------------------------
+const QUERY_STOPWORDS = new Set('why how what when where which who does did doing done are was were the and for with that this than then them they their there from into about would could should can you your use using used more most less much many very just also any all not but have has had get got make made like need want explain tell give show please'.split(' '));
+function queryTerms(query) {
+  return [...new Set(String(query || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !QUERY_STOPWORDS.has(w)))];
+}
+
 function searchCurriculumLessons(query, curriculum) {
   if (!query || !curriculum || !curriculum.tracks) return [];
-  const qTerms = query.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 2);
+  const STOP = new Set('why how what when where which who does did doing done are was were the and for with that this than then them they their there from into about would could should can you your use using used more most less much many very just also any all not but have has had get got make made like need want explain tell give show please'.split(' '));
+  const qTerms = [...new Set(query.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !STOP.has(w)))];
   if (qTerms.length === 0) return [];
 
   const matched = [];
@@ -350,7 +506,7 @@ function searchCurriculumLessons(query, curriculum) {
           if (hay.includes(term)) score += 2;
         }
 
-        if (score > 3) {
+        if (score >= 9) {
           matched.push({
             id: lesson.id,
             title: lesson.title,
@@ -369,6 +525,24 @@ function searchCurriculumLessons(query, curriculum) {
 // --------------------------------------------------------------------------
 // Real Google Gemini AI Integration (Server-Side GEMINI_API_KEY)
 // --------------------------------------------------------------------------
+// Gemini endpoint: overridable so tests can point at a local mock.
+function geminiTarget() {
+  const u = new URL(process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com');
+  const insecure = u.protocol === 'http:';
+  return { mod: insecure ? require('http') : https, hostname: u.hostname, port: u.port || (insecure ? 80 : 443) };
+}
+
+// Request body: system prompt goes in systemInstruction; thinking tokens count against the cap, so keep it generous.
+function geminiPayload(systemPrompt, userQuestion) {
+  return JSON.stringify({
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    contents: [{ role: 'user', parts: [{ text: userQuestion }] }],
+    generationConfig: { maxOutputTokens: 8192, temperature: 0.3 }
+  });
+}
+
+const visibleText = (parts) => (parts || []).filter(p => p && !p.thought && typeof p.text === 'string').map(p => p.text).join('');
+
 async function callRealGeminiAI(systemPrompt, userQuestion) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -377,30 +551,21 @@ async function callRealGeminiAI(systemPrompt, userQuestion) {
 
   // Model fallback chain: resilient to temporary high-demand spikes
   const models = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
-  const payload = JSON.stringify({
-    contents: [
-      {
-        role: 'user',
-        parts: [{ text: `${systemPrompt}\n\nCandidate Question / Design Problem:\n${userQuestion}` }]
-      }
-    ],
-    generationConfig: {
-      maxOutputTokens: 1400,
-      temperature: 0.3
-    }
-  });
+  const payload = geminiPayload(systemPrompt, userQuestion);
 
   let lastError = null;
   for (const model of models) {
     try {
       const result = await new Promise((resolve, reject) => {
-        const url = new URL(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`);
-        const req = https.request({
-          hostname: url.hostname,
-          path: url.pathname + url.search,
+        const tgt = geminiTarget();
+        const req = tgt.mod.request({
+          hostname: tgt.hostname,
+          port: tgt.port,
+          path: `/v1beta/models/${model}:generateContent`,
           method: 'POST',
-          rejectUnauthorized: false, // Supports enterprise/self-signed proxy chains on Windows
+          rejectUnauthorized: process.env.GEMINI_INSECURE_TLS !== '1', // opt-in only, for corporate proxy chains
           headers: {
+            'x-goog-api-key': apiKey,
             'Content-Type': 'application/json',
             'Content-Length': Buffer.byteLength(payload)
           }
@@ -410,8 +575,9 @@ async function callRealGeminiAI(systemPrompt, userQuestion) {
           res.on('end', () => {
             try {
               const parsed = JSON.parse(data);
-              if (parsed.candidates && parsed.candidates[0] && parsed.candidates[0].content?.parts?.[0]?.text) {
-                resolve({ model, text: parsed.candidates[0].content.parts[0].text });
+              const text = visibleText(parsed.candidates?.[0]?.content?.parts);
+              if (text) {
+                resolve({ model, text, finishReason: parsed.candidates[0].finishReason || null });
               } else {
                 reject(new Error(parsed.error?.message || `No text candidate in response from ${model}`));
               }
@@ -710,8 +876,93 @@ function runDailyEmailScheduler(curriculum, forceAll = false) {
   };
 }
 
+// Streaming variant: calls onChunk(text) for each token batch as it arrives (SSE upstream).
+// Falls back across models only until the first chunk has been delivered.
+async function streamRealGeminiAI(systemPrompt, userQuestion, onChunk) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY is not configured on the server. Please export GEMINI_API_KEY.');
+
+  const models = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+  const payload = geminiPayload(systemPrompt, userQuestion);
+
+  let lastError = null;
+  for (const model of models) {
+    let delivered = false;
+    let finishReason = null;
+    try {
+      const fullText = await new Promise((resolve, reject) => {
+        const tgt = geminiTarget();
+        const req = tgt.mod.request({
+          hostname: tgt.hostname,
+          port: tgt.port,
+          path: '/v1beta/models/' + model + ':streamGenerateContent?alt=sse',
+          method: 'POST',
+          rejectUnauthorized: process.env.GEMINI_INSECURE_TLS !== '1',
+          headers: {
+            'x-goog-api-key': apiKey,
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payload)
+          }
+        }, res => {
+          if (res.statusCode >= 400) {
+            let errBody = '';
+            res.on('data', c => errBody += c);
+            res.on('end', () => {
+              let msg = 'HTTP ' + res.statusCode + ' from ' + model;
+              try { msg = JSON.parse(errBody).error?.message || msg; } catch (e) { /* keep default */ }
+              reject(new Error(msg));
+            });
+            return;
+          }
+          let buf = '';
+          let full = '';
+          res.setEncoding('utf8');
+          res.on('data', chunk => {
+            buf += chunk;
+            let idx;
+            while ((idx = buf.indexOf('\n')) !== -1) {
+              const line = buf.slice(0, idx).trim();
+              buf = buf.slice(idx + 1);
+              if (!line.startsWith('data:')) continue;
+              try {
+                const evt = JSON.parse(line.slice(5).trim());
+                const text = visibleText(evt.candidates?.[0]?.content?.parts);
+                if (evt.candidates?.[0]?.finishReason) finishReason = evt.candidates[0].finishReason;
+                if (text) { delivered = true; full += text; onChunk(text); }
+              } catch (e) { /* ignore partial/non-JSON frame */ }
+            }
+          });
+          res.on('end', () => full ? resolve(full) : reject(new Error('Empty response from ' + model)));
+          res.on('error', reject);
+        });
+        req.on('error', reject);
+        req.setTimeout(30000, () => req.destroy(new Error('Request timeout calling model ' + model)));
+        req.write(payload);
+        req.end();
+      });
+      return { model, text: fullText, finishReason };
+    } catch (err) {
+      lastError = err;
+      console.warn('[Gemini Stream] Falling back from ' + model + ':', err.message);
+      if (delivered) throw err; // cannot cleanly restart a partially streamed answer
+    }
+  }
+  throw new Error('All Gemini AI model endpoints were unavailable: ' + (lastError?.message || 'Unknown network error'));
+}
+
 module.exports = {
   SUBSCRIPTION_PLANS,
+  queryTerms,
+  streamRealGeminiAI,
+  signToken,
+  verifyToken,
+  safeEqual,
+  planHas,
+  userHasFeature,
+  getEntitlements,
+  paymentMode,
+  createPaymentOrder,
+  verifyPaymentAndUpgrade,
   getUser,
   getUserSubscription,
   loginUser,

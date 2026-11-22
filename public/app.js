@@ -3,6 +3,26 @@
 // Production-grade architecture with zero fluff
 // ==========================================================================
 
+// Attach the signed session token (and admin key for /api/admin/*) to same-origin API calls.
+const AUTH_TOKEN_KEY = 'algoarch_token';
+(function installAuthFetch() {
+  const origFetch = window.fetch.bind(window);
+  window.fetch = (input, init = {}) => {
+    try {
+      const u = new URL(typeof input === 'string' ? input : input.url, location.href);
+      if (u.origin === location.origin && u.pathname.startsWith('/api/')) {
+        const headers = new Headers(init.headers || {});
+        const token = localStorage.getItem(AUTH_TOKEN_KEY);
+        if (token && !headers.has('Authorization')) headers.set('Authorization', 'Bearer ' + token);
+        const adminKey = localStorage.getItem('algoarch_admin_key');
+        if (adminKey && u.pathname.startsWith('/api/admin/')) headers.set('x-admin-key', adminKey);
+        init = { ...init, headers };
+      }
+    } catch (e) { /* fall through to plain fetch */ }
+    return origFetch(input, init);
+  };
+})();
+
 // Global Application State
 const state = {
   tracks: [],
@@ -82,7 +102,7 @@ async function loadAppData() {
       fetch('/api/videos').then(r => r.json()),
       fetch('/api/progress').then(r => r.json()),
       fetch('/api/stats').then(r => r.json()),
-      fetch(`/api/subscription/status?userId=${state.user?.id || 'guest_default'}`).then(r => r.json()).catch(() => null)
+      fetch('/api/subscription/status').then(r => r.json()).catch(() => null)
     ]);
 
     state.tracks = curriculumRes.tracks || [];
@@ -225,6 +245,8 @@ function renderPillarsRoadmap() {
     const trackLessons = state.allLessons.filter(l => l.trackId === track.id);
     const fiveStars = trackLessons.filter(l => l.stars === 5).length;
     const sampleTags = track.blocks.slice(0, 3).map(b => b.t);
+    const done = trackLessons.filter(l => state.progress.completed.includes(l.id)).length;
+    const pct = trackLessons.length ? Math.round((100 * done) / trackLessons.length) : 0;
 
     return `
       <div class="pillar-card" style="--card-accent: ${track.color};">
@@ -239,8 +261,13 @@ function renderPillarsRoadmap() {
           ${sampleTags.map(t => `<span class="p-tag">${t}</span>`).join('')}
         </div>
 
+        <div class="pillar-progress">
+          <div class="meter-bar"><div class="meter-fill" style="width: ${pct}%;"></div></div>
+          <span>${done} of ${trackLessons.length} done</span>
+        </div>
+
         <button class="btn-open-pillar" onclick="openTrackFromPillar('${track.id}')">
-          View Track (${trackLessons.length} Lessons) →
+          View track
         </button>
       </div>
     `;
@@ -286,8 +313,8 @@ function renderCurriculumLibrary() {
       if (trackSub) trackSub.textContent = activeTrackObj.description;
     }
   } else {
-    if (trackHeading) trackHeading.textContent = `All Courses & Chapters (${state.allLessons.length})`;
-    if (trackSub) trackSub.textContent = `${state.allLessons.length} sequenced engineering lessons calibrated for the ₹50LPA FAANG threshold.`;
+    if (trackHeading) trackHeading.textContent = `All lessons (${state.allLessons.length})`;
+    if (trackSub) trackSub.textContent = `${state.allLessons.length} lessons in order, calibrated for ₹50 LPA interviews.`;
   }
 
   if (state.activeCompanyFilter && state.activeCompanyFilter !== 'all') {
@@ -331,8 +358,8 @@ function renderCurriculumLibrary() {
     if (lesson.blockTitle && lesson.blockTitle !== lastBlock) {
       lastBlock = lesson.blockTitle;
       html += `
-        <div class="block-divider">
-          <span class="block-k">${lesson.blockKey || 'SECTION'}</span>
+        <div class="block-divider" data-block="${lesson.blockKey || ''}">
+          <span class="block-k">${lesson.blockKey || 'Section'}</span>
           <div class="block-t">${lesson.blockTitle}</div>
         </div>
       `;
@@ -348,7 +375,7 @@ function renderCurriculumLibrary() {
           <div class="lesson-top-row">
             <span class="lesson-title-text" onclick="openLesson('${lesson.id}', '${lesson.trackId}')">${lesson.title}</span>
             <span class="stars-badge" title="Priority ${lesson.stars}/5">${starsRendered}</span>
-            ${lesson.isNew ? '<span class="new-badge">50LPA ADVANCED</span>' : ''}
+            ${lesson.isNew ? '<span class="new-badge">Advanced</span>' : ''}
           </div>
           <p class="lesson-desc-text">${lesson.desc || ''}</p>
           <div class="lesson-tags-row">
@@ -363,7 +390,7 @@ function renderCurriculumLibrary() {
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
           </button>
           <button class="btn-read-lesson" onclick="openLesson('${lesson.id}', '${lesson.trackId}')">
-            Open →
+            Open
           </button>
         </div>
       </div>
@@ -382,591 +409,45 @@ function updateFilterCounters() {
 }
 
 // --------------------------------------------------------------------------
-// View 3: Unified Lesson Workbench (Collapsible Bench + Resource Tabs)
+// View 3: Lesson reader (React). The server returns lesson data; the reader renders it.
 // --------------------------------------------------------------------------
-state.activeLessonData = null;
-state.practicedDrills = [];
+window.openLesson = function(lessonId, trackId) {
+  const meta = (state.allLessons || []).find(l => l.id === lessonId);
+  state.activeLesson = meta || { id: lessonId, title: lessonId };
+  state.activeLessonTrack = (state.tracks || []).find(t => t.id === ((meta && meta.trackId) || trackId)) || null;
 
-window.openLesson = async function(lessonId, trackId) {
-  try {
-    const res = await fetch(`/api/lesson?id=${lessonId}&track=${trackId}`).then(r => r.json());
-    if (res.error) {
-      alert(`Error loading lesson: ${res.error}`);
-      return;
-    }
+  const aiContextInd = document.getElementById('ai-context-indicator');
+  if (aiContextInd) aiContextInd.textContent = state.activeLesson.title || '';
 
-    state.activeLesson = res.lesson;
-    state.activeLessonTrack = res.track;
-    state.activeLessonVisualUrl = res.visualUrl;
-    state.activeLessonLabCode = res.labCode;
-    state.activeLessonLabFileName = res.labFileName;
-    state.activeLessonData = res;
-
-    switchView('reader');
-
-    const aiContextInd = document.getElementById('ai-context-indicator');
-    if (aiContextInd) {
-      aiContextInd.textContent = `${res.lesson.title}`;
-    }
-
-    const metaBar = document.getElementById('reader-meta-bar');
-    if (metaBar) {
-      const starsStr = '★'.repeat(res.lesson.stars || 5) + '☆'.repeat(5 - (res.lesson.stars || 5));
-      metaBar.innerHTML = `
-        <span class="l-tag font-bold">${res.track.name}</span>
-        <span class="stars-badge">${starsStr}</span>
-        <span class="text-muted">${res.lesson.duration || '45 min'}</span>
-        ${res.lesson.isNew ? '<span class="new-badge">50LPA ADVANCED</span>' : ''}
-      `;
-    }
-
-    updateReaderButtons(res.lesson.id);
-
-    // 1. Configure Collapsible Native Interactive Visual Bench
-    const benchCard = document.getElementById('bench-collapsible-card');
-    const benchFrame = document.getElementById('reader-bench-frame');
-    const benchToggleBtn = document.getElementById('bench-collapse-toggle');
-    const benchToggleText = document.getElementById('bench-toggle-text');
-    const benchBody = document.getElementById('bench-collapse-body');
-    const benchResetBtn = document.getElementById('btn-reset-bench-card');
-
-    if (res.visualUrl) {
-      if (benchCard) benchCard.style.display = 'block';
-      if (benchBody) benchBody.classList.remove('collapsed');
-      if (benchToggleText) benchToggleText.textContent = 'Collapse ▴';
-      
-      const currentTheme = document.documentElement.dataset.theme || 'dark';
-      const embedSrc = res.visualUrl + (res.visualUrl.includes('?') ? '&' : '?') + `embed=1&theme=${currentTheme}`;
-      if (benchFrame) {
-        benchFrame.src = embedSrc;
-        benchFrame.onload = () => {
-          syncThemeToFrames(document.documentElement.dataset.theme || 'dark');
-        };
-      }
-
-      if (benchToggleBtn) {
-        benchToggleBtn.onclick = (e) => {
-          if (e.target.closest('#btn-reset-bench-card')) return;
-          const isCollapsed = benchBody.classList.toggle('collapsed');
-          benchToggleText.textContent = isCollapsed ? 'Expand Simulation ▾' : 'Collapse ▴';
-        };
-      }
-
-      if (benchResetBtn) {
-        benchResetBtn.onclick = (e) => {
-          e.stopPropagation();
-          if (benchFrame) {
-            const activeTheme = document.documentElement.dataset.theme || 'dark';
-            benchFrame.src = `${res.visualUrl}?embed=1&theme=${activeTheme}&_t=${Date.now()}`;
-          }
-        };
-      }
-    } else {
-      if (benchCard) benchCard.style.display = 'none';
-      if (benchFrame) benchFrame.src = 'about:blank';
-    }
-
-    // 2. Render Markdown Prose Guide with Deterministic Heading IDs
-    const contentEl = document.getElementById('reader-content');
-    if (contentEl) {
-      if (window.marked) {
-        contentEl.innerHTML = marked.parse(res.content || '');
-      } else {
-        contentEl.innerText = res.content || '';
-      }
-    }
-
-    // Build Table of Contents Sidebar Rail from rendered headings
-    buildReaderTOC(contentEl);
-
-    // 3. Populate Video Lectures Tab
-    populateLessonVideos(res.videos || []);
-
-    // 4. Populate Homework & Drills Tab
-    populateLessonHomework(res.drills || [], res.lesson.title);
-
-    // 5. Populate Playground & Lab Code Tab
-    populateLessonPlayground(res.labCode, res.labFileName, res.lesson.title);
-
-    // 6. Populate Articles & Papers Tab
-    populateLessonArticles(res.articles || []);
-
-    // 7. Populate Useful Repos & Downloads Tab
-    populateLessonRepos(res.repos || []);
-
-    // Switch to Overview & Lab tab by default
-    switchReaderTab('guide');
-
-  } catch (err) {
-    console.error('Error fetching lesson:', err);
-  }
+  switchView('reader');
+  renderReader();
 };
 
-// --------------------------------------------------------------------------
-// Video Lectures Tab Populator
-// --------------------------------------------------------------------------
-function populateLessonVideos(videos) {
-  const tabVideoCnt = document.getElementById('tab-video-cnt');
-  if (tabVideoCnt) tabVideoCnt.textContent = videos.length;
-
-  const featuredContainer = document.getElementById('featured-video-player');
-  const featuredIframe = document.getElementById('featured-video-iframe');
-  const featuredTitle = document.getElementById('featured-video-title');
-  const featuredDesc = document.getElementById('featured-video-desc');
-  const gridContainer = document.getElementById('lesson-videos-grid');
-
-  if (videos && videos.length > 0) {
-    const feat = videos[0];
-    if (featuredContainer) featuredContainer.style.display = 'block';
-    if (featuredIframe) featuredIframe.src = `https://www.youtube.com/embed/${feat.youtubeId}?rel=0`;
-    if (featuredTitle) featuredTitle.textContent = `${feat.title} — ${feat.channel}`;
-    if (featuredDesc) featuredDesc.textContent = feat.description;
-
-    if (gridContainer) {
-      gridContainer.innerHTML = videos.map((v, i) => `
-        <div class="video-card">
-          <div class="video-thumb-wrapper" onclick="playLessonVideo('${v.youtubeId}', '${escapeHtml(v.title)}')">
-            <img src="${v.thumbnail || `https://img.youtube.com/vi/${v.youtubeId}/hqdefault.jpg`}" alt="${v.title}" class="v-thumb" loading="lazy">
-            <div class="play-overlay">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-            </div>
-            <span class="v-duration">${v.duration || '20 min'}</span>
-          </div>
-          <div class="video-meta">
-            <span class="v-channel">${v.channel}</span>
-            <h4 class="v-title" onclick="playLessonVideo('${v.youtubeId}', '${escapeHtml(v.title)}')">${v.title}</h4>
-            <p class="v-desc">${v.description}</p>
-          </div>
-        </div>
-      `).join('');
-    }
-  } else {
-    if (featuredContainer) featuredContainer.style.display = 'none';
-    if (gridContainer) {
-      gridContainer.innerHTML = `
-        <div class="empty-video-card" style="padding: 32px 24px; text-align: center; background: var(--bg-card); border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); margin-top: 12px;">
-          <div style="font-size: 28px; margin-bottom: 8px;">🎬</div>
-          <h4 style="font-family: var(--font-mono); font-size: 15px; margin-bottom: 6px;">No Direct Video Lecture For This Specific Section</h4>
-          <p style="font-size: 13.5px; color: var(--text-secondary); max-width: 50ch; margin: 0 auto 16px;">
-            To maintain zero fluff, we only attach video lectures strictly teaching this exact topic. Browse our comprehensive Video Vault featuring 3Blue1Brown, Karpathy, and NeetCode.
-          </p>
-          <button class="btn-pg-ghost" onclick="switchView('videos')" style="font-weight: 600;">
-            Browse Video Vault (${state.videos ? state.videos.length : 33}+ Masterclasses) →
-          </button>
-        </div>
-      `;
-    }
-  }
-}
-
-window.playLessonVideo = function(youtubeId, title) {
-  const featuredContainer = document.getElementById('featured-video-player');
-  const featuredIframe = document.getElementById('featured-video-iframe');
-  const featuredTitle = document.getElementById('featured-video-title');
-  if (featuredContainer) featuredContainer.style.display = 'block';
-  if (featuredIframe) {
-    featuredIframe.src = `https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0`;
-    featuredContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-  if (featuredTitle) featuredTitle.textContent = title;
-};
-
-// --------------------------------------------------------------------------
-// Homework & Mock Drills Tab Populator
-// --------------------------------------------------------------------------
-function populateLessonHomework(drills, lessonTitle) {
-  const drillsContainer = document.getElementById('homework-drills-list');
-  const drillsFill = document.getElementById('hw-progress-fill');
-  const drillsCounter = document.getElementById('hw-progress-counter');
-
-  state.practicedDrills = [];
-
-  const defaultDrills = (drills && drills.length > 0) ? drills : [
-    { title: `Interview Mock Drill: Failure Domain Breakdown for ${lessonTitle}`, notes: "Imagine p99 latency degrades by 20x during high load. Detail your triage sequence and state how idempotency or fencing prevents corruption." },
-    { title: `Capacity & Memory Estimation Test`, notes: "Calculate RAM consumption for 10 million active keys assuming standard overhead. What eviction policy prevents Out-Of-Memory crashes?" },
-    { title: `Invariants Under Network Partition`, notes: "Explain the split-brain scenario. How does quorum consensus or epoch fencing guarantee monotonic linearizability?" }
-  ];
-
-  window.toggleDrillCheck = function(index) {
-    const chk = document.getElementById(`drill-chk-${index}`);
-    const card = document.getElementById(`drill-card-${index}`);
-    if (chk && card) {
-      if (chk.checked) {
-        if (!state.practicedDrills.includes(index)) state.practicedDrills.push(index);
-        card.classList.add('practiced');
-      } else {
-        state.practicedDrills = state.practicedDrills.filter(i => i !== index);
-        card.classList.remove('practiced');
-      }
-      updateDrillsProgress(defaultDrills.length);
-    }
-  };
-
-  window.toggleDrillSolution = function(index) {
-    const box = document.getElementById(`drill-sol-${index}`);
-    if (box) box.classList.toggle('open');
-  };
-
-  function updateDrillsProgress(total) {
-    const done = state.practicedDrills.length;
-    if (drillsCounter) drillsCounter.textContent = `${done} / ${total} Practiced`;
-    if (drillsFill) {
-      const pct = total > 0 ? (done / total) * 100 : 0;
-      drillsFill.style.width = `${pct}%`;
-    }
-  }
-
-  if (drillsContainer) {
-    drillsContainer.innerHTML = defaultDrills.map((d, i) => `
-      <div class="drill-card" id="drill-card-${i}">
-        <div class="drill-top-row">
-          <input type="checkbox" class="drill-check-input" id="drill-chk-${i}" onchange="toggleDrillCheck(${i})">
-          <div class="drill-content">
-            <div class="drill-title">${d.title}</div>
-            <div class="drill-notes">${d.notes || 'Analyze edge cases, theoretical time/space bounds, and state your architectural trade-offs out loud.'}</div>
-            <button class="drill-reveal-btn" onclick="toggleDrillSolution(${i})">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-              Reveal Staff Engineer Defense & Key Phrase
-            </button>
-            <div class="drill-solution-box" id="drill-sol-${i}">
-              <strong>Staff Engineering Model Response:</strong><br>
-              In FAANG rounds, articulate the invariant before the fix:
-              <br><em>"We solve this by decoupling the synchronous mutation path from asynchronous reconciliation. If worker heartbeat expires, we reject stale leases using monotonically increasing fencing tokens to guarantee zero phantom writes."</em>
-            </div>
-          </div>
-        </div>
-      </div>
-    `).join('');
-    updateDrillsProgress(defaultDrills.length);
-  }
-}
-
-// --------------------------------------------------------------------------
-// Playground & Monaco IDE Runner
-// --------------------------------------------------------------------------
-let monacoEditorInstance = null;
-
-function initOrUpdateMonaco(code, lang = 'python') {
-  const mountEl = document.getElementById('monaco-editor-mount');
-  const fallbackTextarea = document.getElementById('playground-editor');
-  if (!mountEl) return;
-
-  const currentTheme = document.documentElement.getAttribute('data-theme') === 'light' ? 'vs' : 'vs-dark';
-
-  if (monacoEditorInstance) {
-    monacoEditorInstance.setValue(code);
-    const model = monacoEditorInstance.getModel();
-    if (model && window.monaco) {
-      monaco.editor.setModelLanguage(model, lang);
-    }
-    return;
-  }
-
-  const createMonaco = (initialCode, initialLang, theme) => {
-    try {
-      mountEl.innerHTML = '';
-      monacoEditorInstance = monaco.editor.create(mountEl, {
-        value: initialCode,
-        language: initialLang,
-        theme: theme,
-        automaticLayout: true,
-        minimap: { enabled: false },
-        fontSize: 13,
-        fontFamily: "'JetBrains Mono', monospace",
-        lineHeight: 21,
-        scrollBeyondLastLine: false,
-        renderLineHighlight: 'all',
-        tabSize: 4
-      });
-      if (fallbackTextarea) fallbackTextarea.style.display = 'none';
-      const badge = document.getElementById('monaco-status-badge');
-      if (badge) badge.textContent = 'Monaco IDE';
-    } catch (err) {
-      if (fallbackTextarea) {
-        fallbackTextarea.style.display = 'block';
-        mountEl.style.display = 'none';
-      }
-    }
-  };
-
-  if (window.monaco) {
-    createMonaco(code, lang, currentTheme);
-  } else if (window.require) {
-    try {
-      require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
-      require(['vs/editor/editor.main'], function() {
-        createMonaco(code, lang, currentTheme);
-      });
-    } catch (e) {
-      if (fallbackTextarea) fallbackTextarea.style.display = 'block';
-    }
-  } else {
-    if (fallbackTextarea) fallbackTextarea.style.display = 'block';
-  }
-}
-
-function populateLessonPlayground(labCode, labFileName, lessonTitle) {
-  const editor = document.getElementById('playground-editor');
-  const filename = document.getElementById('playground-filename');
-  const langSelect = document.getElementById('playground-lang-select');
-  const downloadBtn = document.getElementById('btn-download-lab-pg');
-  const output = document.getElementById('playground-output');
-  const status = document.getElementById('playground-status');
-  const copyBtn = document.getElementById('btn-copy-code-pg');
-  const resetBtn = document.getElementById('btn-reset-code-pg');
-  const runBtn = document.getElementById('btn-run-playground');
-
-  const defaultCode = labCode || `# Production Python 3.11 Blueprint: ${lessonTitle}
-from typing import List, Dict, Optional
-import time
-
-class Solution:
-    def execute(self, items: List[int]) -> Dict[str, any]:
-        """
-        Production single-pass implementation with invariant enforcement.
-        Time: O(N), Space: O(N) bounded.
-        """
-        start = time.perf_counter_ns()
-        
-        if not items:
-            return {"status": "empty", "result": None, "elapsed_ns": 0}
-            
-        seen = {}
-        max_dist = 0
-        
-        for i, val in enumerate(items):
-            if val in seen:
-                max_dist = max(max_dist, i - seen[val])
-            else:
-                seen[val] = i
-                
-        elapsed = time.perf_counter_ns() - start
-        return {"status": "ok", "max_distance": max_dist, "unique_keys": len(seen), "elapsed_ns": elapsed}
-
-if __name__ == "__main__":
-    solver = Solution()
-    sample = [1, 2, 3, 1, 4, 5, 2]
-    res = solver.execute(sample)
-    print("Execution Result:", res)
-    assert res["max_distance"] == 4, "Invariant verification failed"
-    print("✅ Invariant assertions PASSED.")
-`;
-
-  if (editor) editor.value = defaultCode;
-  if (filename) filename.textContent = labFileName || 'solution.py';
-
-  // Initialize Monaco Editor
-  const currentLang = langSelect ? langSelect.value : 'python';
-  initOrUpdateMonaco(defaultCode, currentLang);
-
-  if (langSelect) {
-    langSelect.onchange = () => {
-      if (monacoEditorInstance && window.monaco) {
-        const model = monacoEditorInstance.getModel();
-        if (model) monaco.editor.setModelLanguage(model, langSelect.value);
-      }
-    };
-  }
-
-  if (downloadBtn) {
-    if (labFileName) {
-      downloadBtn.href = `/api/download/lab?file=${encodeURIComponent(labFileName)}`;
-    } else {
-      downloadBtn.href = `data:text/plain;charset=utf-8,${encodeURIComponent(defaultCode)}`;
-      downloadBtn.download = 'solution.py';
-    }
-  }
-
-  if (output) output.textContent = `$ Ready. Press "Run Code & Test" to evaluate this implementation in Monaco IDE.`;
-  if (status) status.textContent = 'Idle';
-
-  if (copyBtn) {
-    copyBtn.onclick = () => {
-      const code = monacoEditorInstance ? monacoEditorInstance.getValue() : (editor ? editor.value : '');
-      navigator.clipboard.writeText(code).then(() => {
-        copyBtn.textContent = 'Copied ✓';
-        setTimeout(() => copyBtn.textContent = 'Copy Code', 1800);
-      });
-    };
-  }
-
-  if (resetBtn) {
-    resetBtn.onclick = () => {
-      if (monacoEditorInstance) monacoEditorInstance.setValue(defaultCode);
-      if (editor) editor.value = defaultCode;
-      if (output) output.textContent = `$ Reset to starter solution.`;
-    };
-  }
-
-  if (runBtn) {
-    runBtn.onclick = () => {
-      if (status) status.textContent = 'Running...';
-      const code = monacoEditorInstance ? monacoEditorInstance.getValue() : (editor ? editor.value : '');
-      const selectedLang = langSelect ? langSelect.value : 'python';
-      
-      output.textContent = `$ ${selectedLang} ${filename ? filename.textContent : 'solution.py'}\n[0.001s] Validating AST syntax and boundary conditions...\n[0.004s] Allocating memory state and verifying invariants...\n[0.007s] Heap usage: 142.6 KB (optimal O(N) ceiling)\n[0.011s] Output: {'status': 'ok', 'max_distance': 4, 'invariants': 'verified'}\n----------------------------------------------------------------------\nRan 4 test assertions in 0.013s\n\n✅ ALL INVARIANT TESTS PASSED.`;
-      setTimeout(() => {
-        if (status) status.textContent = 'Completed';
-      }, 250);
-    };
-  }
-}
-
-// --------------------------------------------------------------------------
-// Articles & RFCs Tab Populator
-// --------------------------------------------------------------------------
-function populateLessonArticles(articles) {
-  const container = document.getElementById('lesson-articles-grid');
-  if (!container) return;
-
-  if (articles && articles.length > 0) {
-    container.innerHTML = articles.map(a => `
-      <div class="article-card">
-        <div>
-          <div class="article-header">
-            <span class="article-org">${a.org || 'Research'}</span>
-            <span class="article-time">${a.readTime || '15 min'}</span>
-          </div>
-          <div class="article-title">${a.title}</div>
-          <p class="article-desc">${a.summary}</p>
-        </div>
-        <div>
-          <a href="${a.url}" target="_blank" rel="noopener noreferrer" class="article-link">
-            Read Whitepaper / RFC →
-          </a>
-        </div>
-      </div>
-    `).join('');
-  } else {
-    container.innerHTML = '<p class="text-muted">No specific whitepapers mapped for this track.</p>';
-  }
-}
-
-// --------------------------------------------------------------------------
-// Useful Repos Tab Populator
-// --------------------------------------------------------------------------
-function populateLessonRepos(repos) {
-  const container = document.getElementById('lesson-repos-grid');
-  if (!container) return;
-
-  if (repos && repos.length > 0) {
-    container.innerHTML = repos.map(r => `
-      <div class="repo-card">
-        <div>
-          <div class="repo-header">
-            <span class="repo-lang">${r.language || 'Codebase'}</span>
-            <span class="repo-stars">${r.stars || ''}</span>
-          </div>
-          <div class="repo-name">${r.name}</div>
-          <p class="repo-desc">${r.description}</p>
-        </div>
-        <div>
-          <a href="${r.url}" target="_blank" rel="noopener noreferrer" class="repo-link">
-            Inspect on GitHub →
-          </a>
-        </div>
-      </div>
-    `).join('');
-  } else {
-    container.innerHTML = '<p class="text-muted">No repositories mapped for this track.</p>';
-  }
-}
-
-// Build sticky Table of Contents Rail on the side
-function buildReaderTOC(contentEl) {
-  const tocContainer = document.getElementById('reader-toc-list');
-  if (!tocContainer || !contentEl) return;
-
-  const headings = contentEl.querySelectorAll('h2, h3');
-  if (headings.length === 0) {
-    tocContainer.innerHTML = '<span class="text-muted" style="font-size: 11px;">Single section</span>';
-    return;
-  }
-
-  let tocHtml = '';
-  headings.forEach(h => {
-    const title = h.textContent.trim();
-    if (title.toLowerCase() === 'table of contents') return;
-
-    const id = h.id || slugifyHeading(title);
-    h.id = id;
-    const isH3 = h.tagName.toLowerCase() === 'h3';
-
-    tocHtml += `
-      <a href="#${id}" class="toc-link ${isH3 ? 'sub-item' : ''}">
-        ${title}
-      </a>
-    `;
+function renderReader() {
+  const el = document.getElementById('reader-root');
+  if (!el || !window.AlgoArchReader || !state.activeLesson) return;
+  const id = state.activeLesson.id;
+  window.AlgoArchReader.mount(el, {
+    lessonId: id,
+    isCompleted: () => state.progress.completed.includes(id),
+    isBookmarked: () => state.progress.bookmarked.includes(id),
+    onToggleComplete: (lid) => window.toggleCompleteLesson(lid),
+    onToggleBookmark: (lid) => window.toggleBookmarkLesson(lid),
+    onAskMentor: () => {
+      const drawer = document.getElementById('ai-drawer');
+      if (drawer) drawer.classList.add('open');
+      const input = document.getElementById('ai-input');
+      if (input) input.focus();
+    },
+    onBack: () => switchView('library'),
+    onNavigate: (lid, tid) => window.openLesson(lid, tid),
+    can: (feature) => can(feature),
+    openPricing: () => window.openPricingModal && window.openPricingModal()
   });
-
-  tocContainer.innerHTML = tocHtml;
-  setupTocScrollSpy(headings);
 }
 
-let tocObserver = null;
-function setupTocScrollSpy(headings) {
-  if (tocObserver) {
-    tocObserver.disconnect();
-    tocObserver = null;
-  }
-  if (!window.IntersectionObserver) return;
-
-  const tocLinks = document.querySelectorAll('.reader-toc-list .toc-link');
-  if (!tocLinks.length || !headings.length) return;
-
-  tocObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        const id = entry.target.id;
-        tocLinks.forEach(link => {
-          link.classList.toggle('active', link.getAttribute('href') === `#${id}`);
-        });
-      }
-    });
-  }, { rootMargin: '-60px 0px -70% 0px' });
-
-  headings.forEach(h => tocObserver.observe(h));
-}
-
-// --------------------------------------------------------------------------
-// Multi-Tab Switcher for Lesson Page
-// --------------------------------------------------------------------------
-window.switchReaderTab = function(tabName) {
-  document.querySelectorAll('.reader-tab').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.tab === tabName);
-  });
-
-  const panes = ['guide', 'videos', 'homework', 'playground', 'articles', 'repos'];
-  panes.forEach(p => {
-    const el = document.getElementById(`pane-${p}`);
-    if (el) {
-      if (p === 'guide') {
-        el.style.display = tabName === 'guide' ? 'grid' : 'none';
-      } else {
-        el.style.display = tabName === p ? 'block' : 'none';
-      }
-    }
-  });
-
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-};
-
-function updateReaderButtons(lessonId) {
-  const isCompleted = state.progress.completed.includes(lessonId);
-  const isBookmarked = state.progress.bookmarked.includes(lessonId);
-
-  const completeBtn = document.getElementById('btn-complete-lesson');
-  const completeText = document.getElementById('complete-btn-text');
-  const bookmarkBtn = document.getElementById('btn-bookmark-lesson');
-
-  if (completeBtn && completeText) {
-    completeBtn.classList.toggle('completed', isCompleted);
-    completeText.textContent = isCompleted ? 'Completed ✓' : 'Mark Completed';
-  }
-
-  if (bookmarkBtn) {
-    bookmarkBtn.classList.toggle('bookmarked', isBookmarked);
-  }
+function updateReaderButtons() {
+  renderReader();
 }
 
 window.toggleCompleteLesson = async function(lessonId) {
@@ -1178,37 +659,30 @@ function setupAIMentor() {
     const typingBubbleId = appendChatMessage('bot', '<em>Analyzing with L5/Staff Engineer context via Google Gemini AI...</em>');
 
     try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-algoarch-user': state.user?.id || 'guest_default'
-        },
-        body: JSON.stringify({
-          question: text,
-          lessonId: state.activeLesson?.id || '',
-          trackId: state.activeLessonTrack?.id || '',
-          lessonTitle: state.activeLesson?.title || 'System Design & DSA Core',
-          userId: state.user?.id || 'guest_default'
-        })
-      }).then(r => r.json());
+      const res = await streamChat({
+        question: text,
+        lessonId: state.activeLesson?.id || '',
+        trackId: state.activeLessonTrack?.id || '',
+        lessonTitle: state.activeLesson?.title || 'System Design & DSA Core'
+      }, typingBubbleId);
 
       const typingEl = document.getElementById(typingBubbleId);
       if (typingEl) {
         let renderedHtml = window.marked ? marked.parse(res.reply) : res.reply;
 
         // Transform deep links matching #open-lesson-([a-zA-Z0-9]+) into interactive buttons
-        renderedHtml = renderedHtml.replace(/<a\s+href="#open-lesson-([a-zA-Z0-9]+)">([^<]+)<\/a>/gi, (match, lessonId, label) => {
-          return `<button class="ai-deep-link-pill" onclick="navigateToLesson('${lessonId}')">📖 Open ${lessonId.toUpperCase()}: ${label.replace(/^📖\s*/, '')} →</button>`;
+        renderedHtml = renderedHtml.replace(/<a\s+href="#open-lesson-([a-zA-Z0-9]+)"[^>]*>([\s\S]*?)<\/a>/gi, (match, lessonId, label) => {
+          const text = label.replace(/<[^>]+>/g, '').trim();
+          return `<button type="button" class="ai-deep-link-pill" onclick="navigateToLesson('${lessonId}')">${text}</button>`;
         });
 
         if (res.exhausted || res.upgradeRequired) {
           renderedHtml += `
             <div style="margin-top: 14px; padding: 12px; background: rgba(240, 136, 62, 0.12); border: 1px solid #f0883e; border-radius: 6px;">
-              <div style="font-weight: 600; font-size: 13px; color: #f0883e; margin-bottom: 4px;">⚡ Daily AI Quota Reached</div>
+              <div style="font-weight: 600; font-size: 13px; color: #f0883e; margin-bottom: 4px;">Daily AI Quota Reached</div>
               <p style="font-size: 12px; color: var(--color-text-secondary); margin: 0 0 10px;">${escapeHtml(res.reason || 'You have reached your daily limit of AI mentor queries.')}</p>
               <button class="btn-action-primary" onclick="window.openPricingModal()" style="font-size: 11.5px; padding: 6px 14px;">
-                🚀 Upgrade to Pro Plan (100 queries/day)
+                Upgrade to Pro Plan (100 queries/day)
               </button>
             </div>
           `;
@@ -1373,22 +847,11 @@ window.onSearchVideoClick = function(youtubeId, title) {
 // --------------------------------------------------------------------------
 // Theme & Event Listeners
 // --------------------------------------------------------------------------
-function syncThemeToFrames(theme) {
-  const frame = document.getElementById('reader-bench-frame');
-  if (frame && frame.contentWindow) {
-    try {
-      frame.contentWindow.postMessage({ theme: theme }, '*');
-    } catch (e) {}
-  }
-  if (monacoEditorInstance && window.monaco) {
-    try {
-      monaco.editor.setTheme(theme === 'dark' ? 'vs-dark' : 'vs');
-    } catch (e) {}
-  }
-}
+// The React reader and embedded content inherit theme tokens from the page, so nothing to sync.
+function syncThemeToFrames() {}
 
 function initTheme() {
-  const saved = localStorage.getItem('algoarch-theme') || 'dark';
+  const saved = localStorage.getItem('algoarch-theme') || (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   document.documentElement.dataset.theme = saved;
 
   const toggle = document.getElementById('btn-theme-toggle');
@@ -1449,79 +912,12 @@ function setupEventListeners() {
     });
   }
 
-  const readerBack = document.getElementById('btn-reader-back');
-  if (readerBack) {
-    readerBack.addEventListener('click', () => switchView('library'));
-  }
-
-  document.querySelectorAll('.reader-tab').forEach(tabBtn => {
-    tabBtn.addEventListener('click', () => {
-      switchReaderTab(tabBtn.dataset.tab);
-    });
-  });
-
-  const refreshIframeBtn = document.getElementById('btn-refresh-iframe');
-  if (refreshIframeBtn) {
-    refreshIframeBtn.addEventListener('click', () => {
-      const frame = document.getElementById('reader-visual-frame');
-      if (frame && state.activeLessonVisualUrl) {
-        frame.src = state.activeLessonVisualUrl;
-      }
-    });
-  }
-
-  const copyCodeBtn = document.getElementById('btn-copy-lab-code');
-  if (copyCodeBtn) {
-    copyCodeBtn.addEventListener('click', () => {
-      const code = document.getElementById('code-display')?.textContent || '';
-      navigator.clipboard.writeText(code).then(() => {
-        copyCodeBtn.textContent = 'Copied ✓';
-        setTimeout(() => copyCodeBtn.textContent = 'Copy Code', 2000);
-      });
-    });
-  }
-
-  const completeBtn = document.getElementById('btn-complete-lesson');
-  if (completeBtn) {
-    completeBtn.addEventListener('click', () => {
-      if (state.activeLesson) toggleCompleteLesson(state.activeLesson.id);
-    });
-  }
-
-  const bookmarkBtn = document.getElementById('btn-bookmark-lesson');
-  if (bookmarkBtn) {
-    bookmarkBtn.addEventListener('click', () => {
-      if (state.activeLesson) toggleBookmarkLesson(state.activeLesson.id);
-    });
-  }
-
-  const prevBtn = document.getElementById('btn-prev-lesson');
-  const nextBtn = document.getElementById('btn-next-lesson');
-
-  if (prevBtn) {
-    prevBtn.addEventListener('click', () => {
-      if (!state.activeLesson) return;
-      const curIdx = state.allLessons.findIndex(l => l.id === state.activeLesson.id);
-      if (curIdx > 0) {
-        const prevLesson = state.allLessons[curIdx - 1];
-        openLesson(prevLesson.id, prevLesson.trackId);
-      }
-    });
-  }
-
-  if (nextBtn) {
-    nextBtn.addEventListener('click', () => {
-      if (!state.activeLesson) return;
-      const curIdx = state.allLessons.findIndex(l => l.id === state.activeLesson.id);
-      if (curIdx < state.allLessons.length - 1) {
-        const nextLesson = state.allLessons[curIdx + 1];
-        openLesson(nextLesson.id, nextLesson.trackId);
-      }
-    });
-  }
-
   document.querySelectorAll('.comp-filter-pill').forEach(pill => {
     pill.addEventListener('click', () => {
+      if ((pill.dataset.company || 'all') !== 'all' && !can('companyFilters')) {
+        if (window.openPricingModal) window.openPricingModal();
+        return;
+      }
       document.querySelectorAll('.comp-filter-pill').forEach(p => p.classList.remove('active'));
       pill.classList.add('active');
       state.activeCompanyFilter = pill.dataset.company || 'all';
@@ -1567,10 +963,6 @@ window.navigateToLesson = function(lessonId) {
   const target = (state.allLessons || []).find(l => l.id.toLowerCase() === cleanId);
   if (target) {
     openLesson(target.id, target.trackId);
-    const guideTab = document.querySelector('.reader-tab[data-tab="guide"]');
-    if (guideTab) guideTab.click();
-    const readerView = document.getElementById('view-reader');
-    if (readerView) readerView.scrollIntoView({ behavior: 'smooth' });
   } else {
     openLesson(lessonId, 'system-design');
   }
@@ -1601,6 +993,8 @@ function setupUserAuth() {
       if (res && res.user) {
         state.user = res.user;
         localStorage.setItem('algoarch_user_id', res.user.id);
+        if (res.token) localStorage.setItem(AUTH_TOKEN_KEY, res.token);
+        refreshSubscription();
         updateUserUI(res.user);
         if (authModal) authModal.classList.remove('active');
       }
@@ -1621,12 +1015,13 @@ function setupUserAuth() {
 
   // Load existing session or default
   const savedUserId = localStorage.getItem('algoarch_user_id') || 'guest_default';
-  fetch(`/api/auth/me?userId=${savedUserId}`)
+  fetch('/api/auth/me')
     .then(r => r.json())
     .then(data => {
       if (data && data.user) {
         state.user = data.user;
         updateUserUI(data.user);
+        refreshSubscription();
       }
     })
     .catch(() => {});
@@ -1668,29 +1063,27 @@ function setupSubscriptionManager() {
 
   const upgradePlan = async (planId) => {
     try {
+      if (planId !== 'free' && state.subscription?.paymentMode === 'razorpay') {
+        return startRazorpayCheckout(planId, () => pricingModal && pricingModal.classList.remove('active'));
+      }
       const res = await fetch('/api/subscription/upgrade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: state.user?.id || 'guest_default',
-          planId: planId
-        })
+        body: JSON.stringify({ plan: planId })
       }).then(r => r.json());
 
-      if (res && res.success) {
-        state.subscription = {
-          plan: res.user.plan,
-          planName: res.plan.name,
-          planBadge: res.plan.badge,
-          dailyLimit: res.plan.dailyAiLimit,
-          usedToday: res.user.dailyAiUsage || 0,
-          remainingToday: res.user.aiRemainingToday !== undefined ? res.user.aiRemainingToday : (res.plan.dailyAiLimit - (res.user.dailyAiUsage || 0))
-        };
-        updateSubscriptionDisplay();
-        alert(`✓ Plan updated to ${res.plan.name} (${res.plan.dailyAiLimit} AI mentor queries/day)`);
+      if (res && res.loginRequired) {
         if (pricingModal) pricingModal.classList.remove('active');
+        const authModal = document.getElementById('auth-modal');
+        if (authModal) authModal.classList.add('active');
+        return;
+      }
+      if (res && res.success) {
+        await refreshSubscription();
+        if (pricingModal) pricingModal.classList.remove('active');
+        alert('Plan updated to ' + res.plan.name + ' (' + res.plan.dailyAiLimit + ' AI mentor queries/day)');
       } else {
-        alert(res.error || 'Failed to update plan.');
+        alert((res && res.error) || 'Failed to update plan.');
       }
     } catch (e) {
       console.error('Upgrade plan error:', e);
@@ -1707,15 +1100,26 @@ function setupSubscriptionManager() {
 }
 
 function updateSubscriptionDisplay() {
+  // Entitlement-driven UI: editor read-only state and locked company pills
+  try {
+    renderReader();
+    document.querySelectorAll('.comp-filter-pill').forEach(p => {
+      const locked = (p.dataset.company || 'all') !== 'all' && !can('companyFilters');
+      p.classList.toggle('locked', locked);
+      p.title = locked ? 'Pro feature: company filters' : '';
+    });
+  } catch (e) { /* UI hints are best-effort */ }
   const sub = state.subscription || { plan: 'free', planName: 'Free Starter', planBadge: 'Free Tier', dailyLimit: 5, remainingToday: 5 };
   
   const navBadge = document.getElementById('nav-plan-badge');
   const navIcon = document.getElementById('nav-plan-icon');
   const drawerUsage = document.getElementById('drawer-usage-cnt');
   const drawerBadge = document.getElementById('drawer-plan-badge');
+  const drawerUpgrade = document.getElementById('btn-drawer-upgrade-plan');
+  if (drawerUpgrade) drawerUpgrade.hidden = sub.plan !== 'free';
 
   if (navBadge) navBadge.textContent = sub.planBadge || 'Free Tier';
-  if (navIcon) navIcon.textContent = sub.plan === 'enterprise' ? '👑' : sub.plan === 'pro' ? '⚡' : '🌱';
+  if (navIcon) navIcon.textContent = sub.plan === 'enterprise' ? '' : sub.plan === 'pro' ? '' : '';
   if (drawerUsage) {
     const rem = sub.remainingToday !== undefined ? sub.remainingToday : (sub.dailyLimit - (sub.usedToday || 0));
     drawerUsage.textContent = `${rem} / ${sub.dailyLimit}`;
@@ -1737,8 +1141,8 @@ function updateSubscriptionDisplay() {
         cardBtn.classList.remove('current');
         if (cardEl) cardEl.classList.remove('is-current');
         if (pid === 'free') cardBtn.textContent = 'Downgrade to Free';
-        if (pid === 'pro') cardBtn.textContent = 'Upgrade to Pro ⚡';
-        if (pid === 'enterprise') cardBtn.textContent = 'Upgrade to Staff 👑';
+        if (pid === 'pro') cardBtn.textContent = 'Upgrade to Pro ';
+        if (pid === 'enterprise') cardBtn.textContent = 'Upgrade to Staff ';
       }
     }
   });
@@ -1765,9 +1169,12 @@ function setupPlannerAndRubric() {
 
   if (generateBtn) {
     generateBtn.onclick = () => {
-      const weeks = parseInt(document.getElementById('planner-select-weeks')?.value || '4');
+      let weeks = parseInt(document.getElementById('planner-select-weeks')?.value || '4');
       const hours = parseInt(document.getElementById('planner-select-hours')?.value || '10');
-      const focus = document.getElementById('planner-select-focus')?.value || 'all';
+      let focus = document.getElementById('planner-select-focus')?.value || 'all';
+      // Free tier: basic 2-week all-track plan. Pro+ unlocks custom length and track focus.
+      const plannerLimited = !can('plannerFull') && (weeks > 2 || focus !== 'all');
+      if (!can('plannerFull')) { weeks = Math.min(weeks, 2); focus = 'all'; }
 
       // Build prioritized dynamic curriculum
       let pool = [...state.allLessons];
@@ -1785,7 +1192,7 @@ function setupPlannerAndRubric() {
       let html = `
         <div class="planner-summary-header" style="margin-bottom: 16px; padding: 12px 16px; background: var(--bg-tertiary); border-radius: 6px; border: 1px solid var(--border-color);">
           <h4 style="margin: 0 0 4px; font-size: 15px; color: var(--color-text-primary);">Custom ${weeks}-Week FAANG Sprint (${hours} hrs/week)</h4>
-          <p style="margin: 0; font-size: 12.5px; color: var(--color-text-secondary);">Total Targeted Modules: <strong>${selected.length} high-signal lessons</strong> · Optimized for Tier-1 interview loops.</p>
+          <p style="margin: 0; font-size: 12.5px; color: var(--color-text-secondary);">Total Targeted Modules: <strong>${selected.length} high-signal lessons</strong> · Optimized for Tier-1 interview loops.${plannerLimited ? ' <a href="#" onclick="window.openPricingModal();return false;">Upgrade to Pro</a> for longer plans and track focus.' : ''}</p>
         </div>
         <div class="planner-weeks-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px;">
       `;
@@ -1824,7 +1231,10 @@ function setupPlannerAndRubric() {
   const triggerRubricBtn = document.getElementById('btn-trigger-rubric');
   const closeRubricBtn = document.getElementById('btn-close-rubric');
 
-  if (triggerRubricBtn) triggerRubricBtn.onclick = () => rubricModal && rubricModal.classList.add('active');
+  if (triggerRubricBtn) triggerRubricBtn.onclick = () => {
+    if (!can('rubric')) { if (window.openPricingModal) window.openPricingModal(); return; }
+    if (rubricModal) rubricModal.classList.add('active');
+  };
   if (closeRubricBtn) closeRubricBtn.onclick = () => rubricModal && rubricModal.classList.remove('active');
 
   const updateRubric = () => {
@@ -2173,7 +1583,7 @@ function setupAdminCMS() {
   const resetAllTokensBtn = document.getElementById('btn-reset-all-tokens');
   if (resetAllTokensBtn) {
     resetAllTokensBtn.onclick = async () => {
-      if (!confirm('⚠️ Are you sure you want to reset ALL users token consumption and audit logs back to 0?')) return;
+      if (!confirm('Are you sure you want to reset ALL users token consumption and audit logs back to 0?')) return;
       try {
         await fetch('/api/admin/tokens/reset-all', { method: 'POST' });
         loadLiteLLMSummary();
@@ -2284,3 +1694,151 @@ function setupAdminCMS() {
     };
   }
 }
+
+
+// --------------------------------------------------------------------------
+// Entitlements, subscription refresh, payments, runner, streaming, downloads
+// --------------------------------------------------------------------------
+function can(feature) {
+  return !!(state.subscription && state.subscription.entitlements && state.subscription.entitlements[feature]);
+}
+
+async function refreshSubscription() {
+  try {
+    const sub = await fetch('/api/subscription/status').then(r => r.json());
+    if (sub && sub.plan) {
+      state.subscription = sub;
+      if (typeof updateSubscriptionDisplay === 'function') updateSubscriptionDisplay();
+    }
+  } catch (e) { /* keep last known state */ }
+}
+
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector('script[src="' + src + '"]')) return resolve();
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = () => reject(new Error('Failed to load ' + src));
+    document.head.appendChild(s);
+  });
+}
+
+async function startRazorpayCheckout(planId, onClose) {
+  try {
+    await loadScriptOnce('https://checkout.razorpay.com/v1/checkout.js');
+    const order = await fetch('/api/payments/create-order', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan: planId })
+    }).then(r => r.json());
+    if (order.loginRequired) {
+      const authModal = document.getElementById('auth-modal');
+      if (authModal) authModal.classList.add('active');
+      return;
+    }
+    if (order.error) { alert(order.error); return; }
+    const rzp = new window.Razorpay({
+      key: order.keyId, amount: order.amount, currency: order.currency, order_id: order.orderId,
+      name: 'AlgoArch', description: 'Plan upgrade',
+      handler: async (resp) => {
+        const result = await fetch('/api/payments/verify', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(resp)
+        }).then(r => r.json());
+        if (result.success) {
+          await refreshSubscription();
+          if (onClose) onClose();
+          alert('Payment verified. Welcome to ' + result.plan.name + '!');
+        } else {
+          alert(result.error || 'Payment verification failed.');
+        }
+      }
+    });
+    rzp.open();
+  } catch (e) {
+    alert('Could not start checkout: ' + e.message);
+  }
+}
+
+// SSE streaming chat. Resolves to a /api/chat-compatible object.
+async function streamChat(payload, bubbleId) {
+  const resp = await fetch('/api/chat/stream', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+  });
+  if (!(resp.headers.get('content-type') || '').includes('text/event-stream')) return resp.json();
+
+  const bubble = document.getElementById(bubbleId);
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '', full = '', meta = {}, related = [], streamError = null;
+  const paint = () => {
+    if (bubble) bubble.innerHTML = window.marked ? marked.parse(full) : escapeHtml(full);
+    const c = document.getElementById('ai-messages-container');
+    if (c) c.scrollTop = c.scrollHeight;
+  };
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let idx;
+    while ((idx = buf.indexOf('\n\n')) !== -1) {
+      const frame = buf.slice(0, idx).trim();
+      buf = buf.slice(idx + 2);
+      if (!frame.startsWith('data:')) continue;
+      let evt;
+      try { evt = JSON.parse(frame.slice(5).trim()); } catch (e) { continue; }
+      if (evt.type === 'meta') meta = evt;
+      else if (evt.type === 'chunk') { full += evt.text; paint(); }
+      else if (evt.type === 'done') { related = evt.related || []; meta.model = evt.model; meta.finishReason = evt.finishReason; }
+      else if (evt.type === 'error') streamError = evt.message;
+    }
+  }
+  if (meta.finishReason === 'MAX_TOKENS') full += '\n\n*The answer reached the length limit. Ask me to continue.*';
+  if (streamError) full += '\n\n**Stream interrupted**: ' + streamError;
+  if (related.length) {
+    full += '\n\n---\n**Related lessons:**\n' +
+      related.map(r => '- [' + r.title + ' (' + r.trackName + ')](#open-lesson-' + r.id + ')').join('\n');
+  }
+  return {
+    reply: full, plan: meta.plan, planName: meta.planName,
+    dailyLimit: meta.dailyLimit, remainingToday: meta.remainingToday, model: meta.model
+  };
+}
+
+// Downloads need the Authorization header, which plain anchors cannot send.
+document.addEventListener('click', async (e) => {
+  const a = e.target.closest && e.target.closest('a[href^="/api/download/"]');
+  if (!a) return;
+  e.preventDefault();
+  const href = a.getAttribute('href');
+  const isZip = href.includes('all-labs.zip');
+  if (!can(isZip ? 'labZip' : 'labDownload')) {
+    if (window.openPricingModal) window.openPricingModal();
+    return;
+  }
+  try {
+    const r = await fetch(href);
+    if (!r.ok) { if (r.status === 402 && window.openPricingModal) window.openPricingModal(); return; }
+    const blobUrl = URL.createObjectURL(await r.blob());
+    const tmp = document.createElement('a');
+    tmp.href = blobUrl;
+    tmp.download = isZip ? '50LPA_FAANG_Labs_Source.zip' : (new URL(href, location.href).searchParams.get('file') || 'lab.py');
+    document.body.appendChild(tmp); tmp.click(); tmp.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1500);
+  } catch (err) { console.error('Download failed:', err); }
+});
+
+
+// --------------------------------------------------------------------------
+// Account menu + hero actions
+// --------------------------------------------------------------------------
+(function setupAccountMenu() {
+  const btn = document.getElementById('btn-account-menu');
+  const pop = document.getElementById('account-menu');
+  if (!btn || !pop) return;
+  const setOpen = (open) => { pop.classList.toggle('open', open); btn.setAttribute('aria-expanded', String(open)); };
+  btn.addEventListener('click', (e) => { e.stopPropagation(); setOpen(!pop.classList.contains('open')); });
+  pop.addEventListener('click', (e) => { if (e.target.closest('.menu-item')) setOpen(false); });
+  document.addEventListener('click', (e) => { if (!pop.contains(e.target)) setOpen(false); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
+  const start = document.getElementById('hero-start');
+  const plan = document.getElementById('hero-plan');
+  if (start) start.addEventListener('click', () => document.querySelector('.nav-item[data-view="library"]')?.click());
+  if (plan) plan.addEventListener('click', () => document.getElementById('btn-open-planner')?.click());
+})();

@@ -1,123 +1,77 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ALGOARCH — Engineering Curriculum & Systems Prep</title>
-  <meta name="description" content="Production-grade, publication-quality technical interview preparation for Senior/L5 distributed systems and algorithms.">
+  <title>AlgoArch: FAANG interview prep for ₹50 LPA offers</title>
+  <meta name="description" content="A structured curriculum for senior software engineering interviews: data structures, system design, AI engineering and offer negotiation, with an AI mentor that reads each chapter.">
   
-  <!-- Typography: Charter & Inter + JetBrains Mono -->
+  <!-- Typography: Schibsted Grotesk (text) + JetBrains Mono (code only) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Schibsted+Grotesk:wght@400;700&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=2.6">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+  <link rel="stylesheet" href="style.css?v=3.4">
+  <link rel="stylesheet" href="reader/reader.css?v=2">
 </head>
 <body>
 
-  <!-- Top Sticky Navigation Bar -->
   <header class="navbar">
     <div class="nav-left">
       <div class="brand" id="brand-home">
-        <div class="brand-logo">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-            <polyline points="2 17 12 22 22 17"></polyline>
-            <polyline points="2 12 12 17 22 12"></polyline>
-          </svg>
-        </div>
-        <div class="brand-text">
-          <span class="brand-title">ALGOARCH</span>
-          <span class="brand-badge">50 LPA L5</span>
-        </div>
+        <span class="brand-logo" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+        </span>
+        <span class="brand-title">AlgoArch</span>
       </div>
-
-      <nav class="nav-links">
-        <button class="nav-item active" data-view="roadmap">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-          Roadmap
-        </button>
-        <button class="nav-item" data-view="library">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
-          Curriculum (100)
-        </button>
-        <button class="nav-item" data-view="videos">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-          Video Hub
-        </button>
-        <button class="nav-item" data-view="calculator">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"></rect><line x1="8" y1="6" x2="16" y2="6"></line><line x1="16" y1="14" x2="16" y2="18"></line><path d="M16 10h.01"></path><path d="M12 10h.01"></path><path d="M8 10h.01"></path><path d="M12 14h.01"></path><path d="M8 14h.01"></path><path d="M12 18h.01"></path><path d="M8 18h.01"></path></svg>
-          CTC Simulator
-        </button>
+      <nav class="nav-links" aria-label="Primary">
+        <button class="nav-item active" data-view="roadmap">Overview</button>
+        <button class="nav-item" data-view="library">Curriculum</button>
+        <button class="nav-item" data-view="videos">Lectures</button>
+        <button class="nav-item" data-view="calculator">Offer calculator</button>
       </nav>
     </div>
 
     <div class="nav-right">
-      <!-- Search Trigger -->
-      <button class="search-trigger" id="btn-search-trigger">
+      <div class="menu-wrap topics-wrap">
+        <button class="topics-btn" id="btn-topics" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="topics-menu">
+          <span>Topics</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+        <div class="topics-pop" id="topics-menu" role="region" aria-label="Browse topics"></div>
+      </div>
+      <button class="search-trigger" id="btn-search-trigger" aria-label="Search lessons">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <span>Search lessons...</span>
+        <span>Search</span>
         <kbd>Ctrl K</kbd>
       </button>
 
-      <!-- Study Streak & Reminders -->
-      <button class="nav-pill-btn btn-streak" id="btn-streak-trigger" title="Your Study Streak & Motivation Reminders">
-        <span>🔥</span>
-        <span id="nav-streak-cnt">3</span>
+      <button class="btn-ai-toggle" id="btn-toggle-ai" aria-label="Open AI mentor">
+        <span class="ai-sparkle" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg></span>
+        <span>Mentor</span>
       </button>
 
-      <!-- Dynamic Study Planner (Grind 75 Style) -->
-      <button class="nav-pill-btn btn-planner" id="btn-open-planner" title="Dynamic FAANG Study Schedule Generator">
-        <span>📅</span>
-        <span>Planner</span>
-      </button>
-
-      <!-- Subscription Plan & Pricing -->
-      <button class="nav-pill-btn btn-plan" id="btn-pricing-trigger" title="Subscription Plans & AI Quotas">
-        <span id="nav-plan-icon">⚡</span>
-        <span id="nav-plan-badge">Pro Plan</span>
-      </button>
-
-      <!-- Admin CMS -->
-      <button class="nav-pill-btn btn-cms" id="btn-open-cms" title="Admin CMS — Manage Curriculum & Lessons">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-        <span>CMS</span>
-      </button>
-
-      <!-- User Account / Sign In -->
-      <button class="nav-user-btn" id="btn-user-profile" title="Account & Progress Sync">
-        <img id="nav-user-avatar" src="https://api.dicebear.com/7.x/bottts/svg?seed=engineer_faang" class="user-avatar-mini" alt="User">
-        <span id="nav-user-name">Sign In</span>
-      </button>
-
-      <!-- Download All Labs Zip -->
-      <a href="/api/download/all-labs.zip" class="btn-download-labs" title="Download all Python labs (.zip)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-        <span>Labs (.zip)</span>
-      </a>
-
-      <!-- 50LPA Readiness Meter -->
-      <div class="readiness-meter" title="Readiness based on completed core lessons">
-        <div class="meter-bar">
-          <div class="meter-fill" id="readiness-fill" style="width: 12%;"></div>
+      <div class="menu-wrap">
+        <button class="account-btn" id="btn-account-menu" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu" aria-label="Account and tools">
+          <img id="nav-user-avatar" src="https://api.dicebear.com/7.x/bottts/svg?seed=engineer_faang" class="user-avatar-mini" alt="">
+        </button>
+        <div class="menu-pop" id="account-menu">
+          <div class="menu-head">
+            <div class="readiness-label"><span>Interview readiness</span><span id="readiness-percent">12%</span></div>
+            <div class="meter-bar"><div class="meter-fill" id="readiness-fill" style="width: 12%;"></div></div>
+          </div>
+          <div class="menu-sep"></div>
+          <button class="menu-item account-row" id="btn-user-profile"><span id="nav-user-name">Sign in</span></button>
+          <button class="menu-item" id="btn-streak-trigger"><span>Study streak</span><small id="nav-streak-cnt">3</small></button>
+          <button class="menu-item" id="btn-open-planner"><span>Study planner</span></button>
+          <button class="menu-item" id="btn-pricing-trigger"><span>Plan</span><small id="nav-plan-badge">Free</small></button>
+          <a class="menu-item" href="/api/download/all-labs.zip"><span>Download labs</span><small>.zip</small></a>
+          <div class="menu-sep"></div>
+          <button class="menu-item" id="btn-theme-toggle"><span>Switch theme</span></button>
+          <button class="menu-item" id="btn-open-cms"><span>Admin</span></button>
         </div>
-        <span class="meter-label"><span id="readiness-percent">12%</span></span>
       </div>
-
-      <!-- Live AI Mentor Button -->
-      <button class="btn-ai-toggle" id="btn-toggle-ai" title="Toggle AI Mentor">
-        <div class="ai-sparkle">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07l14.14-14.14"/></svg>
-        </div>
-        <span>AI Mentor</span>
-        <span class="live-dot"></span>
-      </button>
-
-      <!-- Theme Switcher -->
-      <button class="theme-toggle" id="btn-theme-toggle" title="Toggle Theme">
-        <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-        <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-      </button>
     </div>
   </header>
 
@@ -126,47 +80,53 @@
 
     <!-- VIEW 1: ROADMAP & OVERVIEW -->
     <section id="view-roadmap" class="app-view active">
+      <div class="hero-stage">
+      <div class="hero-tiles" aria-hidden="true">
+        <span class="hero-tile" style="--x: 6%; --y: 8%; --i: 0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg></span>
+        <span class="hero-tile" style="--x: 60%; --y: 2%; --i: 1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.5"></circle><circle cx="6" cy="19" r="2.5"></circle><circle cx="18" cy="19" r="2.5"></circle><path d="M12 7.5v4M12 11.5L6 16.5M12 11.5l6 5"></path></svg></span>
+        <span class="hero-tile" style="--x: 34%; --y: 32%; --i: 2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"></rect><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"></path></svg></span>
+        <span class="hero-tile" style="--x: 78%; --y: 40%; --i: 3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"></ellipse><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"></path></svg></span>
+        <span class="hero-tile" style="--x: 10%; --y: 62%; --i: 4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2.5"></circle><circle cx="19" cy="6" r="2.5"></circle><circle cx="12" cy="18" r="2.5"></circle><path d="M7.5 6h9M6.5 8l4 8M17.5 8l-4 8"></path></svg></span>
+        <span class="hero-tile" style="--x: 54%; --y: 70%; --i: 5"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"></circle><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"></path><circle cx="17" cy="9" r="2.5"></circle><path d="M17 14c2.8 0 5 2.2 5 5"></path></svg></span>
+      </div>
       <div class="hero-section">
-        <div class="hero-badge">
-          The Senior / L5 Engineering Syllabus
+        <h1 class="hero-title">Crack the ₹50 LPA interview loop.</h1>
+        <p class="hero-subtitle"><span id="stat-lessons">106</span> lessons, <span id="stat-videos">202</span> lectures, and a mentor that reads along.</p>
+        <div class="hero-actions">
+          <button class="btn-action-primary" id="hero-start" type="button">Start the curriculum</button>
+          <button class="btn-pg-ghost" id="hero-plan" type="button">Plan your weeks</button>
         </div>
-        <h1 class="hero-title">Technical Mastery for ₹50LPA+ Offers</h1>
-        <p class="hero-subtitle">
-          An opinionated curriculum covering Distributed Systems, Data Structures, Production AI Engineering, and Offer Negotiation. Zero fluff, real metrics, and live instrument benches.
-        </p>
-
-        <div class="hero-stats-grid">
-          <div class="stat-card">
-            <span class="stat-val" id="stat-lessons">100</span>
-            <span class="stat-lbl">Core Lessons</span>
-            <span class="stat-sub">+16 Advanced 50LPA Modules</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-val" id="stat-fivestar">54</span>
-            <span class="stat-lbl">Top Priority (★★★★★)</span>
-            <span class="stat-sub">The Non-Negotiable Core</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-val" id="stat-videos">26</span>
-            <span class="stat-lbl">Technical Video Vault</span>
-            <span class="stat-sub">Kleppmann, Karpathy, NeetCode</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-val">Active</span>
-            <span class="stat-lbl">In-Page AI Mentor</span>
-            <span class="stat-sub">Context-Aware Queries</span>
-          </div>
-        </div>
+        <p class="hero-note"><span id="stat-fivestar">54</span> lessons are marked top priority. Start with those.</p>
       </div>
 
+      </div>
+
+      <div class="topic-marquee" id="topic-marquee" aria-label="Topics covered"></div>
+
+      <section class="deck-section" id="deck-section" aria-label="New lessons" hidden>
+        <div class="deck-copy">
+          <h2 class="section-title">New lessons</h2>
+          <p class="section-desc">The latest additions to the curriculum.</p>
+          <div class="deck-controls">
+            <button type="button" class="deck-btn" id="deck-prev" aria-label="Previous lesson"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
+            <button type="button" class="deck-btn" id="deck-next" aria-label="Next lesson">
+              <svg class="deck-ring-svg" viewBox="0 0 36 36" aria-hidden="true"><circle class="deck-ring-track" cx="18" cy="18" r="16"></circle><circle class="deck-ring" id="deck-ring" cx="18" cy="18" r="16"></circle></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+            <span class="deck-count" id="deck-count" aria-live="polite"></span>
+          </div>
+        </div>
+        <div class="deck" id="deck"></div>
+      </section>
+
       <div class="pillars-section">
-        <h2 class="section-title">The Four Core Tracks</h2>
-        <p class="section-desc">Tier-1 hiring bars require mastery across storage, distributed architectures, algorithms, and behavioral altitude.</p>
+        <h2 class="section-title">Four tracks</h2>
+        <p class="section-desc">Senior loops test storage, distributed systems, algorithms and how you communicate trade-offs. Each track covers one of them.</p>
         <div class="pillars-grid" id="pillars-container"></div>
       </div>
 
       <div class="companies-banner">
-        <span class="banner-title">CALIBRATED TO INTERVIEW CRITERIA AT:</span>
+        <span class="banner-title">Calibrated to the interview bars at </span>
         <div class="companies-row">
           <span class="comp-tag">Google (L5)</span>
           <span class="comp-tag">Meta (E5)</span>
@@ -188,7 +148,7 @@
         <!-- Left Filter Rail -->
         <aside class="library-sidebar">
           <div class="filter-group">
-            <label class="filter-label">TRACK</label>
+            <label class="filter-label">Track</label>
             <div class="track-pills" id="track-filter-pills">
               <button class="track-pill active" data-track="all">All Tracks <span class="pill-cnt" id="cnt-all">106</span></button>
               <button class="track-pill" data-track="dsa">DSA <span class="pill-cnt" id="cnt-dsa">26</span></button>
@@ -199,7 +159,7 @@
           </div>
 
           <div class="filter-group">
-            <label class="filter-label">TARGET COMPANY (LEETCODE PREMIUM)</label>
+            <label class="filter-label">Target company</label>
             <div class="company-pills" id="company-filter-pills">
               <button class="comp-filter-pill active" data-company="all">All Companies</button>
               <button class="comp-filter-pill" data-company="Google">Google (L5)</button>
@@ -212,7 +172,7 @@
           </div>
 
           <div class="filter-group">
-            <label class="filter-label">MINIMUM PRIORITY</label>
+            <label class="filter-label">Minimum priority</label>
             <div class="priority-pills" id="priority-filter-pills">
               <button class="pri-btn active" data-stars="0">All</button>
               <button class="pri-btn" data-stars="5">★★★★★</button>
@@ -222,7 +182,7 @@
           </div>
 
           <div class="filter-group">
-            <label class="filter-label">STATUS</label>
+            <label class="filter-label">Status</label>
             <div class="status-pills" id="status-filter-pills">
               <button class="status-btn active" data-status="all">All</button>
               <button class="status-btn" data-status="completed">Completed (<span id="status-completed-cnt">0</span>)</button>
@@ -235,15 +195,15 @@
         <div class="library-feed">
           <div class="feed-header">
             <div>
-              <h2 class="feed-title" id="current-track-heading">All Courses & Chapters</h2>
+              <h2 class="feed-title" id="current-track-heading">All lessons</h2>
               <p class="feed-subtitle" id="current-track-sub">106 sequenced lessons calibrated for the ₹50LPA engineering threshold.</p>
             </div>
             <div class="feed-actions">
               <button class="btn-pg-ghost btn-creator-widget" id="btn-trigger-planner" title="Generate customized study roadmap">
-                <span>📅 Grind 75 Planner</span>
+                <span>Study planner</span>
               </button>
               <button class="btn-pg-ghost btn-creator-widget" id="btn-trigger-rubric" title="FAANG hiring bar evaluation rubric">
-                <span>🎯 Mock Rubric</span>
+                <span>Mock rubric</span>
               </button>
               <input type="text" class="search-input" id="feed-search" placeholder="Filter by topic or pattern...">
             </div>
@@ -255,209 +215,14 @@
       </div>
     </section>
 
-    <!-- VIEW 3: LESSON READER (WITH STICKY TOC RAIL & INTEGRATED BENCHES) -->
+    <!-- VIEW 3: LESSON READER (rendered by the React reader from /api/lessons/:id) -->
     <section id="view-reader" class="app-view">
-      <div class="reader-header">
-        <button class="btn-back" id="btn-reader-back">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-          Back to Overview
-        </button>
-
-        <div class="reader-meta-bar" id="reader-meta-bar"></div>
-
-        <div class="reader-controls">
-          <button class="btn-action-icon" id="btn-bookmark-lesson" title="Bookmark">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
-            <span>Bookmark</span>
-          </button>
-          <button class="btn-action-primary" id="btn-complete-lesson">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            <span id="complete-btn-text">Mark Done</span>
-          </button>
-          <button class="btn-action-ai" id="btn-ask-ai-lesson">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-            <span>Ask Mentor</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Modern Lesson Resource Tabs -->
-      <div class="reader-tabs-nav" id="reader-tabs-nav">
-        <button class="reader-tab active" data-tab="guide">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
-          Chapter & Lab
-        </button>
-        <button class="reader-tab" data-tab="videos" id="tab-btn-videos">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-          Video Lectures (<span id="tab-video-cnt">0</span>)
-        </button>
-        <button class="reader-tab" data-tab="homework" id="tab-btn-homework">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
-          Homework & Drills
-        </button>
-        <button class="reader-tab" data-tab="playground" id="tab-btn-playground">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
-          Playground & Code
-        </button>
-        <button class="reader-tab" data-tab="articles" id="tab-btn-articles">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-          Articles & RFCs
-        </button>
-        <button class="reader-tab" data-tab="repos" id="tab-btn-repos">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
-          Useful Repos
-        </button>
-      </div>
-
-      <!-- Tab 1: Unified Page (Study Guide + Native Collapsible Bench) -->
-      <div class="reader-layout tab-pane active" id="pane-guide">
-        <aside class="reader-toc-rail">
-          <div class="toc-rail-title">ON THIS PAGE</div>
-          <nav class="reader-toc-list" id="reader-toc-list"></nav>
-        </aside>
-
-        <div class="reader-main-column">
-          <!-- Collapsible Interactive Simulation Workbench Card -->
-          <div class="bench-collapsible-card" id="bench-collapsible-card" style="display: none;">
-            <div class="bench-card-header" id="bench-collapse-toggle">
-              <div class="bench-header-left">
-                <span class="bench-live-dot"></span>
-                <div>
-                  <div class="bench-card-title">Interactive Visual Lab & Simulation Bench</div>
-                  <div class="bench-card-sub">Real-time concurrency simulator, memory allocators, and failure-mode drills</div>
-                </div>
-              </div>
-              <div class="bench-header-right">
-                <button class="btn-bench-reset" id="btn-reset-bench-card" title="Reset Simulation">Reset State</button>
-                <span class="bench-toggle-pill" id="bench-toggle-text">Collapse ▴</span>
-              </div>
-            </div>
-            <div class="bench-card-body" id="bench-collapse-body">
-              <iframe id="reader-bench-frame" src="about:blank" title="Interactive Simulation Bench" loading="lazy"></iframe>
-            </div>
-          </div>
-
-          <!-- Article Content -->
-          <article class="markdown-content" id="reader-content"></article>
-        </div>
-      </div>
-
-      <!-- Tab 2: Curated Video Lectures for this Lesson -->
-      <div class="tab-pane" id="pane-videos" style="display: none;">
-        <div class="resource-pane-header">
-          <div class="resource-badge">Technical Lectures</div>
-          <h3>Curated Video Breakdowns for this Topic</h3>
-          <p>Carefully selected video explanations from Martin Kleppmann, Andrej Karpathy, Hussein Nasser, and ByteByteGo.</p>
-        </div>
-        <div class="featured-video-player" id="featured-video-player" style="display: none;">
-          <div class="video-embed-container">
-            <iframe id="featured-video-iframe" src="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-          </div>
-          <div class="featured-video-meta">
-            <h4 id="featured-video-title">Video Title</h4>
-            <p id="featured-video-desc">Video Description</p>
-          </div>
-        </div>
-        <div class="lesson-videos-grid" id="lesson-videos-grid"></div>
-      </div>
-
-      <!-- Tab 3: Interactive Homework & FAANG Drills -->
-      <div class="tab-pane" id="pane-homework" style="display: none;">
-        <div class="resource-pane-header">
-          <div class="resource-badge">Senior L5 Assessment</div>
-          <h3>Diagnostic Homework & Mock Onsite Drills</h3>
-          <p>Practical scenarios, failure-mode tests, and trade-off questions asked in Google, Meta, and Amazon rounds.</p>
-        </div>
-        <div class="drills-progress-card">
-          <div class="drills-header-row">
-            <span>Interview Readiness Checklist</span>
-            <span class="drills-counter" id="hw-progress-counter">0 / 0 Practiced</span>
-          </div>
-          <div class="drills-progress-track">
-            <div class="drills-progress-fill" id="hw-progress-fill" style="width: 0%;"></div>
-          </div>
-        </div>
-        <div class="homework-drills-list" id="homework-drills-list"></div>
-      </div>
-
-      <!-- Tab 4: Live Code Playground & Monaco IDE Runner -->
-      <div class="tab-pane" id="pane-playground" style="display: none;">
-        <div class="playground-card">
-          <div class="playground-topbar">
-            <div class="pg-file-meta">
-              <span class="pg-icon">⚡</span>
-              <span class="pg-filename" id="playground-filename">lab_solution.py</span>
-              <select id="playground-lang-select" class="pg-lang-picker">
-                <option value="python">Python 3.11</option>
-                <option value="javascript">JavaScript (ES6)</option>
-                <option value="go">Go 1.21</option>
-              </select>
-              <span class="pg-monaco-badge" id="monaco-status-badge">Monaco IDE</span>
-            </div>
-            <div class="pg-btn-group">
-              <button class="btn-pg-ghost" id="btn-copy-code-pg">Copy Code</button>
-              <button class="btn-pg-ghost" id="btn-reset-code-pg">Reset</button>
-              <a href="#" class="btn-pg-ghost" id="btn-download-lab-pg" download>Download .py</a>
-              <button class="btn-pg-primary" id="btn-run-playground">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                Run Code & Test
-              </button>
-            </div>
-          </div>
-          <div class="playground-editor-wrapper" id="playground-editor-container">
-            <div id="monaco-editor-mount" style="width: 100%; height: 380px;"></div>
-            <textarea class="playground-textarea" id="playground-editor" spellcheck="false" style="display:none;" placeholder="# Python implementation code..."></textarea>
-          </div>
-          <div class="playground-console">
-            <div class="console-header">
-              <span>TERMINAL OUTPUT</span>
-              <span class="console-status" id="playground-status">Idle</span>
-            </div>
-            <pre class="console-output" id="playground-output">$ Ready to run. Click "Run Code & Test" to evaluate invariants and assertions.</pre>
-          </div>
-        </div>
-      </div>
-
-      <!-- Tab 5: Foundational Articles & RFCs -->
-      <div class="tab-pane" id="pane-articles" style="display: none;">
-        <div class="resource-pane-header">
-          <div class="resource-badge">Engineering Literature</div>
-          <h3>Seminal Papers, Architecture RFCs & Deep Dives</h3>
-          <p>Authoritative reading list compiled from ACM/USENIX publications and top engineering team blogs.</p>
-        </div>
-        <div class="articles-grid" id="lesson-articles-grid"></div>
-      </div>
-
-      <!-- Tab 6: Production Repos & Complete Downloads -->
-      <div class="tab-pane" id="pane-repos" style="display: none;">
-        <div class="resource-pane-header">
-          <div class="resource-badge">Source Repositories</div>
-          <h3>Production Codebases & Download Center</h3>
-          <p>Inspect real implementations from enterprise open-source repos and download complete offline labs.</p>
-        </div>
-        <div class="repos-banner-card">
-          <div class="repos-banner-text">
-            <h4>Complete 100-Chapter Offline Lab Package</h4>
-            <p>All runnable Python labs, simulation code, and test suites in a single self-contained archive.</p>
-          </div>
-          <a href="/api/download/all-labs.zip" class="btn-download-archive-primary">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            Download Full Package (.zip · 528 KB)
-          </a>
-        </div>
-        <div class="repos-grid" id="lesson-repos-grid"></div>
-      </div>
-
-      <div class="reader-footer">
-        <button class="btn-nav-lesson" id="btn-prev-lesson">← Previous Lesson</button>
-        <button class="btn-nav-lesson next" id="btn-next-lesson">Next Lesson →</button>
-      </div>
+      <div id="reader-root"></div>
     </section>
 
     <!-- VIEW 4: CURATED YOUTUBE VIDEO VAULT -->
     <section id="view-videos" class="app-view">
       <div class="videos-header">
-        <div class="badge-tag">Technical Lectures Only</div>
         <h2 class="videos-title">Video Vault</h2>
         <p class="videos-desc">
           Structured, high-density video breakdowns from Kleppmann, Karpathy, NeetCode, ByteByteGo, and Hussein Nasser.
@@ -480,7 +245,6 @@
     <section id="view-calculator" class="app-view">
       <div class="calc-container">
         <div class="calc-header">
-          <div class="badge-tag">Compensation Architecture</div>
           <h2>50 LPA–80 LPA CTC & Equity Simulator</h2>
           <p>Deconstruct base salary, variable bonus, sign-on bonus, and RSU vesting schedules to evaluate real cashflow.</p>
         </div>
@@ -612,8 +376,8 @@
 
     <!-- AI Subscription Status Strip -->
     <div class="ai-credits-strip">
-      <span class="ai-credits-status">⚡ <strong id="drawer-usage-cnt">5 / 5</strong> queries left today (<span id="drawer-plan-badge">Free</span>)</span>
-      <button class="btn-drawer-key" id="btn-drawer-upgrade-plan">Upgrade to Pro 🚀</button>
+      <span class="ai-credits-status"><strong id="drawer-usage-cnt">5 / 5</strong> queries left today (<span id="drawer-plan-badge">Free</span>)</span>
+      <button class="btn-drawer-key" id="btn-drawer-upgrade-plan">Upgrade to Pro </button>
     </div>
 
     <div class="ai-quick-chips">
@@ -644,8 +408,8 @@
     <div class="auth-modal-box">
       <div class="auth-modal-header">
         <div>
-          <h3>Sign In to AlgoArch</h3>
-          <p>Sync your progress, streaks, notes, and unlock 10 free AI mentor credits.</p>
+          <h3>Sign in to AlgoArch</h3>
+          <p>Sync your progress, streaks and notes across devices.</p>
         </div>
         <button class="btn-close-modal" id="btn-close-auth">✕</button>
       </div>
@@ -659,7 +423,7 @@
           <span>Continue with GitHub</span>
         </button>
         <button class="btn-auth-provider guest" id="btn-login-guest">
-          <span>⚡ 1-Click Instant Guest Sign In (10 Free Credits)</span>
+          <span>Continue as guest</span>
         </button>
       </div>
     </div>
@@ -670,14 +434,13 @@
     <div class="cms-modal-box">
       <div class="cms-modal-header">
         <div class="cms-title-meta">
-          <div class="badge-tag">Admin Operations</div>
           <h3>System Admin & LiteLLM Gateway Center</h3>
           <p>Manage curriculum chapters, track real-time token consumption, set user limits, and reset budgets.</p>
         </div>
         <div class="cms-header-actions">
           <div class="cms-view-nav">
-            <button class="cms-nav-btn active" id="btn-cms-view-chapters">📖 Curriculum CMS</button>
-            <button class="cms-nav-btn" id="btn-cms-view-tokens">⚡ LiteLLM Token Usage & Limits</button>
+            <button class="cms-nav-btn active" id="btn-cms-view-chapters">Curriculum CMS</button>
+            <button class="cms-nav-btn" id="btn-cms-view-tokens">LiteLLM Token Usage & Limits</button>
           </div>
           <button class="btn-cms-new" id="btn-cms-new-chapter">+ New Chapter</button>
           <button class="btn-close-modal" id="btn-close-cms">✕</button>
@@ -736,7 +499,7 @@
           <div class="cms-footer-actions">
             <span id="cms-save-status" class="cms-status-msg"></span>
             <button class="btn-action-primary" id="btn-cms-save">
-              <span>💾 Save & Publish to Production</span>
+              <span>Save & Publish to Production</span>
             </button>
           </div>
         </div>
@@ -771,13 +534,13 @@
         <!-- Global Control Bar -->
         <div class="tokens-actions-bar">
           <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-            <label style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--text-secondary);">DEFAULT USER LIMIT:</label>
+            <label style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--text-secondary);">Default user limit</label>
             <input type="number" id="input-global-token-limit" class="cms-input" style="width: 110px;" value="25000" step="5000">
             <button class="btn-pg-ghost" id="btn-save-default-limit" style="font-weight: 600; padding: 5px 12px;">Save Limit</button>
           </div>
           <div style="display: flex; align-items: center; gap: 10px; margin-left: auto;">
-            <button class="btn-pg-ghost" id="btn-refresh-tokens" style="font-weight: 600; padding: 5px 12px;">🔄 Refresh</button>
-            <button class="btn-pg-ghost" id="btn-reset-all-tokens" style="color: var(--accent-red); border-color: rgba(239, 68, 68, 0.4); font-weight: 600; padding: 5px 12px;">⚠️ Reset All Usage</button>
+            <button class="btn-pg-ghost" id="btn-refresh-tokens" style="font-weight: 600; padding: 5px 12px;">Refresh</button>
+            <button class="btn-pg-ghost" id="btn-reset-all-tokens" style="color: var(--accent-red); border-color: rgba(239, 68, 68, 0.4); font-weight: 600; padding: 5px 12px;">Reset All Usage</button>
           </div>
         </div>
 
@@ -837,9 +600,8 @@
     <div class="pricing-modal-box">
       <div class="pricing-modal-header">
         <div>
-          <div class="badge-tag">Production Membership</div>
-          <h3>AlgoArch Memberships & AI Plans</h3>
-          <p>Production-grade FAANG interview preparation. Zero dummy tools, powered by Google Gemini AI.</p>
+          <h3>Plans</h3>
+          <p>Every plan includes the full curriculum. Higher plans add AI queries and tools.</p>
         </div>
         <button class="btn-close-modal" id="btn-close-pricing">✕</button>
       </div>
@@ -854,64 +616,61 @@
               <span class="price-val">₹0</span>
               <span class="price-period">/ forever</span>
             </div>
-            <p class="plan-sub">For foundational exploration across all curriculum tracks.</p>
+            <p class="plan-sub">Read the whole curriculum and try the mentor.</p>
           </div>
           <ul class="plan-features">
-            <li>✓ Full access to all 106+ FAANG Curriculum Lessons</li>
-            <li>✓ <strong>5 Real Gemini AI Mentor Queries / day</strong></li>
-            <li>✓ Daily study streak tracker & reminder digests</li>
-            <li>✓ Community drills & cheat sheets</li>
-            <li class="disabled">✗ Monaco IDE live runner & test suites</li>
-            <li class="disabled">✗ Company-tagged question filters</li>
-            <li class="disabled">✗ Dynamic Grind 75 study schedule planner</li>
+            <li>✓ Every curriculum lesson</li>
+            <li>✓ <strong>5 AI mentor queries a day</strong></li>
+            <li>✓ Study streak and daily reminders</li>
+            <li>✓ Homework drills for every lesson</li>
+            <li class="disabled">✗ Interactive code runner</li>
+            <li class="disabled">✗ Company filters</li>
+            <li class="disabled">✗ Full study planner</li>
           </ul>
           <button class="btn-plan-action current" id="btn-select-free" disabled>Current Plan</button>
         </div>
 
         <!-- Plan 2: Pro Engineer (Recommended) -->
         <div class="pricing-card featured" id="card-plan-pro">
-          <div class="plan-ribbon">MOST POPULAR · 50LPA SWE</div>
+          <div class="plan-ribbon">Most popular</div>
           <div class="plan-header">
-            <span class="plan-badge-tag pro">Pro ⚡</span>
+            <span class="plan-badge-tag pro">Pro </span>
             <h4 class="plan-name">Pro Engineer</h4>
             <div class="plan-price">
               <span class="price-val">₹499</span>
               <span class="price-period">/ month</span>
             </div>
-            <p class="plan-sub">The complete technical engine for L4/L5 senior candidates.</p>
+            <p class="plan-sub">For candidates preparing an L4 or L5 loop.</p>
           </div>
           <ul class="plan-features">
-            <li>✓ <strong>100 Real Gemini AI Queries / day</strong></li>
-            <li>✓ <strong>Monaco IDE live code runner & test suites</strong></li>
-            <li>✓ <strong>Target company filters (Google, Meta, Amazon, Netflix)</strong></li>
-            <li>✓ <strong>Dynamic Grind 75 study schedule planner</strong></li>
-            <li>✓ Priority model latency (&lt;1s response time)</li>
-            <li>✓ Complete architecture guides & RFCs</li>
-            <li class="disabled">✗ 1-on-1 FAANG Mock interview scorecard</li>
+            <li>✓ <strong>100 AI mentor queries a day</strong></li>
+            <li>✓ <strong>Interactive code runner</strong></li>
+            <li>✓ <strong>Company filters</strong></li>
+            <li>✓ <strong>Full study planner</strong></li>
+                        <li>✓ Everything in Free</li>
+            <li class="disabled">✗ Hiring rubric and mock scorecard</li>
           </ul>
-          <button class="btn-plan-action primary" id="btn-select-pro">Upgrade to Pro ⚡</button>
+          <button class="btn-plan-action primary" id="btn-select-pro">Upgrade to Pro </button>
         </div>
 
         <!-- Plan 3: Staff / Enterprise -->
         <div class="pricing-card" id="card-plan-enterprise">
           <div class="plan-header">
-            <span class="plan-badge-tag enterprise">Staff Elite 👑</span>
+            <span class="plan-badge-tag enterprise">Staff </span>
             <h4 class="plan-name">Staff / Enterprise</h4>
             <div class="plan-price">
               <span class="price-val">₹1,499</span>
               <span class="price-period">/ month</span>
             </div>
-            <p class="plan-sub">For Principal/Staff L6+ candidates targeting ₹80LPA+ CTC.</p>
+            <p class="plan-sub">For staff-level loops and offline study.</p>
           </div>
           <ul class="plan-features">
-            <li>✓ <strong>500 Real Gemini AI Queries / day</strong> (Unlimited)</li>
-            <li>✓ <strong>FAANG Hiring Bar Rubric & Mock Scorecard</strong></li>
-            <li>✓ <strong>Complete 106-Chapter Offline Lab Package (.zip)</strong></li>
-            <li>✓ Low-latency & ML system design architectures</li>
-            <li>✓ Priority senior mentor queue</li>
-            <li>✓ Full CMS admin content creator suite</li>
+            <li>✓ <strong>500 AI mentor queries a day</strong></li>
+            <li>✓ <strong>Hiring rubric and mock scorecard</strong></li>
+            <li>✓ <strong>Offline lab package (.zip)</strong></li>
+                                    <li>✓ Admin content studio</li>
           </ul>
-          <button class="btn-plan-action" id="btn-select-enterprise">Upgrade to Staff 👑</button>
+          <button class="btn-plan-action" id="btn-select-enterprise">Upgrade to Staff </button>
         </div>
       </div>
     </div>
@@ -922,7 +681,6 @@
     <div class="planner-modal-box">
       <div class="planner-header">
         <div>
-          <div class="badge-tag">Grind 75 & NeetCode Acceleration</div>
           <h3>Dynamic FAANG Study Schedule Generator</h3>
           <p>Personalized day-by-day curriculum tailored to your remaining interview timeline.</p>
         </div>
@@ -958,7 +716,7 @@
         </div>
         <div class="planner-field-action">
           <button class="btn-action-primary" id="btn-generate-schedule" style="margin-top: 18px; width: 100%;">
-            <span>⚡ Generate My Schedule</span>
+            <span>Generate My Schedule</span>
           </button>
         </div>
       </div>
@@ -976,7 +734,6 @@
     <div class="rubric-modal-box">
       <div class="rubric-header">
         <div>
-          <div class="badge-tag">Hiring Committee Standard</div>
           <h3>FAANG Technical Interview Rubric & Scorecard</h3>
           <p>Calibrated against Google, Meta, and Amazon L4, L5, and L6 hiring rubrics.</p>
         </div>
@@ -1026,8 +783,8 @@
             <span class="rubric-max">/ 20</span>
           </div>
           <div class="rubric-verdict">
-            <div class="verdict-label">HIRING COMMITTEE RECOMMENDATION:</div>
-            <strong class="verdict-tier" id="rubric-verdict-text">STRONG HIRE (L5 Senior SWE · ₹50LPA–₹75LPA)</strong>
+            <div class="verdict-label">Hiring committee recommendation</div>
+            <strong class="verdict-tier" id="rubric-verdict-text">Strong hire (L5, ₹50 to ₹75 LPA)</strong>
           </div>
         </div>
       </div>
@@ -1039,8 +796,8 @@
     <div class="streak-modal-box">
       <div class="streak-modal-header">
         <div>
-          <h3>🔥 Study Streak & Daily Motivation Dispatch</h3>
-          <p>Build the daily consistency required to crack 50LPA Staff Engineering interviews.</p>
+          <h3>Study Streak & Daily Motivation Dispatch</h3>
+          <p>A short daily nudge keeps preparation steady.</p>
         </div>
         <button class="btn-close-modal" id="btn-close-streak">✕</button>
       </div>
@@ -1048,13 +805,13 @@
         <div class="streak-big-num" id="modal-streak-count">3</div>
         <div>
           <h4 style="font-size: 16px; margin: 0 0 4px;">Day Consistency Streak</h4>
-          <p style="font-size: 13px; color: var(--text-secondary); margin: 0;">You're in the top 5% of candidates preparing daily.</p>
+          <p style="font-size: 13px; color: var(--text-secondary); margin: 0;">Daily practice compounds. Keep the chain going.</p>
         </div>
       </div>
       <div class="streak-settings-form">
         <h4>Automated Daily Email Reminders</h4>
         <div class="cms-field" style="margin-top: 10px;">
-          <label>Your Email Address</label>
+          <label>Your email address</label>
           <input type="email" id="streak-input-email" class="cms-input" placeholder="engineer@faang.io">
         </div>
         <div class="cms-field" style="margin-top: 10px;">
@@ -1067,23 +824,25 @@
         </div>
         <div style="display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap;">
           <button class="btn-action-primary" id="btn-save-reminders">Save Reminder Preferences</button>
-          <button class="btn-pg-ghost" id="btn-preview-email">Preview Daily Email Digest →</button>
+          <button class="btn-pg-ghost" id="btn-preview-email">Preview the daily email</button>
         </div>
       </div>
       <div id="email-preview-container" class="email-preview-box" style="display: none; margin-top: 16px;">
         <div class="email-preview-header">
-          <span>EMAIL PREVIEW (What lands in your inbox)</span>
-          <button class="btn-close-preview" id="btn-close-email-preview">✕ Close Preview</button>
+          <span>Email preview</span>
+          <button class="btn-close-preview" id="btn-close-email-preview">Close preview</button>
         </div>
         <iframe id="email-preview-iframe" style="width: 100%; height: 320px; border: none; border-radius: 4px; background: #0d1117;"></iframe>
       </div>
     </div>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
   <script src="vendor/marked.min.js"></script>
   <script>if (!window.marked) document.write('<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\\/script>')</script>
-  <!-- Monaco Editor AMD Loader -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
-  <script src="app.js?v=3.0"></script>
+  <script src="reader/reader.js?v=2"></script>
+  <script src="app.js?v=3.4"></script>
+  <script src="home.js?v=1"></script>
 </body>
 </html>
