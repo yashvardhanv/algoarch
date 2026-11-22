@@ -68,26 +68,6 @@
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setTopicsOpen(false); });
   }
 
-  // ----------------------------------------------------------------- topic ticker
-  function renderTicker() {
-    const el = $('topic-marquee');
-    if (!el || !state.allLessons.length) return;
-    const seen = new Set();
-    const topics = [];
-    for (const l of state.allLessons.filter(x => x.stars === 5)) {
-      for (const tag of l.tags || []) {
-        const k = tag.toLowerCase();
-        if (!seen.has(k) && tag.length <= 28) { seen.add(k); topics.push(tag); }
-        if (topics.length >= 30) break;
-      }
-      if (topics.length >= 30) break;
-    }
-    if (topics.length < 6) { el.hidden = true; return; }
-    const list = topics.map(t => '<li>' + esc(t) + '</li>').join('');
-    el.innerHTML = '<ul class="topic-track" aria-label="Topics covered">' + list + '</ul>' +
-      '<ul class="topic-track" aria-hidden="true">' + list + '</ul>';
-  }
-
   // ------------------------------------------------------------ new-lessons deck
   let deckIdx = 0;
   const deckItems = () => {
@@ -163,7 +143,7 @@
   }
 
   // ------------------------------------------- pause looping motion when off-screen
-  const loops = [document.querySelector('.hero-stage'), $('topic-marquee'), deckBox].filter(Boolean);
+  const loops = [document.querySelector('.hero-stage'), deckBox].filter(Boolean);
   if ('IntersectionObserver' in window) {
     const io = new IntersectionObserver((entries) => {
       entries.forEach(en => en.target.classList.toggle('is-offscreen', !en.isIntersecting));
@@ -177,7 +157,6 @@
   window.renderPillarsRoadmap = function () {
     originalPillars();
     renderTopicsMenu();
-    renderTicker();
     if (!document.querySelector('#deck .deck-card')) renderDeck();
   };
 

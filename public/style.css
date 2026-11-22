@@ -654,14 +654,6 @@ input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); height
 @media (max-width: 1100px) { .hero-tiles { display: none; } }
 
 /* topic ticker (full-bleed band) */
-.topic-marquee { display: flex; overflow: hidden; margin-inline: calc(50% - 50vw); padding: var(--s-sm) 0; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: var(--text-small); }
-.topic-marquee[hidden] { display: none; }
-.topic-track { display: flex; flex: none; align-items: center; gap: var(--s-xl); min-width: 100%; margin: 0; padding: 0 var(--s-xl) 0 0; list-style: none; animation: marquee 70s linear infinite; }
-.topic-track li { display: inline-flex; align-items: center; gap: var(--s-xl); white-space: nowrap; }
-.topic-track li::after { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.6; }
-.topic-marquee:hover .topic-track { animation-play-state: paused; }
-.topic-marquee.is-offscreen .topic-track, html.tab-hidden .topic-track { animation-play-state: paused; }
-@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-100%); } }
 
 /* new lessons: stacked card deck */
 .deck-section { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: var(--s-xl); align-items: center; padding: var(--s-2xl) 0 var(--s-xl); }
@@ -706,9 +698,6 @@ input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); height
 /* reduced motion: no loops, no drift */
 @media (prefers-reduced-motion: reduce) {
   .hero-tile { animation: none; }
-  .topic-marquee { overflow-x: auto; }
-  .topic-track { animation: none; flex-wrap: wrap; padding: 0 var(--gutter); gap: var(--s-xs) var(--s-lg); }
-  .topic-track[aria-hidden="true"] { display: none; }
   .deck-ring { display: none; }
   .deck-card { transition: none; }
 }
@@ -716,3 +705,28 @@ input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); height
 
 /* the ghost-button hover must not repaint the filled primary plan button */
 .btn-plan-action.primary:hover { background: var(--accent); color: var(--accent-ink); opacity: 0.88; }
+
+/* sign-in wall */
+body.auth-checking > :not(script):not(style),
+body.auth-locked > :not(.auth-gate):not(script):not(style) { display: none !important; }
+.auth-gate { display: none; min-height: 100vh; place-items: center; padding: var(--s-lg) var(--gutter); background: var(--paper); }
+body.auth-locked .auth-gate { display: grid; }
+.gate-card { width: min(420px, 100%); display: grid; gap: var(--s-sm); }
+.gate-brand { font-weight: 800; letter-spacing: -0.02em; color: var(--accent-text); }
+.gate-card h1 { font-size: var(--text-h1); line-height: 1.1; }
+.gate-sub { color: var(--ink-2); }
+.gate-actions { display: grid; gap: var(--s-xs); margin-top: var(--s-sm); }
+.gate-actions a.btn-auth-provider[hidden], .gate-dev[hidden], .gate-note[hidden], .gate-error[hidden] { display: none; }
+.gate-dev { display: grid; gap: var(--s-xs); }
+.gate-dev label { font-size: var(--text-small); color: var(--ink-2); }
+.gate-note { font-size: var(--text-small); color: var(--ink-3); }
+.gate-error { font-size: var(--text-small); color: var(--danger); font-weight: 600; }
+.acct-body { display: grid; gap: var(--s-md); }
+.admin-panel { display: grid; gap: var(--s-xs); border-top: 1px solid var(--line); padding-top: var(--s-md); }
+.admin-panel h4 { font-size: var(--text-body); }
+.admin-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2xs); }
+.admin-list li { display: flex; justify-content: space-between; align-items: center; gap: var(--s-xs); font-size: var(--text-small); }
+.admin-list button { color: var(--danger); font-weight: 600; font-size: var(--text-small); }
+.admin-list button:disabled { opacity: 0.4; cursor: not-allowed; }
+.admin-add { display: flex; gap: var(--s-xs); }
+.admin-add input { flex: 1; min-width: 0; }

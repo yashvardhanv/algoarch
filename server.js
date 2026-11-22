@@ -10,6 +10,7 @@ const url = require('url');
 const cmsAuth = require('./server_cms_auth');
 const litellm = require('./litellm_tracker');
 const { openDb, createRepo } = require('./db');
+const oauth = require('./oauth');
 
 const PORT = process.env.PORT || 5050;
 const DATA_DIR = process.env.ALGOARCH_DATA_DIR || path.join(__dirname, 'data');
@@ -49,19 +50,37 @@ const MIME_TYPES = {
   '.wasm': 'application/wasm'
 };
 
-// Identity comes ONLY from a signed bearer token; otherwise the shared guest account.
+// Identity comes ONLY from a signed bearer token for an account that exists. There is no
+// anonymous or shared guest account: every /api route except /api/auth/* needs a sign-in.
 function getReqUserId(req) {
   const m = /^Bearer\s+(.+)$/i.exec(req.headers['authorization'] || '');
-  const fromToken = m ? cmsAuth.verifyToken(m[1].trim()) : null;
-  return fromToken || 'guest_default';
+  const id = m ? cmsAuth.verifyToken(m[1].trim()) : null;
+  return id && cmsAuth.userExists(id) ? id : null;
 }
 
-// Admin APIs: ADMIN_KEY header if configured, otherwise loopback-only.
+// Admin = a signed-in user whose verified email is in the admin_emails table,
+// or (for automation) a caller presenting the configured ADMIN_KEY.
 function isAdminRequest(req) {
   const key = process.env.ADMIN_KEY;
-  if (key) return cmsAuth.safeEqual(req.headers['x-admin-key'] || '', key);
-  const ip = req.socket.remoteAddress || '';
-  return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+  if (key && cmsAuth.safeEqual(req.headers['x-admin-key'] || '', key)) return true;
+  const id = getReqUserId(req);
+  const user = id ? cmsAuth.getUser(id) : null;
+  return !!(user && repo.isAdminEmail(user.email));
+}
+
+const isLoopback = (req) => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress || '');
+// Local development only: no OAuth app configured, not production, and a loopback caller.
+function devLoginAllowed(req) {
+  const c = oauth.configured();
+  return process.env.NODE_ENV !== 'production' && !c.google && !c.github && isLoopback(req);
+}
+function readCookie(req, name) {
+  const m = (req.headers.cookie || '').split(/;\s*/).map(p => p.split('=')).find(p => p[0] === name);
+  return m ? decodeURIComponent(m.slice(1).join('=')) : null;
+}
+function redirect(res, location, extraHeaders = {}) {
+  res.writeHead(302, { Location: location, 'Cache-Control': 'no-store', ...extraHeaders });
+  res.end();
 }
 
 // Mentor prompt. The open lesson's full text is supplied separately and is the primary source.
@@ -167,8 +186,17 @@ const server = http.createServer(async (req, res) => {
   const parsedUrl = url.parse(req.url, true);
   const pathname = parsedUrl.pathname;
 
-  if (pathname.startsWith('/api/admin/') && req.method !== 'OPTIONS' && !isAdminRequest(req)) {
-    return sendJson(res, 403, { error: 'Admin access required' });
+  if (pathname.startsWith('/api/') && req.method !== 'OPTIONS' && !pathname.startsWith('/api/auth/')) {
+    const adminOnly = pathname.startsWith('/api/admin/') || pathname === '/api/reminders/trigger-cron' || pathname === '/api/reminders/logs';
+    if (adminOnly) {
+      if (!isAdminRequest(req)) {
+        return getReqUserId(req)
+          ? sendJson(res, 403, { error: 'Admin access required' })
+          : sendJson(res, 401, { error: 'Sign in required', loginRequired: true });
+      }
+    } else if (!getReqUserId(req)) {
+      return sendJson(res, 401, { error: 'Sign in required', loginRequired: true });
+    }
   }
 
   // Handle CORS preflight
@@ -413,9 +441,6 @@ const server = http.createServer(async (req, res) => {
       const userId = getReqUserId(req);
       const plan = body.plan || body.planId;
       if (!cmsAuth.SUBSCRIPTION_PLANS[plan]) return sendJson(res, 400, { error: 'Invalid plan' });
-      if (userId === 'guest_default' && plan !== 'free') {
-        return sendJson(res, 401, { error: 'Please sign in before upgrading', loginRequired: true });
-      }
       if (plan === 'free') return sendJson(res, 200, cmsAuth.upgradeUserPlan(userId, 'free'));
       if (cmsAuth.paymentMode() !== 'demo') {
         return sendJson(res, 402, { error: 'Payment required. Use /api/payments/create-order.', paymentMode: cmsAuth.paymentMode() });
@@ -430,7 +455,6 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/payments/create-order' && req.method === 'POST') {
     try {
       const userId = getReqUserId(req);
-      if (userId === 'guest_default') return sendJson(res, 401, { error: 'Please sign in before upgrading', loginRequired: true });
       if (cmsAuth.paymentMode() !== 'razorpay') return sendJson(res, 400, { error: 'Payment gateway not configured', paymentMode: cmsAuth.paymentMode() });
       const body = await parseBody(req);
       return sendJson(res, 200, await cmsAuth.createPaymentOrder(userId, body.plan || body.planId));
@@ -455,20 +479,61 @@ const server = http.createServer(async (req, res) => {
   // --------------------------------------------------------------------------
   // AUTH & USER APIs
   // --------------------------------------------------------------------------
-  if (pathname === '/api/auth/login' && req.method === 'POST') {
+  if (pathname === '/api/auth/providers' && req.method === 'GET') {
+    return sendJson(res, 200, { ...oauth.configured(), dev: devLoginAllowed(req) });
+  }
+
+  // Step 1: send the browser to Google/GitHub. A signed state carries a nonce that is also
+  // set as an HttpOnly cookie, so the callback only succeeds in the browser that started it.
+  const startMatch = /^\/api\/auth\/(google|github)\/start$/.exec(pathname);
+  if (startMatch && req.method === 'GET') {
+    const provider = startMatch[1];
+    if (!oauth.configured()[provider]) return redirect(res, '/?auth_error=' + encodeURIComponent(provider + ' sign-in is not configured'));
+    const nonce = oauth.newNonce();
+    const state = cmsAuth.signState({ p: provider, n: nonce });
+    const secure = oauth.baseUrl(req).startsWith('https') ? '; Secure' : '';
+    return redirect(res, oauth.authorizeUrl(req, provider, state), {
+      'Set-Cookie': 'aa_oauth=' + nonce + '; HttpOnly; SameSite=Lax; Path=/api/auth; Max-Age=600' + secure
+    });
+  }
+
+  // Step 2: provider calls back with a code; we verify the identity and issue our own token.
+  const cbMatch = /^\/api\/auth\/(google|github)\/callback$/.exec(pathname);
+  if (cbMatch && req.method === 'GET') {
+    const provider = cbMatch[1];
+    const clearCookie = { 'Set-Cookie': 'aa_oauth=; HttpOnly; SameSite=Lax; Path=/api/auth; Max-Age=0' };
+    const fail = (msg) => redirect(res, '/?auth_error=' + encodeURIComponent(msg), clearCookie);
+    try {
+      const q = parsedUrl.query;
+      if (q.error) return fail('Sign-in was cancelled');
+      const st = cmsAuth.verifyState(String(q.state || ''));
+      if (!st || st.p !== provider || !st.n || st.n !== readCookie(req, 'aa_oauth')) return fail('Sign-in expired, please try again');
+      if (!q.code) return fail('Sign-in failed');
+      const who = await oauth.fetchIdentity(req, provider, String(q.code));
+      const { token } = cmsAuth.loginUser({ provider, ...who });
+      return redirect(res, '/#auth=' + token, clearCookie);
+    } catch (e) {
+      console.error('[Auth]', provider, 'callback failed:', e.message);
+      return fail(e.message || 'Sign-in failed');
+    }
+  }
+
+  // Local development convenience; unavailable once an OAuth app is configured or in production.
+  if (pathname === '/api/auth/dev-login' && req.method === 'POST') {
+    if (!devLoginAllowed(req)) return sendJson(res, 404, { error: 'Not found' });
     try {
       const body = await parseBody(req);
-      const result = cmsAuth.loginUser(body);
-      return sendJson(res, 200, result);
+      return sendJson(res, 200, cmsAuth.loginUser({ provider: 'dev', email: body.email, name: body.name }));
     } catch (e) {
-      return sendJson(res, 500, { error: e.message });
+      return sendJson(res, 400, { error: e.message });
     }
   }
 
   if (pathname === '/api/auth/me' && req.method === 'GET') {
     const userId = getReqUserId(req);
+    if (!userId) return sendJson(res, 401, { error: 'Sign in required', loginRequired: true });
     const user = cmsAuth.getUser(userId);
-    return sendJson(res, 200, { user });
+    return sendJson(res, 200, { user: { ...user, isAdmin: repo.isAdminEmail(user.email) } });
   }
 
   if (pathname === '/api/user/sync-progress' && req.method === 'POST') {
@@ -496,6 +561,23 @@ const server = http.createServer(async (req, res) => {
   // --------------------------------------------------------------------------
   // ADMIN CMS APIs
   // --------------------------------------------------------------------------
+  if (pathname === '/api/admin/admins' && req.method === 'GET') {
+    return sendJson(res, 200, { admins: repo.listAdmins() });
+  }
+  if (pathname === '/api/admin/admins' && req.method === 'POST') {
+    try {
+      const body = await parseBody(req);
+      const me = cmsAuth.getUser(getReqUserId(req));
+      return sendJson(res, 200, { admins: repo.addAdmin(body.email, me ? me.email : 'admin-key') });
+    } catch (e) { return sendJson(res, 400, { error: e.message }); }
+  }
+  if (pathname === '/api/admin/admins/remove' && req.method === 'POST') {
+    try {
+      const body = await parseBody(req);
+      return sendJson(res, 200, { admins: repo.removeAdmin(body.email) });
+    } catch (e) { return sendJson(res, 400, { error: e.message }); }
+  }
+
   if (pathname === '/api/admin/lessons' && req.method === 'GET') {
     try {
       const curriculum = repo.getCurriculum();

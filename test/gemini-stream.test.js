@@ -43,9 +43,10 @@ before(async () => {
   const env = { ...process.env, PORT: String(PORT), ALGOARCH_DATA_DIR: tmpData, AUTH_SECRET: 't', GEMINI_API_KEY: 'test-key', GEMINI_BASE_URL: `http://127.0.0.1:${MOCK_PORT}` };
   child = spawn(process.execPath, ['server.js'], { cwd: ROOT, env, stdio: 'ignore' });
   for (let i = 0; i < 50; i++) {
-    try { await get('/api/subscription/plans'); return; } catch (e) { await new Promise(r => setTimeout(r, 100)); }
+    try { await get('/api/auth/providers'); break; } catch (e) { await new Promise(r => setTimeout(r, 100)); }
+    if (i === 49) throw new Error('server did not start');
   }
-  throw new Error('server did not start');
+  token = JSON.parse((await post('/api/auth/dev-login', { email: 'mentor-test@example.com' }, false)).raw).token;
 });
 
 after(() => {
@@ -56,14 +57,15 @@ after(() => {
 
 function get(p) {
   return new Promise((resolve, reject) => {
-    http.get({ host: '127.0.0.1', port: PORT, path: p }, res => { let d = ''; res.on('data', c => d += c); res.on('end', () => resolve(d)); }).on('error', reject);
+    http.get({ host: '127.0.0.1', port: PORT, path: p, headers: token ? { Authorization: 'Bearer ' + token } : {} }, res => { let d = ''; res.on('data', c => d += c); res.on('end', () => resolve(d)); }).on('error', reject);
   });
 }
 
-function post(p, body) {
+let token = null;
+function post(p, body, auth = true) {
   return new Promise((resolve, reject) => {
     const payload = JSON.stringify(body);
-    const req = http.request({ host: '127.0.0.1', port: PORT, path: p, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } }, res => {
+    const req = http.request({ host: '127.0.0.1', port: PORT, path: p, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload), ...(auth && token ? { Authorization: 'Bearer ' + token } : {}) } }, res => {
       let d = ''; res.on('data', c => d += c); res.on('end', () => resolve({ status: res.statusCode, raw: d }));
     });
     req.on('error', reject); req.write(payload); req.end();
@@ -117,6 +119,8 @@ test('structured lesson documents are flattened with section titles for the mode
 });
 
 test('without an open lesson the mentor answers generally', async () => {
+  // fresh account: the free plan's daily mentor quota is per user
+  token = JSON.parse((await post('/api/auth/dev-login', { email: 'general-test@example.com' }, false)).raw).token;
   await post('/api/chat/stream', { question: 'what is a heap' });
   assert.ok(!lastBody.contents[0].parts[0].text.includes('<lesson>'));
   assert.ok(!lastBody.systemInstruction.parts[0].text.includes('Answer from the lesson first'));

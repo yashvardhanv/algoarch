@@ -146,7 +146,7 @@ function normalizeUserPlan(user) {
 
 function getUser(userId) {
   const users = loadUsers();
-  let user = users[userId] || users['guest_default'] || null;
+  let user = users[userId] || null;
   if (user) {
     user = normalizeUserPlan(user);
     users[user.id] = user;
@@ -157,7 +157,7 @@ function getUser(userId) {
 
 function checkAndIncrementAiUsage(userId) {
   const users = loadUsers();
-  const user = users[userId] || users['guest_default'];
+  const user = users[userId];
   if (!user) return { allowed: false, error: 'User account not found' };
 
   normalizeUserPlan(user);
@@ -193,7 +193,7 @@ function checkAndIncrementAiUsage(userId) {
 
 function upgradeUserPlan(userId, newPlanId) {
   const users = loadUsers();
-  const user = users[userId] || users['guest_default'];
+  const user = users[userId];
   if (!user) return { success: false, error: 'User not found' };
 
   if (!SUBSCRIPTION_PLANS[newPlanId]) {
@@ -253,6 +253,22 @@ function signToken(userId) {
   const payload = Buffer.from(JSON.stringify({ u: userId, exp: Date.now() + TOKEN_TTL_MS })).toString('base64url');
   const sig = crypto.createHmac('sha256', AUTH_SECRET).update(payload).digest('base64url');
   return payload + '.' + sig;
+}
+
+// Short-lived signed blobs (OAuth state), separate from session tokens.
+function signState(obj, ttlMs = 10 * 60 * 1000) {
+  const payload = Buffer.from(JSON.stringify({ ...obj, exp: Date.now() + ttlMs })).toString('base64url');
+  return payload + '.' + crypto.createHmac('sha256', AUTH_SECRET + ':state').update(payload).digest('base64url');
+}
+function verifyState(blob) {
+  if (!blob || typeof blob !== 'string' || !blob.includes('.')) return null;
+  const [payload, sig] = blob.split('.');
+  const expected = crypto.createHmac('sha256', AUTH_SECRET + ':state').update(payload).digest('base64url');
+  if (!safeEqual(sig || '', expected)) return null;
+  try {
+    const d = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    return d.exp && d.exp > Date.now() ? d : null;
+  } catch (e) { return null; }
 }
 
 function safeEqual(a, b) {
@@ -380,15 +396,19 @@ function verifyPaymentAndUpgrade(userId, { orderId, paymentId, signature }) {
   return result;
 }
 
-function loginUser({ provider = 'guest', email, name, avatar }) {
+// Called only with an identity the server verified (OAuth callback, or the local dev login).
+// One account per email, regardless of which provider signed the person in.
+function loginUser({ provider, email, name, avatar }) {
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('A verified email is required');
+  email = String(email).trim().toLowerCase();
   const users = loadUsers();
-  const safeId = email ? `${provider}_${email.replace(/[^a-zA-Z0-9]/g, '_')}` : `${provider}_${Date.now()}`;
+  const safeId = 'u_' + email.replace(/[^a-z0-9]/g, '_');
   
   if (!users[safeId]) {
     users[safeId] = {
       id: safeId,
-      name: name || (provider === 'google' ? 'Google Engineer' : provider === 'github' ? 'GitHub Developer' : 'Staff Engineer Prep'),
-      email: email || `${safeId}@algoarch.io`,
+      name: name || email.split('@')[0],
+      email,
       provider,
       avatar: avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${safeId}`,
       plan: 'free',
@@ -407,7 +427,7 @@ function loginUser({ provider = 'guest', email, name, avatar }) {
       reminders: {
         enabled: true,
         time: '09:00',
-        email: email || `${safeId}@algoarch.io`,
+        email,
         frequency: 'daily',
         lastSentDate: null
       }
@@ -426,7 +446,7 @@ function loginUser({ provider = 'guest', email, name, avatar }) {
 
 function syncProgress(userId, progressData) {
   const users = loadUsers();
-  const user = users[userId] || users['guest_default'];
+  const user = users[userId];
   if (!user) return null;
   
   user.progress = {
@@ -458,7 +478,7 @@ function syncProgress(userId, progressData) {
 
 function deductCredit(userId) {
   const users = loadUsers();
-  const user = users[userId] || users['guest_default'];
+  const user = users[userId];
   if (!user) return { success: false, credits: 0 };
   
   if (user.credits <= 0) {
@@ -472,7 +492,7 @@ function deductCredit(userId) {
 
 function addCredits(userId, amount = 10) {
   const users = loadUsers();
-  const user = users[userId] || users['guest_default'];
+  const user = users[userId];
   if (!user) return null;
   user.credits = (user.credits || 0) + amount;
   saveUsers(users);
@@ -956,7 +976,10 @@ module.exports = {
   streamRealGeminiAI,
   signToken,
   verifyToken,
+  signState,
+  verifyState,
   safeEqual,
+  userExists: (id) => !!loadUsers()[id],
   planHas,
   userHasFeature,
   getEntitlements,

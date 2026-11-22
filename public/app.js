@@ -17,6 +17,13 @@ const AUTH_TOKEN_KEY = 'algoarch_token';
         const adminKey = localStorage.getItem('algoarch_admin_key');
         if (adminKey && u.pathname.startsWith('/api/admin/')) headers.set('x-admin-key', adminKey);
         init = { ...init, headers };
+        if (!u.pathname.startsWith('/api/auth/')) {
+          // an expired or revoked session sends the person back to the sign-in wall
+          return origFetch(input, init).then((r) => {
+            if (r.status === 401) { try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch (e) { /* ignore */ } showAuthGate(); }
+            return r;
+          });
+        }
       }
     } catch (e) { /* fall through to plain fetch */ }
     return origFetch(input, init);
@@ -91,8 +98,59 @@ document.addEventListener('DOMContentLoaded', async () => {
   initTheme();
   setupEventListeners();
   setupAnchorScrollInterceptor();
-  await loadAppData();
+  if (await initAuth()) await loadAppData();
 });
+
+// --------------------------------------------------------------------------
+// Sign-in wall. Nothing renders until the server confirms a session.
+// --------------------------------------------------------------------------
+async function showAuthGate(errorMessage) {
+  document.body.classList.remove('auth-checking');
+  document.body.classList.add('auth-locked');
+  const $ = (id) => document.getElementById(id);
+  let p = {};
+  try { p = await origAuthFetch('/api/auth/providers').then(r => r.json()); } catch (e) { /* offline */ }
+  $('gate-google').hidden = !p.google;
+  $('gate-github').hidden = !p.github;
+  $('gate-dev').hidden = !p.dev;
+  $('gate-none').hidden = !!(p.google || p.github || p.dev);
+  const err = $('gate-error');
+  const msg = errorMessage || new URLSearchParams(location.search).get('auth_error');
+  err.textContent = msg || '';
+  err.hidden = !msg;
+}
+const origAuthFetch = (u, i) => fetch(u, i);
+
+async function initAuth() {
+  const m = /[#&]auth=([^&]+)/.exec(location.hash);
+  if (m) { try { localStorage.setItem(AUTH_TOKEN_KEY, m[1]); } catch (e) { /* ignore */ } }
+  const authError = new URLSearchParams(location.search).get('auth_error');
+  if (m || authError) history.replaceState(null, '', location.pathname);
+  const form = document.getElementById('gate-dev');
+  if (form) {
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('gate-dev-email').value.trim();
+      const r = await fetch('/api/auth/dev-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d.token) { localStorage.setItem(AUTH_TOKEN_KEY, d.token); location.reload(); } else showAuthGate(d.error || 'Sign-in failed');
+    };
+  }
+  if (!localStorage.getItem(AUTH_TOKEN_KEY)) { await showAuthGate(authError); return false; }
+  try {
+    const r = await fetch('/api/auth/me');
+    if (!r.ok) { await showAuthGate(authError); return false; }
+    state.user = (await r.json()).user;
+  } catch (e) { await showAuthGate('Could not reach the server'); return false; }
+  document.body.classList.remove('auth-checking', 'auth-locked');
+  updateUserUI(state.user);
+  return true;
+}
+
+function signOut() {
+  try { localStorage.removeItem(AUTH_TOKEN_KEY); localStorage.removeItem('algoarch_user_id'); } catch (e) { /* ignore */ }
+  location.reload();
+}
 
 // Load curriculum, videos, progress, stats, subscription
 async function loadAppData() {
@@ -974,57 +1032,54 @@ window.navigateToLesson = function(lessonId) {
 function setupUserAuth() {
   const profileBtn = document.getElementById('btn-user-profile');
   const authModal = document.getElementById('auth-modal');
-  const closeAuthBtn = document.getElementById('btn-close-auth');
-  const googleBtn = document.getElementById('btn-login-google');
-  const githubBtn = document.getElementById('btn-login-github');
-  const guestBtn = document.getElementById('btn-login-guest');
+  const closeBtn = document.getElementById('btn-close-auth');
+  if (profileBtn) profileBtn.onclick = () => { renderAccount(); if (authModal) authModal.classList.add('active'); };
+  if (closeBtn) closeBtn.onclick = () => authModal && authModal.classList.remove('active');
+  ['btn-sign-out', 'btn-sign-out-2'].forEach(id => { const b = document.getElementById(id); if (b) b.onclick = signOut; });
 
-  if (profileBtn) profileBtn.onclick = () => authModal && authModal.classList.add('active');
-  if (closeAuthBtn) closeAuthBtn.onclick = () => authModal && authModal.classList.remove('active');
+  const addForm = document.getElementById('admin-add');
+  if (addForm) {
+    addForm.onsubmit = async (ev) => {
+      ev.preventDefault();
+      const input = document.getElementById('admin-add-email');
+      await adminCall('/api/admin/admins', { email: input.value });
+      input.value = '';
+    };
+  }
+}
 
-  const executeLogin = async (provider, email, name, avatar) => {
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider, email, name, avatar })
-      }).then(r => r.json());
+async function adminCall(url, body) {
+  const err = document.getElementById('admin-error');
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const d = await r.json().catch(() => ({}));
+  err.hidden = r.ok;
+  err.textContent = r.ok ? '' : (d.error || 'Request failed');
+  if (r.ok) drawAdmins(d.admins);
+}
 
-      if (res && res.user) {
-        state.user = res.user;
-        localStorage.setItem('algoarch_user_id', res.user.id);
-        if (res.token) localStorage.setItem(AUTH_TOKEN_KEY, res.token);
-        refreshSubscription();
-        updateUserUI(res.user);
-        if (authModal) authModal.classList.remove('active');
-      }
-    } catch (e) {
-      console.error('Login error:', e);
-    }
+function drawAdmins(admins) {
+  const list = document.getElementById('admin-list');
+  if (!list) return;
+  list.innerHTML = admins.map(a =>
+    '<li><span>' + escapeHtml(a.email) + '</span><button type="button" data-email="' + escapeHtml(a.email) + '"' +
+    (admins.length < 2 ? ' disabled' : '') + '>Remove</button></li>').join('');
+  list.onclick = (ev) => {
+    const b = ev.target.closest('button[data-email]');
+    if (b && !b.disabled) adminCall('/api/admin/admins/remove', { email: b.dataset.email });
   };
+}
 
-  if (googleBtn) {
-    googleBtn.onclick = () => executeLogin('google', 'engineer@google.internal', 'Google L5 Aspirant', 'https://api.dicebear.com/7.x/bottts/svg?seed=google_eng');
+async function renderAccount() {
+  const u = state.user;
+  if (!u) return;
+  document.getElementById('acct-name').textContent = u.name || 'Account';
+  document.getElementById('acct-email').textContent = u.email || '';
+  const panel = document.getElementById('admin-panel');
+  panel.hidden = !u.isAdmin;
+  if (u.isAdmin) {
+    const r = await fetch('/api/admin/admins');
+    if (r.ok) drawAdmins((await r.json()).admins);
   }
-  if (githubBtn) {
-    githubBtn.onclick = () => executeLogin('github', 'dev@github.internal', 'Staff Fullstack SWE', 'https://api.dicebear.com/7.x/bottts/svg?seed=github_dev');
-  }
-  if (guestBtn) {
-    guestBtn.onclick = () => executeLogin('guest', 'guest@faang.io', 'Guest Candidate', 'https://api.dicebear.com/7.x/bottts/svg?seed=guest_faang');
-  }
-
-  // Load existing session or default
-  const savedUserId = localStorage.getItem('algoarch_user_id') || 'guest_default';
-  fetch('/api/auth/me')
-    .then(r => r.json())
-    .then(data => {
-      if (data && data.user) {
-        state.user = data.user;
-        updateUserUI(data.user);
-        refreshSubscription();
-      }
-    })
-    .catch(() => {});
 }
 
 function updateUserUI(user) {
@@ -1035,7 +1090,9 @@ function updateUserUI(user) {
   const modalStreakEl = document.getElementById('modal-streak-count');
   const emailInput = document.getElementById('streak-input-email');
 
-  if (nameEl) nameEl.textContent = user.name || 'Candidate';
+  if (nameEl) nameEl.textContent = user.name || 'Account';
+  const adminBtn = document.getElementById('btn-open-cms');
+  if (adminBtn) adminBtn.hidden = !user.isAdmin;
   if (avatarEl && user.avatar) avatarEl.src = user.avatar;
   if (streakEl) streakEl.textContent = user.streak || 1;
   if (modalStreakEl) modalStreakEl.textContent = user.streak || 1;

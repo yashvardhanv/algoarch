@@ -125,7 +125,10 @@ Python code cells (Monaco editor + Pyodide in a Web Worker) and the timed-drill 
 | :--- | :--- |
 | `GEMINI_API_KEY` | Required for the AI mentor (sent in a header, never in the URL) |
 | `AUTH_SECRET` | HMAC secret for session tokens (auto-generated into `data/.auth_secret` if unset) |
-| `ADMIN_KEY` | Required `x-admin-key` header for `/api/admin/*`; if unset, admin is loopback-only |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Enables "Continue with Google" (redirect URI: `<PUBLIC_URL>/api/auth/google/callback`) |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | Enables "Continue with GitHub" (callback: `<PUBLIC_URL>/api/auth/github/callback`) |
+| `PUBLIC_URL` | Public origin used to build OAuth redirect URIs, e.g. `https://algoarch.example.com` (defaults to the request host) |
+| `ADMIN_KEY` | Optional `x-admin-key` for automation. People are admins by email: see the `admin_emails` table |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | Enables real paid upgrades (order creation + signature verification) |
 | `NODE_ENV=production` | Disables dev-only demo upgrades (no payment) |
 | `ALLOW_DEMO_UPGRADE=false` | Explicitly disable demo upgrades outside production |
@@ -137,7 +140,10 @@ Run tests with `npm test`.
 ### Security model
 - Identity comes only from a signed bearer token issued at login; client-sent `userId` is ignored.
 - Plan gating (Monaco runner, lab downloads, company filters, planner, rubric) is enforced via server-side entitlements.
-- Known limitation: OAuth sign-in buttons are simulated; login does not verify email ownership yet.
+- Sign-in is required for the whole app. Every `/api` route except `/api/auth/*` returns 401 without a valid session.
+- Google and GitHub OAuth (authorization-code flow, signed state bound to an HttpOnly cookie). Only verified emails sign in; one account per email.
+- Admin = a signed-in user whose email is in the `admin_emails` table (seeded with the owner; manage it from the Account panel). Admins' emails are never taken from the client.
+- With no OAuth app configured, a localhost-only dev sign-in appears (disabled in production or once a provider is configured).
 
 ## 📜 License
 MIT License. Created by Yashvardhan Vyas.

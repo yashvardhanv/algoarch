@@ -52,6 +52,18 @@ const MIGRATIONS = [
         PRIMARY KEY (track_id, kind, position)
       );
     `
+  },
+  {
+    id: 2,
+    sql: `
+      CREATE TABLE admin_emails (
+        email TEXT PRIMARY KEY COLLATE NOCASE,
+        added_by TEXT,
+        created_at TEXT NOT NULL
+      );
+      INSERT INTO admin_emails (email, added_by, created_at)
+        VALUES ('yashji2117@gmail.com', 'seed', datetime('now'));
+    `
   }
 ];
 
@@ -183,6 +195,29 @@ function createRepo(db) {
           .run(id, markdown || '', new Date().toISOString());
       })();
       return { success: true, id, message: `Lesson ${id} published successfully.` };
+    },
+
+    // ---- admin emails: only a verified sign-in with one of these addresses is an admin
+    isAdminEmail(email) {
+      if (!email) return false;
+      return !!db.prepare('SELECT 1 FROM admin_emails WHERE email = ?').get(String(email).trim());
+    },
+    listAdmins() {
+      return db.prepare('SELECT email, added_by AS addedBy, created_at AS createdAt FROM admin_emails ORDER BY created_at, email').all();
+    },
+    addAdmin(email, addedBy) {
+      const e = String(email || '').trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) throw new Error('Enter a valid email address');
+      db.prepare('INSERT OR IGNORE INTO admin_emails (email, added_by, created_at) VALUES (?, ?, ?)')
+        .run(e, addedBy || null, new Date().toISOString());
+      return this.listAdmins();
+    },
+    removeAdmin(email) {
+      const e = String(email || '').trim();
+      const total = db.prepare('SELECT COUNT(*) AS n FROM admin_emails').get().n;
+      if (total <= 1) throw new Error('Cannot remove the last admin');
+      db.prepare('DELETE FROM admin_emails WHERE email = ?').run(e);
+      return this.listAdmins();
     }
   };
 }

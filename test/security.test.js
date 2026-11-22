@@ -12,13 +12,16 @@ const ROOT = path.join(__dirname, '..');
 const PORT = 5600 + Math.floor(Math.random() * 300);
 let child;
 let tmpData;
+let defaultToken = null;
 
 function request(method, urlPath, { body, token, headers = {} } = {}) {
   return new Promise((resolve, reject) => {
     const payload = body ? JSON.stringify(body) : null;
     const h = { ...headers };
     if (payload) { h['Content-Type'] = 'application/json'; h['Content-Length'] = Buffer.byteLength(payload); }
-    if (token) h['Authorization'] = 'Bearer ' + token;
+    // requests carry a default signed-in test user unless a test passes token: false (anonymous)
+    const t = token === undefined ? defaultToken : token;
+    if (t) h['Authorization'] = 'Bearer ' + t;
     const req = http.request({ host: '127.0.0.1', port: PORT, path: urlPath, method, headers: h }, res => {
       let data = '';
       res.on('data', c => data += c);
@@ -35,7 +38,7 @@ function request(method, urlPath, { body, token, headers = {} } = {}) {
 }
 
 async function login(email) {
-  const r = await request('POST', '/api/auth/login', { body: { provider: 'google', email, name: 'T' } });
+  const r = await request('POST', '/api/auth/dev-login', { body: { email, name: 'T' } });
   assert.equal(r.status, 200);
   assert.ok(r.json.token.includes('.'), 'token should be signed (payload.sig)');
   return r.json.token;
@@ -52,10 +55,11 @@ before(async () => {
   delete env.RAZORPAY_KEY_ID; delete env.RAZORPAY_KEY_SECRET; delete env.ADMIN_KEY; delete env.NODE_ENV;
   child = spawn(process.execPath, ['server.js'], { cwd: ROOT, env, stdio: 'ignore' });
   for (let i = 0; i < 50; i++) {
-    try { const r = await request('GET', '/api/subscription/plans'); if (r.status === 200) return; } catch (e) { /* not up yet */ }
+    try { const r = await request('GET', '/api/auth/providers', { token: false }); if (r.status === 200) break; } catch (e) { /* not up yet */ }
+    if (i === 49) throw new Error('server did not start');
     await new Promise(r => setTimeout(r, 100));
   }
-  throw new Error('server did not start');
+  defaultToken = await login('default-tester@example.com');
 });
 
 after(() => {
@@ -63,30 +67,48 @@ after(() => {
   if (tmpData) fs.rmSync(tmpData, { recursive: true, force: true });
 });
 
-test('forged or tampered tokens fall back to guest, not the claimed user', async () => {
+test('forged or tampered tokens are rejected, never mapped to another user', async () => {
   const token = await login('victim@example.com');
   const [payload, sig] = token.split('.');
-  const forged = Buffer.from(JSON.stringify({ u: 'guest_default', exp: Date.now() + 1e9 })).toString('base64url') + '.' + sig;
-  const me = await request('GET', '/api/auth/me', { token: forged });
-  assert.equal(me.json.user.id, 'guest_default');
-  const bogus = await request('GET', '/api/auth/me', { token: 'google_victim_example_com' });
-  assert.equal(bogus.json.user.id, 'guest_default');
+  const forged = Buffer.from(JSON.stringify({ u: 'u_victim_example_com', exp: Date.now() + 1e9 })).toString('base64url') + '.' + sig;
+  assert.equal((await request('GET', '/api/auth/me', { token: forged })).status, 401);
+  assert.equal((await request('GET', '/api/auth/me', { token: 'u_victim_example_com' })).status, 401);
   const real = await request('GET', '/api/auth/me', { token });
-  assert.equal(real.json.user.id, 'google_victim_example_com');
+  assert.equal(real.json.user.id, 'u_victim_example_com');
+  assert.equal(real.json.user.isAdmin, false);
   assert.ok(payload);
 });
 
-test('client-supplied userId / x-algoarch-user headers are ignored', async () => {
-  const r = await request('GET', '/api/subscription/status?userId=google_victim_example_com', {
-    headers: { 'x-algoarch-user': 'google_victim_example_com' }
-  });
-  assert.equal(r.json.userId, 'guest_default');
+test('every API except /api/auth/* requires a sign-in', async () => {
+  for (const p of ['/api/curriculum', '/api/videos', '/api/lessons/ds00', '/api/subscription/plans', '/api/progress', '/api/stats', '/api/auth/me']) {
+    const r = await request('GET', p, { token: false });
+    assert.equal(r.status, 401, p + ' should need a sign-in');
+    assert.equal(r.json.loginRequired, true);
+  }
+  assert.equal((await request('POST', '/api/chat/stream', { token: false, body: { question: 'hi' } })).status, 401);
+  assert.equal((await request('GET', '/api/curriculum', { token: await login('gate@example.com') })).status, 200);
 });
 
-test('guest cannot upgrade to a paid plan', async () => {
-  const r = await request('POST', '/api/subscription/upgrade', { body: { plan: 'enterprise' } });
-  assert.equal(r.status, 401);
-  assert.equal(r.json.loginRequired, true);
+test('client-supplied userId / x-algoarch-user headers are ignored', async () => {
+  const token = await login('real@example.com');
+  await login('other@example.com');
+  const r = await request('GET', '/api/subscription/status?userId=u_other_example_com', {
+    token, headers: { 'x-algoarch-user': 'u_other_example_com' }
+  });
+  assert.equal(r.json.userId, 'u_real_example_com');
+});
+
+test('the old trust-the-client login endpoint is gone', async () => {
+  const r = await request('POST', '/api/auth/login', { body: { provider: 'google', email: 'a@b.co' } });
+  assert.ok(!(r.json && r.json.token), 'no token can be minted from client-supplied identity');
+});
+
+test('anyone can sign in with the same email only as that one account (case-insensitive)', async () => {
+  const a = await request('POST', '/api/auth/dev-login', { body: { email: 'Same@Example.com' } });
+  const b = await request('POST', '/api/auth/dev-login', { body: { email: 'same@example.com' } });
+  assert.equal(a.json.user.id, b.json.user.id);
+  const bad = await request('POST', '/api/auth/dev-login', { body: { email: 'not-an-email' } });
+  assert.equal(bad.status, 400);
 });
 
 test('upgrade honours the requested plan (planId bug regression) in demo mode', async () => {
@@ -145,10 +167,29 @@ test('chat quota still enforced on the free plan', async () => {
   assert.ok(exhausted, 'free plan should hit its 5/day limit');
 });
 
-test('admin APIs are reachable from loopback when no ADMIN_KEY is configured', async () => {
-  // Loopback caller is allowed when no ADMIN_KEY is configured
-  const r = await request('GET', '/api/admin/lessons');
-  assert.equal(r.status, 200);
+test('admin APIs need an admin email: anonymous 401, regular user 403, seeded admin 200', async () => {
+  assert.equal((await request('GET', '/api/admin/lessons', { token: false })).status, 401);
+  const user = await login('regular@example.com');
+  assert.equal((await request('GET', '/api/admin/lessons', { token: user })).status, 403);
+  assert.equal((await request('POST', '/api/reminders/trigger-cron', { token: user })).status, 403);
+  const admin = await login('YashJi2117@gmail.com');
+  assert.equal((await request('GET', '/api/admin/lessons', { token: admin })).status, 200);
+  assert.equal((await request('GET', '/api/auth/me', { token: admin })).json.user.isAdmin, true);
+});
+
+test('admin emails table: seeded, manageable, and the last admin cannot be removed', async () => {
+  const admin = await login('yashji2117@gmail.com');
+  const list = await request('GET', '/api/admin/admins', { token: admin });
+  assert.deepEqual(list.json.admins.map(a => a.email), ['yashji2117@gmail.com']);
+  const added = await request('POST', '/api/admin/admins', { token: admin, body: { email: 'Second@Example.com' } });
+  assert.deepEqual(added.json.admins.map(a => a.email).sort(), ['second@example.com', 'yashji2117@gmail.com']);
+  const second = await login('second@example.com');
+  assert.equal((await request('GET', '/api/admin/lessons', { token: second })).status, 200);
+  assert.equal((await request('POST', '/api/admin/admins', { token: admin, body: { email: 'nope' } })).status, 400);
+  await request('POST', '/api/admin/admins/remove', { token: admin, body: { email: 'second@example.com' } });
+  assert.equal((await request('GET', '/api/admin/lessons', { token: second })).status, 403);
+  const last = await request('POST', '/api/admin/admins/remove', { token: admin, body: { email: 'yashji2117@gmail.com' } });
+  assert.equal(last.status, 400);
 });
 
 test('lesson API serves structured data from the database, with no markup or scripts', async () => {
