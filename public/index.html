@@ -1,0 +1,1089 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ALGOARCH — Engineering Curriculum & Systems Prep</title>
+  <meta name="description" content="Production-grade, publication-quality technical interview preparation for Senior/L5 distributed systems and algorithms.">
+  
+  <!-- Typography: Charter & Inter + JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css?v=2.6">
+</head>
+<body>
+
+  <!-- Top Sticky Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-left">
+      <div class="brand" id="brand-home">
+        <div class="brand-logo">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">ALGOARCH</span>
+          <span class="brand-badge">50 LPA L5</span>
+        </div>
+      </div>
+
+      <nav class="nav-links">
+        <button class="nav-item active" data-view="roadmap">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          Roadmap
+        </button>
+        <button class="nav-item" data-view="library">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          Curriculum (100)
+        </button>
+        <button class="nav-item" data-view="videos">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          Video Hub
+        </button>
+        <button class="nav-item" data-view="calculator">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"></rect><line x1="8" y1="6" x2="16" y2="6"></line><line x1="16" y1="14" x2="16" y2="18"></line><path d="M16 10h.01"></path><path d="M12 10h.01"></path><path d="M8 10h.01"></path><path d="M12 14h.01"></path><path d="M8 14h.01"></path><path d="M12 18h.01"></path><path d="M8 18h.01"></path></svg>
+          CTC Simulator
+        </button>
+      </nav>
+    </div>
+
+    <div class="nav-right">
+      <!-- Search Trigger -->
+      <button class="search-trigger" id="btn-search-trigger">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <span>Search lessons...</span>
+        <kbd>Ctrl K</kbd>
+      </button>
+
+      <!-- Study Streak & Reminders -->
+      <button class="nav-pill-btn btn-streak" id="btn-streak-trigger" title="Your Study Streak & Motivation Reminders">
+        <span>🔥</span>
+        <span id="nav-streak-cnt">3</span>
+      </button>
+
+      <!-- Dynamic Study Planner (Grind 75 Style) -->
+      <button class="nav-pill-btn btn-planner" id="btn-open-planner" title="Dynamic FAANG Study Schedule Generator">
+        <span>📅</span>
+        <span>Planner</span>
+      </button>
+
+      <!-- Subscription Plan & Pricing -->
+      <button class="nav-pill-btn btn-plan" id="btn-pricing-trigger" title="Subscription Plans & AI Quotas">
+        <span id="nav-plan-icon">⚡</span>
+        <span id="nav-plan-badge">Pro Plan</span>
+      </button>
+
+      <!-- Admin CMS -->
+      <button class="nav-pill-btn btn-cms" id="btn-open-cms" title="Admin CMS — Manage Curriculum & Lessons">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+        <span>CMS</span>
+      </button>
+
+      <!-- User Account / Sign In -->
+      <button class="nav-user-btn" id="btn-user-profile" title="Account & Progress Sync">
+        <img id="nav-user-avatar" src="https://api.dicebear.com/7.x/bottts/svg?seed=engineer_faang" class="user-avatar-mini" alt="User">
+        <span id="nav-user-name">Sign In</span>
+      </button>
+
+      <!-- Download All Labs Zip -->
+      <a href="/api/download/all-labs.zip" class="btn-download-labs" title="Download all Python labs (.zip)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        <span>Labs (.zip)</span>
+      </a>
+
+      <!-- 50LPA Readiness Meter -->
+      <div class="readiness-meter" title="Readiness based on completed core lessons">
+        <div class="meter-bar">
+          <div class="meter-fill" id="readiness-fill" style="width: 12%;"></div>
+        </div>
+        <span class="meter-label"><span id="readiness-percent">12%</span></span>
+      </div>
+
+      <!-- Live AI Mentor Button -->
+      <button class="btn-ai-toggle" id="btn-toggle-ai" title="Toggle AI Mentor">
+        <div class="ai-sparkle">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07l14.14-14.14"/></svg>
+        </div>
+        <span>AI Mentor</span>
+        <span class="live-dot"></span>
+      </button>
+
+      <!-- Theme Switcher -->
+      <button class="theme-toggle" id="btn-theme-toggle" title="Toggle Theme">
+        <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+        <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="app-container">
+
+    <!-- VIEW 1: ROADMAP & OVERVIEW -->
+    <section id="view-roadmap" class="app-view active">
+      <div class="hero-section">
+        <div class="hero-badge">
+          The Senior / L5 Engineering Syllabus
+        </div>
+        <h1 class="hero-title">Technical Mastery for ₹50LPA+ Offers</h1>
+        <p class="hero-subtitle">
+          An opinionated curriculum covering Distributed Systems, Data Structures, Production AI Engineering, and Offer Negotiation. Zero fluff, real metrics, and live instrument benches.
+        </p>
+
+        <div class="hero-stats-grid">
+          <div class="stat-card">
+            <span class="stat-val" id="stat-lessons">100</span>
+            <span class="stat-lbl">Core Lessons</span>
+            <span class="stat-sub">+16 Advanced 50LPA Modules</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-val" id="stat-fivestar">54</span>
+            <span class="stat-lbl">Top Priority (★★★★★)</span>
+            <span class="stat-sub">The Non-Negotiable Core</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-val" id="stat-videos">26</span>
+            <span class="stat-lbl">Technical Video Vault</span>
+            <span class="stat-sub">Kleppmann, Karpathy, NeetCode</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-val">Active</span>
+            <span class="stat-lbl">In-Page AI Mentor</span>
+            <span class="stat-sub">Context-Aware Queries</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pillars-section">
+        <h2 class="section-title">The Four Core Tracks</h2>
+        <p class="section-desc">Tier-1 hiring bars require mastery across storage, distributed architectures, algorithms, and behavioral altitude.</p>
+        <div class="pillars-grid" id="pillars-container"></div>
+      </div>
+
+      <div class="companies-banner">
+        <span class="banner-title">CALIBRATED TO INTERVIEW CRITERIA AT:</span>
+        <div class="companies-row">
+          <span class="comp-tag">Google (L5)</span>
+          <span class="comp-tag">Meta (E5)</span>
+          <span class="comp-tag">Uber (Senior)</span>
+          <span class="comp-tag">Amazon (SDE-3)</span>
+          <span class="comp-tag">Microsoft (L63)</span>
+          <span class="comp-tag">Atlassian (P40)</span>
+          <span class="comp-tag">Databricks</span>
+          <span class="comp-tag">Swiggy / Zepto</span>
+          <span class="comp-tag">OpenAI / Anthropic</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: CURRICULUM EXPLORER -->
+    <section id="view-library" class="app-view">
+      <div class="library-layout">
+        
+        <!-- Left Filter Rail -->
+        <aside class="library-sidebar">
+          <div class="filter-group">
+            <label class="filter-label">TRACK</label>
+            <div class="track-pills" id="track-filter-pills">
+              <button class="track-pill active" data-track="all">All Tracks <span class="pill-cnt" id="cnt-all">106</span></button>
+              <button class="track-pill" data-track="dsa">DSA <span class="pill-cnt" id="cnt-dsa">26</span></button>
+              <button class="track-pill" data-track="system-design">System Design <span class="pill-cnt" id="cnt-sd">44</span></button>
+              <button class="track-pill" data-track="ai-engineering">AI Engineering <span class="pill-cnt" id="cnt-ai">28</span></button>
+              <button class="track-pill" data-track="behavioral">Behavioral <span class="pill-cnt" id="cnt-be">8</span></button>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <label class="filter-label">TARGET COMPANY (LEETCODE PREMIUM)</label>
+            <div class="company-pills" id="company-filter-pills">
+              <button class="comp-filter-pill active" data-company="all">All Companies</button>
+              <button class="comp-filter-pill" data-company="Google">Google (L5)</button>
+              <button class="comp-filter-pill" data-company="Meta">Meta (E5)</button>
+              <button class="comp-filter-pill" data-company="Amazon">Amazon (SDE-3)</button>
+              <button class="comp-filter-pill" data-company="Netflix">Netflix</button>
+              <button class="comp-filter-pill" data-company="Apple">Apple (ICT4)</button>
+              <button class="comp-filter-pill" data-company="Uber">Uber (L5+)</button>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <label class="filter-label">MINIMUM PRIORITY</label>
+            <div class="priority-pills" id="priority-filter-pills">
+              <button class="pri-btn active" data-stars="0">All</button>
+              <button class="pri-btn" data-stars="5">★★★★★</button>
+              <button class="pri-btn" data-stars="4">4★+</button>
+              <button class="pri-btn" data-stars="3">3★+</button>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <label class="filter-label">STATUS</label>
+            <div class="status-pills" id="status-filter-pills">
+              <button class="status-btn active" data-status="all">All</button>
+              <button class="status-btn" data-status="completed">Completed (<span id="status-completed-cnt">0</span>)</button>
+              <button class="status-btn" data-status="bookmarked">Bookmarked (<span id="status-bookmarked-cnt">0</span>)</button>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Right Lessons Feed -->
+        <div class="library-feed">
+          <div class="feed-header">
+            <div>
+              <h2 class="feed-title" id="current-track-heading">All Courses & Chapters</h2>
+              <p class="feed-subtitle" id="current-track-sub">106 sequenced lessons calibrated for the ₹50LPA engineering threshold.</p>
+            </div>
+            <div class="feed-actions">
+              <button class="btn-pg-ghost btn-creator-widget" id="btn-trigger-planner" title="Generate customized study roadmap">
+                <span>📅 Grind 75 Planner</span>
+              </button>
+              <button class="btn-pg-ghost btn-creator-widget" id="btn-trigger-rubric" title="FAANG hiring bar evaluation rubric">
+                <span>🎯 Mock Rubric</span>
+              </button>
+              <input type="text" class="search-input" id="feed-search" placeholder="Filter by topic or pattern...">
+            </div>
+          </div>
+
+          <div class="lessons-container" id="lessons-list"></div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- VIEW 3: LESSON READER (WITH STICKY TOC RAIL & INTEGRATED BENCHES) -->
+    <section id="view-reader" class="app-view">
+      <div class="reader-header">
+        <button class="btn-back" id="btn-reader-back">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+          Back to Overview
+        </button>
+
+        <div class="reader-meta-bar" id="reader-meta-bar"></div>
+
+        <div class="reader-controls">
+          <button class="btn-action-icon" id="btn-bookmark-lesson" title="Bookmark">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+            <span>Bookmark</span>
+          </button>
+          <button class="btn-action-primary" id="btn-complete-lesson">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span id="complete-btn-text">Mark Done</span>
+          </button>
+          <button class="btn-action-ai" id="btn-ask-ai-lesson">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            <span>Ask Mentor</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Modern Lesson Resource Tabs -->
+      <div class="reader-tabs-nav" id="reader-tabs-nav">
+        <button class="reader-tab active" data-tab="guide">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+          Chapter & Lab
+        </button>
+        <button class="reader-tab" data-tab="videos" id="tab-btn-videos">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          Video Lectures (<span id="tab-video-cnt">0</span>)
+        </button>
+        <button class="reader-tab" data-tab="homework" id="tab-btn-homework">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+          Homework & Drills
+        </button>
+        <button class="reader-tab" data-tab="playground" id="tab-btn-playground">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+          Playground & Code
+        </button>
+        <button class="reader-tab" data-tab="articles" id="tab-btn-articles">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          Articles & RFCs
+        </button>
+        <button class="reader-tab" data-tab="repos" id="tab-btn-repos">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+          Useful Repos
+        </button>
+      </div>
+
+      <!-- Tab 1: Unified Page (Study Guide + Native Collapsible Bench) -->
+      <div class="reader-layout tab-pane active" id="pane-guide">
+        <aside class="reader-toc-rail">
+          <div class="toc-rail-title">ON THIS PAGE</div>
+          <nav class="reader-toc-list" id="reader-toc-list"></nav>
+        </aside>
+
+        <div class="reader-main-column">
+          <!-- Collapsible Interactive Simulation Workbench Card -->
+          <div class="bench-collapsible-card" id="bench-collapsible-card" style="display: none;">
+            <div class="bench-card-header" id="bench-collapse-toggle">
+              <div class="bench-header-left">
+                <span class="bench-live-dot"></span>
+                <div>
+                  <div class="bench-card-title">Interactive Visual Lab & Simulation Bench</div>
+                  <div class="bench-card-sub">Real-time concurrency simulator, memory allocators, and failure-mode drills</div>
+                </div>
+              </div>
+              <div class="bench-header-right">
+                <button class="btn-bench-reset" id="btn-reset-bench-card" title="Reset Simulation">Reset State</button>
+                <span class="bench-toggle-pill" id="bench-toggle-text">Collapse ▴</span>
+              </div>
+            </div>
+            <div class="bench-card-body" id="bench-collapse-body">
+              <iframe id="reader-bench-frame" src="about:blank" title="Interactive Simulation Bench" loading="lazy"></iframe>
+            </div>
+          </div>
+
+          <!-- Article Content -->
+          <article class="markdown-content" id="reader-content"></article>
+        </div>
+      </div>
+
+      <!-- Tab 2: Curated Video Lectures for this Lesson -->
+      <div class="tab-pane" id="pane-videos" style="display: none;">
+        <div class="resource-pane-header">
+          <div class="resource-badge">Technical Lectures</div>
+          <h3>Curated Video Breakdowns for this Topic</h3>
+          <p>Carefully selected video explanations from Martin Kleppmann, Andrej Karpathy, Hussein Nasser, and ByteByteGo.</p>
+        </div>
+        <div class="featured-video-player" id="featured-video-player" style="display: none;">
+          <div class="video-embed-container">
+            <iframe id="featured-video-iframe" src="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+          </div>
+          <div class="featured-video-meta">
+            <h4 id="featured-video-title">Video Title</h4>
+            <p id="featured-video-desc">Video Description</p>
+          </div>
+        </div>
+        <div class="lesson-videos-grid" id="lesson-videos-grid"></div>
+      </div>
+
+      <!-- Tab 3: Interactive Homework & FAANG Drills -->
+      <div class="tab-pane" id="pane-homework" style="display: none;">
+        <div class="resource-pane-header">
+          <div class="resource-badge">Senior L5 Assessment</div>
+          <h3>Diagnostic Homework & Mock Onsite Drills</h3>
+          <p>Practical scenarios, failure-mode tests, and trade-off questions asked in Google, Meta, and Amazon rounds.</p>
+        </div>
+        <div class="drills-progress-card">
+          <div class="drills-header-row">
+            <span>Interview Readiness Checklist</span>
+            <span class="drills-counter" id="hw-progress-counter">0 / 0 Practiced</span>
+          </div>
+          <div class="drills-progress-track">
+            <div class="drills-progress-fill" id="hw-progress-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+        <div class="homework-drills-list" id="homework-drills-list"></div>
+      </div>
+
+      <!-- Tab 4: Live Code Playground & Monaco IDE Runner -->
+      <div class="tab-pane" id="pane-playground" style="display: none;">
+        <div class="playground-card">
+          <div class="playground-topbar">
+            <div class="pg-file-meta">
+              <span class="pg-icon">⚡</span>
+              <span class="pg-filename" id="playground-filename">lab_solution.py</span>
+              <select id="playground-lang-select" class="pg-lang-picker">
+                <option value="python">Python 3.11</option>
+                <option value="javascript">JavaScript (ES6)</option>
+                <option value="go">Go 1.21</option>
+              </select>
+              <span class="pg-monaco-badge" id="monaco-status-badge">Monaco IDE</span>
+            </div>
+            <div class="pg-btn-group">
+              <button class="btn-pg-ghost" id="btn-copy-code-pg">Copy Code</button>
+              <button class="btn-pg-ghost" id="btn-reset-code-pg">Reset</button>
+              <a href="#" class="btn-pg-ghost" id="btn-download-lab-pg" download>Download .py</a>
+              <button class="btn-pg-primary" id="btn-run-playground">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                Run Code & Test
+              </button>
+            </div>
+          </div>
+          <div class="playground-editor-wrapper" id="playground-editor-container">
+            <div id="monaco-editor-mount" style="width: 100%; height: 380px;"></div>
+            <textarea class="playground-textarea" id="playground-editor" spellcheck="false" style="display:none;" placeholder="# Python implementation code..."></textarea>
+          </div>
+          <div class="playground-console">
+            <div class="console-header">
+              <span>TERMINAL OUTPUT</span>
+              <span class="console-status" id="playground-status">Idle</span>
+            </div>
+            <pre class="console-output" id="playground-output">$ Ready to run. Click "Run Code & Test" to evaluate invariants and assertions.</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 5: Foundational Articles & RFCs -->
+      <div class="tab-pane" id="pane-articles" style="display: none;">
+        <div class="resource-pane-header">
+          <div class="resource-badge">Engineering Literature</div>
+          <h3>Seminal Papers, Architecture RFCs & Deep Dives</h3>
+          <p>Authoritative reading list compiled from ACM/USENIX publications and top engineering team blogs.</p>
+        </div>
+        <div class="articles-grid" id="lesson-articles-grid"></div>
+      </div>
+
+      <!-- Tab 6: Production Repos & Complete Downloads -->
+      <div class="tab-pane" id="pane-repos" style="display: none;">
+        <div class="resource-pane-header">
+          <div class="resource-badge">Source Repositories</div>
+          <h3>Production Codebases & Download Center</h3>
+          <p>Inspect real implementations from enterprise open-source repos and download complete offline labs.</p>
+        </div>
+        <div class="repos-banner-card">
+          <div class="repos-banner-text">
+            <h4>Complete 100-Chapter Offline Lab Package</h4>
+            <p>All runnable Python labs, simulation code, and test suites in a single self-contained archive.</p>
+          </div>
+          <a href="/api/download/all-labs.zip" class="btn-download-archive-primary">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Download Full Package (.zip · 528 KB)
+          </a>
+        </div>
+        <div class="repos-grid" id="lesson-repos-grid"></div>
+      </div>
+
+      <div class="reader-footer">
+        <button class="btn-nav-lesson" id="btn-prev-lesson">← Previous Lesson</button>
+        <button class="btn-nav-lesson next" id="btn-next-lesson">Next Lesson →</button>
+      </div>
+    </section>
+
+    <!-- VIEW 4: CURATED YOUTUBE VIDEO VAULT -->
+    <section id="view-videos" class="app-view">
+      <div class="videos-header">
+        <div class="badge-tag">Technical Lectures Only</div>
+        <h2 class="videos-title">Video Vault</h2>
+        <p class="videos-desc">
+          Structured, high-density video breakdowns from Kleppmann, Karpathy, NeetCode, ByteByteGo, and Hussein Nasser.
+        </p>
+
+        <div class="video-filters" id="video-filter-pills">
+          <button class="v-pill active" data-vfilter="all">All (<span id="v-cnt-all">202</span>)</button>
+          <button class="v-pill" data-vfilter="3b1b">3Blue1Brown (Math & Neural)</button>
+          <button class="v-pill" data-vfilter="system-design">System Design</button>
+          <button class="v-pill" data-vfilter="dsa">DSA (NeetCode)</button>
+          <button class="v-pill" data-vfilter="ai-engineering">AI & LLMs (Karpathy / 3B1B)</button>
+          <button class="v-pill" data-vfilter="behavioral">Behavioral & Negotiation</button>
+        </div>
+      </div>
+
+      <div class="videos-grid" id="videos-container"></div>
+    </section>
+
+    <!-- VIEW 5: CTC & EQUITY CALCULATOR -->
+    <section id="view-calculator" class="app-view">
+      <div class="calc-container">
+        <div class="calc-header">
+          <div class="badge-tag">Compensation Architecture</div>
+          <h2>50 LPA–80 LPA CTC & Equity Simulator</h2>
+          <p>Deconstruct base salary, variable bonus, sign-on bonus, and RSU vesting schedules to evaluate real cashflow.</p>
+        </div>
+
+        <div class="calc-card-grid">
+          <div class="calc-inputs-card">
+            <h3>Offer Parameters</h3>
+
+            <div class="input-field">
+              <label>Fixed Base Salary (₹ Lakhs / Year)</label>
+              <div class="range-val-wrapper">
+                <input type="range" id="input-base" min="15" max="60" value="32" step="1">
+                <span class="range-display" id="disp-base">₹32 L</span>
+              </div>
+            </div>
+
+            <div class="input-field">
+              <label>Target Performance Bonus (%)</label>
+              <div class="range-val-wrapper">
+                <input type="range" id="input-bonus" min="0" max="30" value="15" step="1">
+                <span class="range-display" id="disp-bonus">15%</span>
+              </div>
+            </div>
+
+            <div class="input-field">
+              <label>First Year Signing Bonus (₹ Lakhs)</label>
+              <div class="range-val-wrapper">
+                <input type="range" id="input-jb" min="0" max="20" value="6" step="1">
+                <span class="range-display" id="disp-jb">₹6 L</span>
+              </div>
+            </div>
+
+            <div class="input-field">
+              <label>Total 4-Year Grant ($ USD)</label>
+              <div class="range-val-wrapper">
+                <input type="range" id="input-rsu" min="10000" max="150000" value="60000" step="5000">
+                <span class="range-display" id="disp-rsu">$60,000</span>
+              </div>
+            </div>
+
+            <div class="input-field">
+              <label>Vesting Schedule</label>
+              <select id="select-vesting" class="calc-select">
+                <option value="equal">Standard Equal (25% / 25% / 25% / 25%)</option>
+                <option value="amazon">Amazon Backloaded (5% / 15% / 40% / 40%)</option>
+                <option value="quarterly">Quarterly Even (6.25% per quarter)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="calc-results-card">
+            <h3>First-Year Realized Value</h3>
+
+            <div class="headline-metric">
+              <span class="metric-label">Year 1 Total Realized Value (Pre-Tax)</span>
+              <span class="metric-val" id="res-year1-total">₹55.2 Lakhs</span>
+              <small class="metric-note">Base + Bonus + Sign-on + Year 1 RSUs</small>
+            </div>
+
+            <div class="breakdown-table">
+              <div class="table-row">
+                <span>Monthly Post-Tax In-Hand (~30% Tax + EPF):</span>
+                <strong id="res-monthly-cash">₹1.87 L / mo</strong>
+              </div>
+              <div class="table-row">
+                <span>Year 1 Liquid RSUs (@ ₹85 / USD):</span>
+                <strong id="res-year1-rsu">₹12.75 L</strong>
+              </div>
+              <div class="table-row">
+                <span>Target Performance Bonus:</span>
+                <strong id="res-annual-bonus">₹4.80 L</strong>
+              </div>
+              <div class="table-row">
+                <span>Total 4-Year Cumulative Value:</span>
+                <strong id="res-four-year-total">₹2.12 Cr</strong>
+              </div>
+            </div>
+
+            <div class="negotiation-tip">
+              <strong>Negotiation Protocol:</strong>
+              <p>Anchor firmly on <strong>Fixed Base</strong> first. Discretionary sign-on bonuses can bridge immediate gaps without compromising long-term equity multipliers.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Global Command Palette / Search Modal (Ctrl + K) -->
+  <div class="modal-backdrop" id="search-modal">
+    <div class="search-modal-box">
+      <div class="search-input-wrapper">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="global-search-input" placeholder="Search lessons, concepts, or algorithms..." autocomplete="off">
+        <button class="btn-close-modal" id="btn-close-search">ESC</button>
+      </div>
+      <div class="search-results-list" id="search-results">
+        <div class="search-empty-state">Type a query...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Video Player Modal -->
+  <div class="modal-backdrop" id="video-modal">
+    <div class="video-modal-box">
+      <div class="video-modal-header">
+        <h3 id="video-modal-title">Lecture</h3>
+        <button class="btn-close-modal" id="btn-close-video">✕</button>
+      </div>
+      <div class="video-embed-wrapper" id="video-embed-container"></div>
+    </div>
+  </div>
+
+  <!-- Live In-Page AI Mentor Drawer -->
+  <aside class="ai-drawer" id="ai-drawer">
+    <div class="ai-drawer-header">
+      <div class="ai-header-left">
+        <div class="ai-avatar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10H12V2z"></path><path d="M12 12 2.1 12a10.1 10.1 0 0 0 1.9 4.9"></path></svg>
+        </div>
+        <div>
+          <div class="ai-title">Technical Mentor</div>
+          <div class="ai-sub" id="ai-context-indicator">Context Active</div>
+        </div>
+      </div>
+      <button class="btn-close-ai" id="btn-close-ai">✕</button>
+    </div>
+
+    <!-- AI Subscription Status Strip -->
+    <div class="ai-credits-strip">
+      <span class="ai-credits-status">⚡ <strong id="drawer-usage-cnt">5 / 5</strong> queries left today (<span id="drawer-plan-badge">Free</span>)</span>
+      <button class="btn-drawer-key" id="btn-drawer-upgrade-plan">Upgrade to Pro 🚀</button>
+    </div>
+
+    <div class="ai-quick-chips">
+      <button class="quick-chip" data-prompt="Explain the core mental model and constraints.">Mental Model</button>
+      <button class="quick-chip" data-prompt="What is the primary interview trap or failure mode on this?">Failure Modes</button>
+      <button class="quick-chip" data-prompt="Provide a production Python implementation with complexity analysis.">Implementation</button>
+      <button class="quick-chip" data-prompt="Simulate a senior FAANG interviewer follow-up drill on this.">Mock Drill</button>
+    </div>
+
+    <div class="ai-messages" id="ai-messages-container">
+      <div class="ai-msg bot">
+        <div class="msg-bubble">
+          <strong>Mentor Active.</strong> Context for the current chapter is automatically loaded. Ask any question regarding trade-offs, invariants, or edge-case diagnostics.
+        </div>
+      </div>
+    </div>
+
+    <div class="ai-input-bar">
+      <input type="text" id="ai-input" placeholder="Ask about this chapter or any concept..." autocomplete="off">
+      <button id="btn-send-ai">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- User Authentication Modal -->
+  <div class="modal-backdrop" id="auth-modal">
+    <div class="auth-modal-box">
+      <div class="auth-modal-header">
+        <div>
+          <h3>Sign In to AlgoArch</h3>
+          <p>Sync your progress, streaks, notes, and unlock 10 free AI mentor credits.</p>
+        </div>
+        <button class="btn-close-modal" id="btn-close-auth">✕</button>
+      </div>
+      <div class="auth-providers-list">
+        <button class="btn-auth-provider google" id="btn-login-google">
+          <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+          <span>Continue with Google</span>
+        </button>
+        <button class="btn-auth-provider github" id="btn-login-github">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          <span>Continue with GitHub</span>
+        </button>
+        <button class="btn-auth-provider guest" id="btn-login-guest">
+          <span>⚡ 1-Click Instant Guest Sign In (10 Free Credits)</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin CMS & LiteLLM Control Center Modal -->
+  <div class="modal-backdrop modal-xl" id="cms-modal">
+    <div class="cms-modal-box">
+      <div class="cms-modal-header">
+        <div class="cms-title-meta">
+          <div class="badge-tag">Admin Operations</div>
+          <h3>System Admin & LiteLLM Gateway Center</h3>
+          <p>Manage curriculum chapters, track real-time token consumption, set user limits, and reset budgets.</p>
+        </div>
+        <div class="cms-header-actions">
+          <div class="cms-view-nav">
+            <button class="cms-nav-btn active" id="btn-cms-view-chapters">📖 Curriculum CMS</button>
+            <button class="cms-nav-btn" id="btn-cms-view-tokens">⚡ LiteLLM Token Usage & Limits</button>
+          </div>
+          <button class="btn-cms-new" id="btn-cms-new-chapter">+ New Chapter</button>
+          <button class="btn-close-modal" id="btn-close-cms">✕</button>
+        </div>
+      </div>
+
+      <!-- VIEW A: CURRICULUM CMS -->
+      <div class="cms-body-grid" id="cms-view-chapters-body">
+        <div class="cms-sidebar">
+          <input type="text" id="cms-search-input" placeholder="Search 100 lessons..." class="cms-input">
+          <div class="cms-lessons-list" id="cms-lessons-list"></div>
+        </div>
+        <div class="cms-editor-panel">
+          <div class="cms-form-grid">
+            <div class="cms-field">
+              <label>Lesson ID</label>
+              <input type="text" id="cms-field-id" class="cms-input" placeholder="e.g. sy42">
+            </div>
+            <div class="cms-field">
+              <label>Title</label>
+              <input type="text" id="cms-field-title" class="cms-input" placeholder="Lesson Title">
+            </div>
+            <div class="cms-field">
+              <label>Track</label>
+              <select id="cms-field-track" class="cms-input">
+                <option value="system-design">System Design</option>
+                <option value="dsa">DSA</option>
+                <option value="ai-engineering">AI Engineering</option>
+                <option value="behavioral">Behavioral</option>
+              </select>
+            </div>
+            <div class="cms-field">
+              <label>Duration & Stars</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="cms-field-duration" class="cms-input" placeholder="45 min">
+                <select id="cms-field-stars" class="cms-input" style="width: 80px;">
+                  <option value="5">5 ★</option>
+                  <option value="4">4 ★</option>
+                  <option value="3">3 ★</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="cms-field" style="margin-top: 10px;">
+            <label>Tags (comma separated)</label>
+            <input type="text" id="cms-field-tags" class="cms-input" placeholder="Redis, Caching, Event Loop">
+          </div>
+          <div class="cms-field" style="margin-top: 10px;">
+            <div class="cms-md-tabs">
+              <button class="cms-tab active" id="cms-tab-edit">Markdown Editor</button>
+              <button class="cms-tab" id="cms-tab-preview">Live Rendered Preview</button>
+            </div>
+            <textarea id="cms-field-markdown" class="cms-textarea" placeholder="# Chapter Markdown Guide..."></textarea>
+            <div id="cms-markdown-preview" class="cms-preview-box" style="display: none;"></div>
+          </div>
+          <div class="cms-footer-actions">
+            <span id="cms-save-status" class="cms-status-msg"></span>
+            <button class="btn-action-primary" id="btn-cms-save">
+              <span>💾 Save & Publish to Production</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW B: LITELLM TOKEN USAGE & LIMITS CONTROL CENTER -->
+      <div id="cms-view-tokens-body" style="display: none; flex-direction: column; flex: 1; overflow-y: auto; gap: 16px; margin-top: 14px; min-height: 0;">
+        <!-- KPI Cards -->
+        <div class="tokens-kpi-grid">
+          <div class="token-kpi-card">
+            <span class="token-kpi-label">Total Tokens Tracked</span>
+            <strong class="token-kpi-val" id="kpi-total-tokens">0</strong>
+            <span class="token-kpi-sub" id="kpi-tokens-split">0 prompt / 0 comp</span>
+          </div>
+          <div class="token-kpi-card">
+            <span class="token-kpi-label">Estimated Cloud Spend</span>
+            <strong class="token-kpi-val" id="kpi-total-cost">$0.0000</strong>
+            <span class="token-kpi-sub">LiteLLM Blended Pricing</span>
+          </div>
+          <div class="token-kpi-card">
+            <span class="token-kpi-label">Total AI Queries</span>
+            <strong class="token-kpi-val" id="kpi-total-requests">0</strong>
+            <span class="token-kpi-sub">100% Request Audited</span>
+          </div>
+          <div class="token-kpi-card">
+            <span class="token-kpi-label">Default User Quota</span>
+            <strong class="token-kpi-val" id="kpi-default-limit">25,000</strong>
+            <span class="token-kpi-sub">Tokens per Free Account</span>
+          </div>
+        </div>
+
+        <!-- Global Control Bar -->
+        <div class="tokens-actions-bar">
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <label style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--text-secondary);">DEFAULT USER LIMIT:</label>
+            <input type="number" id="input-global-token-limit" class="cms-input" style="width: 110px;" value="25000" step="5000">
+            <button class="btn-pg-ghost" id="btn-save-default-limit" style="font-weight: 600; padding: 5px 12px;">Save Limit</button>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; margin-left: auto;">
+            <button class="btn-pg-ghost" id="btn-refresh-tokens" style="font-weight: 600; padding: 5px 12px;">🔄 Refresh</button>
+            <button class="btn-pg-ghost" id="btn-reset-all-tokens" style="color: var(--accent-red); border-color: rgba(239, 68, 68, 0.4); font-weight: 600; padding: 5px 12px;">⚠️ Reset All Usage</button>
+          </div>
+        </div>
+
+        <!-- User Limits & Usage Table -->
+        <div class="tokens-table-card">
+          <div class="tokens-table-header">
+            <h4>User Token Budgets & Rate Limit Status</h4>
+            <span id="tokens-table-user-count" style="font-size: 12px; color: var(--text-secondary);">0 Active Users</span>
+          </div>
+          <div class="tokens-table-wrapper">
+            <table class="tokens-table">
+              <thead>
+                <tr>
+                  <th>User / Email</th>
+                  <th>Tokens Used</th>
+                  <th>Token Limit</th>
+                  <th>Budget Consumption</th>
+                  <th>Spend ($)</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="tokens-users-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Real-Time Request Audit Log -->
+        <div class="tokens-table-card">
+          <div class="tokens-table-header">
+            <h4>Real-Time Request Trace Audit Logs (LiteLLM)</h4>
+            <span style="font-size: 12px; color: var(--text-secondary);">Last 40 Inferences</span>
+          </div>
+          <div class="tokens-table-wrapper">
+            <table class="tokens-table logs-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>User</th>
+                  <th>Model</th>
+                  <th>Tokens (Prompt / Comp / Total)</th>
+                  <th>Cost ($)</th>
+                  <th>Latency</th>
+                  <th>Query Snippet</th>
+                </tr>
+              </thead>
+              <tbody id="tokens-logs-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Subscription & Paid Plans Modal -->
+  <div class="modal-backdrop modal-xl" id="pricing-modal">
+    <div class="pricing-modal-box">
+      <div class="pricing-modal-header">
+        <div>
+          <div class="badge-tag">Production Membership</div>
+          <h3>AlgoArch Memberships & AI Plans</h3>
+          <p>Production-grade FAANG interview preparation. Zero dummy tools, powered by Google Gemini AI.</p>
+        </div>
+        <button class="btn-close-modal" id="btn-close-pricing">✕</button>
+      </div>
+
+      <div class="pricing-plans-grid">
+        <!-- Plan 1: Free Starter -->
+        <div class="pricing-card" id="card-plan-free">
+          <div class="plan-header">
+            <span class="plan-badge-tag">Free Tier</span>
+            <h4 class="plan-name">Free Starter</h4>
+            <div class="plan-price">
+              <span class="price-val">₹0</span>
+              <span class="price-period">/ forever</span>
+            </div>
+            <p class="plan-sub">For foundational exploration across all curriculum tracks.</p>
+          </div>
+          <ul class="plan-features">
+            <li>✓ Full access to all 106+ FAANG Curriculum Lessons</li>
+            <li>✓ <strong>5 Real Gemini AI Mentor Queries / day</strong></li>
+            <li>✓ Daily study streak tracker & reminder digests</li>
+            <li>✓ Community drills & cheat sheets</li>
+            <li class="disabled">✗ Monaco IDE live runner & test suites</li>
+            <li class="disabled">✗ Company-tagged question filters</li>
+            <li class="disabled">✗ Dynamic Grind 75 study schedule planner</li>
+          </ul>
+          <button class="btn-plan-action current" id="btn-select-free" disabled>Current Plan</button>
+        </div>
+
+        <!-- Plan 2: Pro Engineer (Recommended) -->
+        <div class="pricing-card featured" id="card-plan-pro">
+          <div class="plan-ribbon">MOST POPULAR · 50LPA SWE</div>
+          <div class="plan-header">
+            <span class="plan-badge-tag pro">Pro ⚡</span>
+            <h4 class="plan-name">Pro Engineer</h4>
+            <div class="plan-price">
+              <span class="price-val">₹499</span>
+              <span class="price-period">/ month</span>
+            </div>
+            <p class="plan-sub">The complete technical engine for L4/L5 senior candidates.</p>
+          </div>
+          <ul class="plan-features">
+            <li>✓ <strong>100 Real Gemini AI Queries / day</strong></li>
+            <li>✓ <strong>Monaco IDE live code runner & test suites</strong></li>
+            <li>✓ <strong>Target company filters (Google, Meta, Amazon, Netflix)</strong></li>
+            <li>✓ <strong>Dynamic Grind 75 study schedule planner</strong></li>
+            <li>✓ Priority model latency (&lt;1s response time)</li>
+            <li>✓ Complete architecture guides & RFCs</li>
+            <li class="disabled">✗ 1-on-1 FAANG Mock interview scorecard</li>
+          </ul>
+          <button class="btn-plan-action primary" id="btn-select-pro">Upgrade to Pro ⚡</button>
+        </div>
+
+        <!-- Plan 3: Staff / Enterprise -->
+        <div class="pricing-card" id="card-plan-enterprise">
+          <div class="plan-header">
+            <span class="plan-badge-tag enterprise">Staff Elite 👑</span>
+            <h4 class="plan-name">Staff / Enterprise</h4>
+            <div class="plan-price">
+              <span class="price-val">₹1,499</span>
+              <span class="price-period">/ month</span>
+            </div>
+            <p class="plan-sub">For Principal/Staff L6+ candidates targeting ₹80LPA+ CTC.</p>
+          </div>
+          <ul class="plan-features">
+            <li>✓ <strong>500 Real Gemini AI Queries / day</strong> (Unlimited)</li>
+            <li>✓ <strong>FAANG Hiring Bar Rubric & Mock Scorecard</strong></li>
+            <li>✓ <strong>Complete 106-Chapter Offline Lab Package (.zip)</strong></li>
+            <li>✓ Low-latency & ML system design architectures</li>
+            <li>✓ Priority senior mentor queue</li>
+            <li>✓ Full CMS admin content creator suite</li>
+          </ul>
+          <button class="btn-plan-action" id="btn-select-enterprise">Upgrade to Staff 👑</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dynamic Study Schedule Planner Modal (Grind 75 Style) -->
+  <div class="modal-backdrop modal-xl" id="planner-modal">
+    <div class="planner-modal-box">
+      <div class="planner-header">
+        <div>
+          <div class="badge-tag">Grind 75 & NeetCode Acceleration</div>
+          <h3>Dynamic FAANG Study Schedule Generator</h3>
+          <p>Personalized day-by-day curriculum tailored to your remaining interview timeline.</p>
+        </div>
+        <button class="btn-close-modal" id="btn-close-planner">✕</button>
+      </div>
+
+      <div class="planner-controls-grid">
+        <div class="planner-field">
+          <label>Weeks Until Interview</label>
+          <select id="planner-select-weeks" class="cms-input">
+            <option value="2">2 Weeks (Crash Sprint)</option>
+            <option value="4" selected>4 Weeks (Intensive Core)</option>
+            <option value="8">8 Weeks (Comprehensive Mastery)</option>
+            <option value="12">12 Weeks (Zero-to-Staff L5/L6)</option>
+          </select>
+        </div>
+        <div class="planner-field">
+          <label>Study Hours Per Week</label>
+          <select id="planner-select-hours" class="cms-input">
+            <option value="5">5 Hours / week (1 hr/day)</option>
+            <option value="10" selected>10 Hours / week (2 hrs/day)</option>
+            <option value="20">20 Hours / week (Full-time Prep)</option>
+          </select>
+        </div>
+        <div class="planner-field">
+          <label>Target Track Focus</label>
+          <select id="planner-select-focus" class="cms-input">
+            <option value="all" selected>Balanced (DSA + System Design + AI)</option>
+            <option value="dsa">DSA & Recognition Core</option>
+            <option value="system-design">High-Scale Distributed Systems</option>
+            <option value="ai-engineering">Production ML & GenAI</option>
+          </select>
+        </div>
+        <div class="planner-field-action">
+          <button class="btn-action-primary" id="btn-generate-schedule" style="margin-top: 18px; width: 100%;">
+            <span>⚡ Generate My Schedule</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="planner-results-wrapper" id="planner-results-container">
+        <div class="planner-empty-state">
+          Select your target timeline above and click <strong>Generate My Schedule</strong> to receive your prioritized weekly assignments.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAANG Mock Interview Rubric Scorecard Modal -->
+  <div class="modal-backdrop" id="rubric-modal">
+    <div class="rubric-modal-box">
+      <div class="rubric-header">
+        <div>
+          <div class="badge-tag">Hiring Committee Standard</div>
+          <h3>FAANG Technical Interview Rubric & Scorecard</h3>
+          <p>Calibrated against Google, Meta, and Amazon L4, L5, and L6 hiring rubrics.</p>
+        </div>
+        <button class="btn-close-modal" id="btn-close-rubric">✕</button>
+      </div>
+
+      <div class="rubric-body">
+        <div class="rubric-dimension">
+          <div class="rubric-dim-header">
+            <strong>1. Signal Detection & Constraint Framing</strong>
+            <span class="dim-score" id="dim-score-1">4 / 5</span>
+          </div>
+          <p class="rubric-dim-desc">Did candidate identify bounds, calculate Big-O ceiling, and state edge cases before writing code?</p>
+          <input type="range" min="1" max="5" value="4" class="rubric-slider" id="slider-dim-1">
+        </div>
+
+        <div class="rubric-dimension">
+          <div class="rubric-dim-header">
+            <strong>2. Algorithm & Invariant Proof</strong>
+            <span class="dim-score" id="dim-score-2">4 / 5</span>
+          </div>
+          <p class="rubric-dim-desc">Correct choice of data structure, valid proof of termination, and amortized complexity handling.</p>
+          <input type="range" min="1" max="5" value="4" class="rubric-slider" id="slider-dim-2">
+        </div>
+
+        <div class="rubric-dimension">
+          <div class="rubric-dim-header">
+            <strong>3. Code Quality & Defensive Hygiene</strong>
+            <span class="dim-score" id="dim-score-3">4 / 5</span>
+          </div>
+          <p class="rubric-dim-desc">Modular clean naming, typed parameters, idiomatic patterns, zero syntax errors.</p>
+          <input type="range" min="1" max="5" value="4" class="rubric-slider" id="slider-dim-3">
+        </div>
+
+        <div class="rubric-dimension">
+          <div class="rubric-dim-header">
+            <strong>4. Senior Communication & Trade-off Altitude</strong>
+            <span class="dim-score" id="dim-score-4">4 / 5</span>
+          </div>
+          <p class="rubric-dim-desc">Thinks out loud, challenges suboptimal assumptions, and demonstrates Staff-level trade-off judgment.</p>
+          <input type="range" min="1" max="5" value="4" class="rubric-slider" id="slider-dim-4">
+        </div>
+
+        <div class="rubric-scorecard-banner">
+          <div class="rubric-total">
+            <span class="rubric-num" id="rubric-total-num">16</span>
+            <span class="rubric-max">/ 20</span>
+          </div>
+          <div class="rubric-verdict">
+            <div class="verdict-label">HIRING COMMITTEE RECOMMENDATION:</div>
+            <strong class="verdict-tier" id="rubric-verdict-text">STRONG HIRE (L5 Senior SWE · ₹50LPA–₹75LPA)</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Motivation, Streaks & Daily Email Modal -->
+  <div class="modal-backdrop" id="streak-modal">
+    <div class="streak-modal-box">
+      <div class="streak-modal-header">
+        <div>
+          <h3>🔥 Study Streak & Daily Motivation Dispatch</h3>
+          <p>Build the daily consistency required to crack 50LPA Staff Engineering interviews.</p>
+        </div>
+        <button class="btn-close-modal" id="btn-close-streak">✕</button>
+      </div>
+      <div class="streak-status-banner">
+        <div class="streak-big-num" id="modal-streak-count">3</div>
+        <div>
+          <h4 style="font-size: 16px; margin: 0 0 4px;">Day Consistency Streak</h4>
+          <p style="font-size: 13px; color: var(--text-secondary); margin: 0;">You're in the top 5% of candidates preparing daily.</p>
+        </div>
+      </div>
+      <div class="streak-settings-form">
+        <h4>Automated Daily Email Reminders</h4>
+        <div class="cms-field" style="margin-top: 10px;">
+          <label>Your Email Address</label>
+          <input type="email" id="streak-input-email" class="cms-input" placeholder="engineer@faang.io">
+        </div>
+        <div class="cms-field" style="margin-top: 10px;">
+          <label>Preferred Daily Dispatch Time</label>
+          <select id="streak-select-time" class="cms-input">
+            <option value="08:00">08:00 AM (Before Standup)</option>
+            <option value="09:00" selected>09:00 AM (Morning Study Block)</option>
+            <option value="20:00">08:00 PM (Evening Deep Dive)</option>
+          </select>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap;">
+          <button class="btn-action-primary" id="btn-save-reminders">Save Reminder Preferences</button>
+          <button class="btn-pg-ghost" id="btn-preview-email">Preview Daily Email Digest →</button>
+        </div>
+      </div>
+      <div id="email-preview-container" class="email-preview-box" style="display: none; margin-top: 16px;">
+        <div class="email-preview-header">
+          <span>EMAIL PREVIEW (What lands in your inbox)</span>
+          <button class="btn-close-preview" id="btn-close-email-preview">✕ Close Preview</button>
+        </div>
+        <iframe id="email-preview-iframe" style="width: 100%; height: 320px; border: none; border-radius: 4px; background: #0d1117;"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <script src="vendor/marked.min.js"></script>
+  <script>if (!window.marked) document.write('<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\\/script>')</script>
+  <!-- Monaco Editor AMD Loader -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+  <script src="app.js?v=3.0"></script>
+</body>
+</html>

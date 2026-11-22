@@ -1,0 +1,2335 @@
+{
+  "tracks": [
+    {
+      "id": "dsa",
+      "name": "Data Structures & Algorithms",
+      "shortName": "DSA",
+      "badge": "Recognition Core",
+      "description": "Built backwards from the usual course: the trained skill is recognition — which technique to reach for in the first 45 seconds of reading the constraints.",
+      "totalLessons": 26,
+      "color": "#10b981",
+      "blocks": [
+        {
+          "k": "start",
+          "t": "The Recognition Engine",
+          "lessons": [
+            {
+              "n": "00",
+              "id": "ds00",
+              "title": "The Recognition Engine",
+              "stars": 5,
+              "desc": "The drill that trains the 45 seconds between reading a problem and knowing which technique to reach for — the skill the whole course is built around.",
+              "duration": "45 min drill",
+              "tags": [
+                "Pattern Recognition",
+                "Diagnostic",
+                "Intuition"
+              ],
+              "existingPath": "dsa-faang-prep/lessons/00-recognition-engine.md",
+              "visualPath": "dsa-faang-prep/visuals/00-recognition-engine.html",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            }
+          ]
+        },
+        {
+          "k": "block i",
+          "t": "The Recognition Core",
+          "lessons": [
+            {
+              "n": "01",
+              "id": "ds01",
+              "title": "Complexity & the Recognition Reflex",
+              "stars": 5,
+              "desc": "Reading n backwards to the algorithm; the constraint→complexity table; amortisation; the real cost of Python's operations, measured; the 5-step ritual on every problem.",
+              "duration": "35 min",
+              "tags": [
+                "Big-O",
+                "Constraints",
+                "Amortized Analysis"
+              ],
+              "existingPath": "dsa-faang-prep/lessons/01-complexity-and-recognition.md",
+              "visualPath": "dsa-faang-prep/visuals/01-complexity-and-recognition.html",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            },
+            {
+              "n": "02",
+              "id": "ds02",
+              "title": "Hashmap as an Index",
+              "stars": 5,
+              "desc": "The single highest-yield idea in interview DSA: trade memory for a lookup. Complement trick, seen-index map, frequency map, canonical-key grouping.",
+              "duration": "40 min",
+              "tags": [
+                "Hash Tables",
+                "Prefix Map",
+                "Frequency Counting"
+              ],
+              "existingPath": "dsa-faang-prep/lessons/02-hashmap-as-index.md",
+              "visualPath": "dsa-faang-prep/visuals/02-hashmap-as-index.html",
+              "companies": [
+                "Meta",
+                "Netflix"
+              ]
+            },
+            {
+              "n": "03",
+              "id": "ds03",
+              "title": "Two Pointers",
+              "stars": 5,
+              "desc": "Opposite-ends vs same-direction vs fast/slow; sortedness as the license; in-place partition; the 'why not just nested loops' derivation.",
+              "duration": "40 min",
+              "tags": [
+                "Two Pointers",
+                "Partition",
+                "Fast-Slow Pointers"
+              ],
+              "existingPath": "dsa-faang-prep/lessons/03-two-pointers.md",
+              "visualPath": "dsa-faang-prep/visuals/03-two-pointers.html",
+              "companies": [
+                "Amazon",
+                "Apple"
+              ]
+            },
+            {
+              "n": "04",
+              "id": "ds04",
+              "title": "Sliding Window",
+              "stars": 5,
+              "desc": "Fixed and variable; the shrink condition as the only hard part; the monotonicity precondition and where it fails; at-most-K minus at-most-(K−1) for exactly-K.",
+              "duration": "45 min",
+              "tags": [
+                "Sliding Window",
+                "Subarrays",
+                "Monotonicity"
+              ],
+              "existingPath": "dsa-faang-prep/lessons/04-sliding-window.md",
+              "visualPath": "dsa-faang-prep/visuals/04-sliding-window.html",
+              "companies": [
+                "Netflix",
+                "Uber"
+              ]
+            },
+            {
+              "n": "05",
+              "id": "ds05",
+              "title": "Prefix Sums & Difference Arrays",
+              "stars": 4,
+              "desc": "Where sliding windows die and prefix+hashmap takes over; 2D prefix; range-update difference array; prefix XOR.",
+              "duration": "45 min",
+              "tags": [
+                "Prefix Sums",
+                "Difference Array",
+                "2D Grids",
+                "XOR"
+              ],
+              "existingPath": "dsa-faang-prep/lessons/05-prefix-sums.md",
+              "visualPath": "dsa-faang-prep/visuals/05-prefix-sums.html",
+              "companies": [
+                "Apple",
+                "Google"
+              ]
+            },
+            {
+              "n": "06",
+              "id": "ds06",
+              "title": "Binary Search & Search on Answer",
+              "stars": 5,
+              "desc": "One template with one invariant; bisect_left vs bisect_right; rotated arrays; and the senior move: binary searching the answer space on 'minimise the maximum'.",
+              "duration": "50 min",
+              "tags": [
+                "Binary Search",
+                "Parametric Search",
+                "Invariants"
+              ],
+              "existingPath": "dsa-faang-prep/lessons/06-binary-search.md",
+              "visualPath": "dsa-faang-prep/visuals/06-binary-search.html",
+              "companies": [
+                "Uber",
+                "Meta"
+              ]
+            },
+            {
+              "n": "07",
+              "id": "ds07",
+              "title": "Monotonic Stack & Deque",
+              "stars": 4,
+              "desc": "'Next greater', spans, histogram rectangles, sliding-window maximum; the amortised O(n) argument that makes it look like magic.",
+              "duration": "45 min",
+              "tags": [
+                "Monotonic Stack",
+                "Histogram",
+                "Sliding Window Max"
+              ],
+              "existingPath": "dsa-faang-prep/lessons/07-monotonic-stack.md",
+              "visualPath": "dsa-faang-prep/visuals/07-monotonic-stack.html",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            },
+            {
+              "n": "08",
+              "id": "ds08",
+              "title": "Heaps & Top-K",
+              "stars": 5,
+              "desc": "heapq is min-only and what that forces; size-k heap vs full sort vs quickselect; two-heap running median; k-way merge; lazy deletion.",
+              "duration": "50 min",
+              "tags": [
+                "Priority Queue",
+                "Quickselect",
+                "Running Median",
+                "K-way Merge"
+              ],
+              "existingPath": "dsa-faang-prep/lessons/08-heaps-and-top-k.md",
+              "visualPath": "dsa-faang-prep/visuals/08-heaps-and-top-k.html",
+              "companies": [
+                "Meta",
+                "Netflix"
+              ]
+            }
+          ]
+        },
+        {
+          "k": "block ii",
+          "t": "Structures Where Traversal is Algorithm",
+          "lessons": [
+            {
+              "n": "09",
+              "id": "ds09",
+              "title": "Linked List Surgery",
+              "stars": 4,
+              "desc": "The dummy head that deletes half your edge cases; in-place reversal; Floyd's cycle detection and phase 2; k-group reversal; LRU as dict+DLL.",
+              "duration": "40 min",
+              "tags": [
+                "Linked Lists",
+                "Floyd Cycle",
+                "LRU Cache",
+                "Pointer Manipulation"
+              ],
+              "existingPath": "dsa-faang-prep/lessons/09-linked-lists.md",
+              "visualPath": "dsa-faang-prep/visuals/09-linked-lists.html",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            },
+            {
+              "n": "10",
+              "id": "ds10",
+              "title": "Trees & DFS Return-Value Design",
+              "stars": 5,
+              "desc": "DFS return-value design — the entire skill is choosing what the recursion returns; diameter and max-path-sum; BST invariant; iterative traversal; LCA.",
+              "duration": "50 min",
+              "tags": [
+                "Binary Trees",
+                "BST",
+                "DFS",
+                "Recursion Design",
+                "LCA"
+              ],
+              "existingPath": "dsa-faang-prep/lessons/10-trees-dfs.md",
+              "visualPath": "dsa-faang-prep/visuals/10-trees-dfs.html",
+              "companies": [
+                "Meta",
+                "Netflix"
+              ]
+            },
+            {
+              "n": "11",
+              "id": "ds11",
+              "title": "Graphs: BFS, DFS & Modelling",
+              "stars": 5,
+              "desc": "The real skill is seeing the graph in a problem that never says 'graph'; grid-as-graph; mark visited on enqueue; multi-source BFS; topological sort; 3-colour cycle detection; Dijkstra.",
+              "duration": "60 min",
+              "tags": [
+                "Graph Theory",
+                "BFS",
+                "Topological Sort",
+                "Dijkstra",
+                "Cycle Detection"
+              ],
+              "existingPath": "dsa-faang-prep/lessons/11-graphs-bfs-dfs.md",
+              "visualPath": "dsa-faang-prep/visuals/11-graphs-bfs-dfs.html",
+              "companies": [
+                "Amazon",
+                "Apple"
+              ]
+            },
+            {
+              "n": "12",
+              "id": "ds12",
+              "title": "Union-Find (Disjoint Set Union)",
+              "stars": 3,
+              "desc": "When connectivity is the question and you never need the path; path compression + union by size; the alpha(n) bound; and what it refuses to do.",
+              "duration": "40 min",
+              "tags": [
+                "DSU",
+                "Connected Components",
+                "Kruskal Prereq",
+                "Graph Connectivity"
+              ],
+              "existingPath": "dsa-faang-prep/lessons/12-union-find.md",
+              "visualPath": "dsa-faang-prep/visuals/12-union-find.html",
+              "companies": [
+                "Netflix",
+                "Uber"
+              ]
+            }
+          ]
+        },
+        {
+          "k": "block iii",
+          "t": "Search & Optimisation",
+          "lessons": [
+            {
+              "n": "13",
+              "id": "ds13",
+              "title": "Backtracking",
+              "stars": 4,
+              "desc": "Choose/explore/un-choose; subsets vs permutations vs combinations as three configurations of one loop; duplicate pruning with i > start.",
+              "duration": "45 min",
+              "tags": [
+                "Backtracking",
+                "Subsets",
+                "Permutations",
+                "Pruning"
+              ],
+              "existingPath": "dsa-faang-prep/lessons/13-backtracking.md",
+              "visualPath": "dsa-faang-prep/visuals/13-backtracking.html",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            },
+            {
+              "n": "14",
+              "id": "ds14",
+              "title": "Dynamic Programming I: 1D",
+              "stars": 4,
+              "desc": "Recurrence first, table second; count / optimise / reachability; memo → tabulation → rolling variables; Kadane and LIS via 'ending at i'.",
+              "duration": "55 min",
+              "tags": [
+                "DP",
+                "1D State",
+                "Kadane",
+                "LIS",
+                "Memoization"
+              ],
+              "existingPath": "dsa-faang-prep/lessons/14-dp-1d.md",
+              "visualPath": "dsa-faang-prep/visuals/14-dp-1d.html",
+              "companies": [
+                "Meta",
+                "Netflix"
+              ]
+            },
+            {
+              "n": "15",
+              "id": "ds15",
+              "title": "Dynamic Programming II: 2D & Sequences",
+              "stars": 3,
+              "desc": "State design as the whole game; LCS and edit distance as one table; the knapsack loop direction; combinations vs permutations by loop order; interval DP.",
+              "duration": "60 min",
+              "tags": [
+                "2D DP",
+                "Knapsack",
+                "Edit Distance",
+                "LCS",
+                "Interval DP"
+              ],
+              "existingPath": "dsa-faang-prep/lessons/15-dp-2d.md",
+              "visualPath": "dsa-faang-prep/visuals/15-dp-2d.html",
+              "companies": [
+                "Amazon",
+                "Apple"
+              ]
+            },
+            {
+              "n": "16",
+              "id": "ds16",
+              "title": "Greedy & Intervals",
+              "stars": 4,
+              "desc": "The exchange argument as proof obligation; sort-by-end vs sort-by-start; merge/insert/erase; sweep line; and where greedy dies.",
+              "duration": "45 min",
+              "tags": [
+                "Greedy",
+                "Intervals",
+                "Sweep Line",
+                "Exchange Argument"
+              ],
+              "existingPath": "dsa-faang-prep/lessons/16-greedy-intervals.md",
+              "visualPath": "dsa-faang-prep/visuals/16-greedy-intervals.html",
+              "companies": [
+                "Netflix",
+                "Uber"
+              ]
+            },
+            {
+              "n": "17",
+              "id": "ds17",
+              "title": "Tries & Bit Manipulation",
+              "stars": 3,
+              "desc": "Prefix structures and why is_word is not optional; trie-pruned grid search; XOR identities; subsets as bitmasks; Python 32-bit trap.",
+              "duration": "45 min",
+              "tags": [
+                "Trie",
+                "Bitwise Operations",
+                "Bitmask",
+                "Prefix Tree"
+              ],
+              "existingPath": "dsa-faang-prep/lessons/17-tries-and-bits.md",
+              "visualPath": "dsa-faang-prep/visuals/17-tries-and-bits.html",
+              "companies": [
+                "Apple",
+                "Google"
+              ]
+            },
+            {
+              "n": "18",
+              "id": "ds18",
+              "title": "Mock Rounds & 45-Min Protocol",
+              "stars": 5,
+              "desc": "The 45-minute protocol with live phase clock; the 4-axis rubric and what is actually graded; six recovery scripts; 6 mocks behind reveals.",
+              "duration": "60 min",
+              "tags": [
+                "Mock Interview",
+                "Protocol",
+                "Recovery Scripts",
+                "Time Management"
+              ],
+              "existingPath": "dsa-faang-prep/lessons/18-mock-rounds.md",
+              "visualPath": "dsa-faang-prep/visuals/18-mock-rounds.html",
+              "companies": [
+                "Uber",
+                "Meta"
+              ]
+            }
+          ]
+        },
+        {
+          "k": "block iv",
+          "t": "Advanced 50LPA FAANG Bar (New)",
+          "lessons": [
+            {
+              "n": "19",
+              "id": "ds19",
+              "title": "Advanced Graphs: Shortest Paths, MST & SCC",
+              "stars": 5,
+              "desc": "Bellman-Ford for negative weights, Floyd-Warshall all-pairs O(V^3), Kruskal's & Prim's MST, Tarjan's Strongly Connected Components and Bridges in O(V+E).",
+              "duration": "60 min",
+              "tags": [
+                "Bellman-Ford",
+                "Floyd-Warshall",
+                "MST",
+                "Tarjan SCC",
+                "Bridges"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/ds19-advanced-graphs.md",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            },
+            {
+              "n": "20",
+              "id": "ds20",
+              "title": "Segment Trees & Fenwick Trees (BIT)",
+              "stars": 5,
+              "desc": "Point and range queries in O(log n); Lazy propagation for range updates; Coordinate compression; When to choose Fenwick over Segment Tree.",
+              "duration": "65 min",
+              "tags": [
+                "Segment Tree",
+                "Fenwick Tree",
+                "Lazy Propagation",
+                "Range Queries"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/ds20-segment-trees.md",
+              "companies": [
+                "Meta",
+                "Netflix"
+              ]
+            },
+            {
+              "n": "21",
+              "id": "ds21",
+              "title": "Bitmask Dynamic Programming & State Compression",
+              "stars": 4,
+              "desc": "When n <= 20 signals bitmask DP; Traveling Salesperson Problem (TSP) in O(n^2 * 2^n); Matching and assignment problems; Iterating submasks in O(3^n).",
+              "duration": "50 min",
+              "tags": [
+                "Bitmask DP",
+                "State Compression",
+                "TSP",
+                "Submask Enumeration"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/ds21-bitmask-dp.md",
+              "companies": [
+                "Amazon",
+                "Apple"
+              ]
+            },
+            {
+              "n": "22",
+              "id": "ds22",
+              "title": "Math, Probability & Reservoir Sampling",
+              "stars": 4,
+              "desc": "Fast modular exponentiation; Fermat's Little Theorem for modular inverse; Sieve of Eratosthenes; Reservoir sampling on infinite streams; Expected value linearity.",
+              "duration": "45 min",
+              "tags": [
+                "Modular Math",
+                "Reservoir Sampling",
+                "Number Theory",
+                "Probability"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/ds22-math-sampling.md",
+              "companies": [
+                "Netflix",
+                "Uber"
+              ]
+            },
+            {
+              "n": "23",
+              "id": "ds23",
+              "title": "String Algorithms: KMP, Rabin-Karp & Rolling Hash",
+              "stars": 4,
+              "desc": "Knuth-Morris-Pratt (KMP) prefix failure function (LPS table); Rabin-Karp polynomial rolling hash; Palindrome detection with Manacher's; Z-algorithm.",
+              "duration": "50 min",
+              "tags": [
+                "KMP",
+                "Rabin-Karp",
+                "Rolling Hash",
+                "String Matching"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/ds23-string-algorithms.md",
+              "companies": [
+                "Apple",
+                "Google"
+              ]
+            }
+          ]
+        },
+        {
+          "k": "creator-patterns",
+          "t": "Elite Creator Patterns (NeetCode & Grokking)",
+          "lessons": [
+            {
+              "n": "24",
+              "id": "ds24",
+              "title": "Cyclic Sort & In-Place State Encodings",
+              "stars": 5,
+              "desc": "The single most under-taught O(n) time O(1) space pattern: array value-as-index mapping. First Missing Positive, finding duplicates, and bit-sign state flags.",
+              "duration": "45 min drill",
+              "tags": [
+                "Cyclic Sort",
+                "In-Place",
+                "Array Indexing",
+                "Amazon",
+                "Meta"
+              ],
+              "companies": [
+                "Amazon",
+                "Meta",
+                "Google"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/ds24.md"
+            },
+            {
+              "n": "25",
+              "id": "ds25",
+              "title": "Topological Sort & DAG Dependency Resolution",
+              "stars": 5,
+              "desc": "Kahns In-Degree BFS vs Tarjans Post-Order DFS. Cycle detection, topological ordering, Course Schedule II, and Alien Dictionary lexicographical order.",
+              "duration": "50 min drill",
+              "tags": [
+                "Topological Sort",
+                "DAG",
+                "Kahns BFS",
+                "Graph Cycles",
+                "Google",
+                "Uber"
+              ],
+              "companies": [
+                "Google",
+                "Uber",
+                "Apple"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/ds25.md"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "system-design",
+      "name": "System Design (HLD & LLD)",
+      "shortName": "System Design",
+      "badge": "Scale & Architecture",
+      "description": "Storage internals up through distributed systems, followed by production case studies run directly against the L5/Senior FAANG interview rubric.",
+      "totalLessons": 44,
+      "color": "#6366f1",
+      "blocks": [
+        {
+          "k": "week 1",
+          "t": "Storage Foundations",
+          "lessons": [
+            {
+              "n": "01",
+              "id": "sy01",
+              "title": "Redis Internals & Eviction",
+              "stars": 5,
+              "desc": "Internals, persistence (RDB/AOF), eviction algorithms (LRU/LFU), distributed locks with Redlock, cluster sharding.",
+              "duration": "50 min",
+              "tags": [
+                "Redis",
+                "Caching",
+                "Persistence",
+                "Distributed Locks"
+              ],
+              "existingPath": "system-design-prep/lessons/01-redis.md",
+              "visualPath": "system-design-prep/visuals/01-redis.html",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            },
+            {
+              "n": "02",
+              "id": "sy02",
+              "title": "Postgres I: Indexes & Scans",
+              "stars": 4,
+              "desc": "B-tree internals, leftmost prefix rule, covering indexes, index-only scans, and BRIN indexes for append-only data.",
+              "duration": "45 min",
+              "tags": [
+                "PostgreSQL",
+                "B-Tree",
+                "Indexes",
+                "Query Optimization"
+              ],
+              "existingPath": "system-design-prep/lessons/02-postgres-indexes.md",
+              "visualPath": "system-design-prep/visuals/02-postgres-indexes.html",
+              "companies": [
+                "Meta",
+                "Netflix"
+              ]
+            },
+            {
+              "n": "03",
+              "id": "sy03",
+              "title": "Postgres II: MVCC & Locking",
+              "stars": 3,
+              "desc": "MVCC, table bloat, autovacuum, transaction wraparound, isolation levels, row locks vs table locks, zero-downtime migrations.",
+              "duration": "45 min",
+              "tags": [
+                "MVCC",
+                "Vacuum",
+                "Deadlocks",
+                "Safe Migrations"
+              ],
+              "existingPath": "system-design-prep/lessons/03-postgres-mvcc-locks.md",
+              "visualPath": "system-design-prep/visuals/03-postgres-mvcc-locks.html",
+              "companies": [
+                "Amazon",
+                "Apple"
+              ]
+            },
+            {
+              "n": "04",
+              "id": "sy04",
+              "title": "Postgres III: Query Planner & Pooling",
+              "stars": 3,
+              "desc": "Query planner, join algorithms (nested loop, hash join, merge join), work_mem sizing, partitioning, and PgBouncer connection pooling.",
+              "duration": "45 min",
+              "tags": [
+                "Query Planner",
+                "Joins",
+                "Partitioning",
+                "PgBouncer"
+              ],
+              "existingPath": "system-design-prep/lessons/04-postgres-plans-joins-pooling.md",
+              "visualPath": "system-design-prep/visuals/04-postgres-plans-joins-pooling.html",
+              "companies": [
+                "Netflix",
+                "Uber"
+              ]
+            },
+            {
+              "n": "05",
+              "id": "sy05",
+              "title": "NoSQL, LSM Trees & Cassandra",
+              "stars": 5,
+              "desc": "LSM trees, SSTables, Bloom filters, compaction strategies (size-tiered vs leveled), RUM conjecture, Cassandra partition keys, DynamoDB.",
+              "duration": "55 min",
+              "tags": [
+                "NoSQL",
+                "LSM-Tree",
+                "Cassandra",
+                "DynamoDB",
+                "Compaction"
+              ],
+              "existingPath": "system-design-prep/lessons/05-nosql-lsm.md",
+              "visualPath": "system-design-prep/visuals/05-nosql-lsm.html",
+              "companies": [
+                "Apple",
+                "Google"
+              ]
+            },
+            {
+              "n": "06",
+              "id": "sy06",
+              "title": "Latency Numbers & Capacity Estimation",
+              "stars": 5,
+              "desc": "Latency ladder, six-step estimation framework, tail latency amplification, Little's Law, and the utilization cliff.",
+              "duration": "45 min",
+              "tags": [
+                "Capacity Planning",
+                "Latency Ladder",
+                "Little's Law",
+                "Calculations"
+              ],
+              "existingPath": "system-design-prep/lessons/06-estimation-latency.md",
+              "visualPath": "system-design-prep/visuals/06-estimation-latency.html",
+              "companies": [
+                "Uber",
+                "Meta"
+              ]
+            }
+          ]
+        },
+        {
+          "k": "week 2",
+          "t": "Distributed Systems Core",
+          "lessons": [
+            {
+              "n": "07",
+              "id": "sy07",
+              "title": "Replication & Sharding",
+              "stars": 5,
+              "desc": "Sync/async/semi-sync replication, replication lag anomalies, split-brain, consistent hashing with virtual nodes, hot shards.",
+              "duration": "50 min",
+              "tags": [
+                "Replication",
+                "Sharding",
+                "Consistent Hashing",
+                "High Availability"
+              ],
+              "existingPath": "system-design-prep/lessons/07-replication-sharding.md",
+              "visualPath": "system-design-prep/visuals/07-replication-sharding.html",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            },
+            {
+              "n": "08",
+              "id": "sy08",
+              "title": "CAP Theorem to PACELC",
+              "stars": 5,
+              "desc": "Consistency ladder: linearizability, sequential, causal, eventual; session guarantees; sloppy quorums; vector clocks; CRDTs.",
+              "duration": "50 min",
+              "tags": [
+                "CAP Theorem",
+                "PACELC",
+                "Vector Clocks",
+                "Linearizability"
+              ],
+              "existingPath": "system-design-prep/lessons/08-cap-consistency.md",
+              "visualPath": "system-design-prep/visuals/08-cap-consistency.html",
+              "companies": [
+                "Meta",
+                "Netflix"
+              ]
+            },
+            {
+              "n": "09",
+              "id": "sy09",
+              "title": "Distributed Consensus & Raft",
+              "stars": 4,
+              "desc": "Raft leader election & log replication, network partitions, etcd vs ZooKeeper, correct distributed locks with fencing tokens.",
+              "duration": "50 min",
+              "tags": [
+                "Raft",
+                "Consensus",
+                "etcd",
+                "ZooKeeper",
+                "Fencing Tokens"
+              ],
+              "existingPath": "system-design-prep/lessons/09-consensus-raft.md",
+              "visualPath": "system-design-prep/visuals/09-consensus-raft.html",
+              "companies": [
+                "Amazon",
+                "Apple"
+              ]
+            },
+            {
+              "n": "10",
+              "id": "sy10",
+              "title": "Idempotency, Outbox & Sagas",
+              "stars": 5,
+              "desc": "Delivery semantics, idempotency keys, dual-write trap, transactional outbox pattern, Debezium CDC, 2PC vs choreo/orchestration sagas.",
+              "duration": "55 min",
+              "tags": [
+                "Idempotency",
+                "Transactional Outbox",
+                "Sagas",
+                "CDC",
+                "Distributed Transactions"
+              ],
+              "existingPath": "system-design-prep/lessons/10-idempotency-outbox-saga.md",
+              "visualPath": "system-design-prep/visuals/10-idempotency-outbox-saga.html",
+              "companies": [
+                "Netflix",
+                "Uber"
+              ]
+            },
+            {
+              "n": "11",
+              "id": "sy11",
+              "title": "Kafka I: The Log & Producers",
+              "stars": 5,
+              "desc": "Append-only commit log, zero-copy read (sendfile), partition assignment, batching, acks=all & the In-Sync Replica (ISR) trap.",
+              "duration": "50 min",
+              "tags": [
+                "Kafka",
+                "Commit Log",
+                "Zero-Copy",
+                "ISR",
+                "Producers"
+              ],
+              "existingPath": "system-design-prep/lessons/11-kafka-log-producers.md",
+              "visualPath": "system-design-prep/visuals/11-kafka-log-producers.html",
+              "companies": [
+                "Apple",
+                "Google"
+              ]
+            },
+            {
+              "n": "12",
+              "id": "sy12",
+              "title": "Kafka II: Consumers & Compaction",
+              "stars": 4,
+              "desc": "Consumer groups, incremental cooperative rebalancing, heartbeat vs poll loops, offset commit strategies, topic log compaction, dead letter queues (DLQs).",
+              "duration": "50 min",
+              "tags": [
+                "Kafka Consumers",
+                "Rebalancing",
+                "Log Compaction",
+                "DLQ"
+              ],
+              "existingPath": "system-design-prep/lessons/12-kafka-consumers-compaction.md",
+              "visualPath": "system-design-prep/visuals/12-kafka-consumers-compaction.html",
+              "companies": [
+                "Uber",
+                "Meta"
+              ]
+            }
+          ]
+        },
+        {
+          "k": "week 3",
+          "t": "Systems, Networking & Resilience",
+          "lessons": [
+            {
+              "n": "13",
+              "id": "sy13",
+              "title": "Docker & Container Internals",
+              "stars": 2,
+              "desc": "Linux namespaces, cgroups, Copy-on-Write overlayfs, layer caching, PID 1 signal forwarding and zombie reaper.",
+              "duration": "35 min",
+              "tags": [
+                "Docker",
+                "cgroups",
+                "Namespaces",
+                "OverlayFS"
+              ],
+              "existingPath": "system-design-prep/lessons/13-docker-internals.md",
+              "visualPath": "system-design-prep/visuals/13-docker-internals.html",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            },
+            {
+              "n": "14",
+              "id": "sy14",
+              "title": "Kubernetes I: Core Control Plane",
+              "stars": 2,
+              "desc": "Reconciliation loop, etcd state, API server, Kubelet, Pod phase lifecycle, liveness/readiness/startup probes, QoS classes.",
+              "duration": "40 min",
+              "tags": [
+                "Kubernetes",
+                "Control Plane",
+                "Probes",
+                "Scheduling"
+              ],
+              "existingPath": "system-design-prep/lessons/14-kubernetes-core.md",
+              "visualPath": "system-design-prep/visuals/14-kubernetes-core.html",
+              "companies": [
+                "Meta",
+                "Netflix"
+              ]
+            },
+            {
+              "n": "15",
+              "id": "sy15",
+              "title": "Kubernetes II: Networking & Rollouts",
+              "stars": 2,
+              "desc": "ClusterIP/NodePort/Ingress, StatefulSets, rolling updates, graceful shutdown races, PodDisruptionBudgets (PDBs), Horizontal Pod Autoscaling (HPA).",
+              "duration": "40 min",
+              "tags": [
+                "K8s Networking",
+                "Ingress",
+                "Graceful Termination",
+                "HPA"
+              ],
+              "existingPath": "system-design-prep/lessons/15-kubernetes-services-rollouts.md",
+              "visualPath": "system-design-prep/visuals/15-kubernetes-services-rollouts.html",
+              "companies": [
+                "Amazon",
+                "Apple"
+              ]
+            },
+            {
+              "n": "16",
+              "id": "sy16",
+              "title": "Networking, TLS & Load Balancing",
+              "stars": 4,
+              "desc": "RTT math, TCP slow start, TLS 1.3 0-RTT, HTTP/2 multiplexing & HOL blocking, L4 vs L7 load balancing, gRPC load balancing dilemma, Anycast DNS, CDN.",
+              "duration": "55 min",
+              "tags": [
+                "Networking",
+                "TLS 1.3",
+                "L4/L7 LB",
+                "gRPC",
+                "CDN"
+              ],
+              "existingPath": "system-design-prep/lessons/16-networking-load-balancing.md",
+              "visualPath": "system-design-prep/visuals/16-networking-load-balancing.html",
+              "companies": [
+                "Netflix",
+                "Uber"
+              ]
+            },
+            {
+              "n": "17",
+              "id": "sy17",
+              "title": "API Design, Auth & Gateways",
+              "stars": 4,
+              "desc": "REST semantics, Protobuf wire format, GraphQL N+1 problem, keyset pagination vs offset pagination, OAuth2/PKCE/OIDC/JWT validation, API Gateway architecture.",
+              "duration": "50 min",
+              "tags": [
+                "API Design",
+                "Protobuf",
+                "Pagination",
+                "OAuth2",
+                "API Gateway"
+              ],
+              "existingPath": "system-design-prep/lessons/17-api-design-auth.md",
+              "visualPath": "system-design-prep/visuals/17-api-design-auth.html",
+              "companies": [
+                "Apple",
+                "Google"
+              ]
+            },
+            {
+              "n": "18",
+              "id": "sy18",
+              "title": "Resilience: Rate Limiting & Circuit Breakers",
+              "stars": 5,
+              "desc": "Metastable failures, timeout budgets, exponential backoff with full jitter, circuit breakers, bulkhead isolation, 5 rate limiting algorithms, load shedding.",
+              "duration": "55 min",
+              "tags": [
+                "Resilience",
+                "Rate Limiting",
+                "Circuit Breakers",
+                "Load Shedding"
+              ],
+              "existingPath": "system-design-prep/lessons/18-resilience-rate-limiting.md",
+              "visualPath": "system-design-prep/visuals/18-resilience-rate-limiting.html",
+              "companies": [
+                "Uber",
+                "Meta"
+              ]
+            },
+            {
+              "n": "19",
+              "id": "sy19",
+              "title": "Observability: Metrics, Tracing & Alerting",
+              "stars": 4,
+              "desc": "Metrics cardinality trap, HDR histograms, pull vs push (Prometheus vs StatsD), distributed tracing with OpenTelemetry (OTel), context propagation, multi-window burn-rate SLO alerts.",
+              "duration": "45 min",
+              "tags": [
+                "Observability",
+                "Prometheus",
+                "OpenTelemetry",
+                "SLO",
+                "Cardinailty"
+              ],
+              "existingPath": "system-design-prep/lessons/19-observability.md",
+              "visualPath": "system-design-prep/visuals/19-observability.html",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            }
+          ]
+        },
+        {
+          "k": "week 4",
+          "t": "Case Studies & Battle-Tested Architectures",
+          "lessons": [
+            {
+              "n": "20",
+              "id": "sy20",
+              "title": "The System Design Interview Framework",
+              "stars": 5,
+              "desc": "The 45-minute breakdown, the 4-axis grading rubric, requirements gathering, napkin math, high-level diagram, deep dive on bottlenecks.",
+              "duration": "45 min",
+              "tags": [
+                "Framework",
+                "Interview Rubric",
+                "Time Management",
+                "L5 Bar"
+              ],
+              "existingPath": "system-design-prep/lessons/20-interview-framework.md",
+              "visualPath": "system-design-prep/visuals/20-interview-framework.html",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            },
+            {
+              "n": "21",
+              "id": "sy21",
+              "title": "Case Study: TinyURL & Distributed ID Generator",
+              "stars": 4,
+              "desc": "Keyspace calculation, Base62 encoding, Snowflake ID vs UUID vs DB auto-increment, 301 Permanent vs 302 Temporary redirect analytics.",
+              "duration": "40 min",
+              "tags": [
+                "URL Shortener",
+                "Snowflake ID",
+                "Base62",
+                "Caching"
+              ],
+              "existingPath": "system-design-prep/lessons/21-url-shortener.md",
+              "visualPath": "system-design-prep/visuals/21-url-shortener.html",
+              "companies": [
+                "Meta",
+                "Netflix"
+              ]
+            },
+            {
+              "n": "22",
+              "id": "sy22",
+              "title": "Case Study: Distributed Rate Limiter",
+              "stars": 5,
+              "desc": "Token bucket vs sliding window counter, Redis + Lua scripts for atomicity, local memory cache + async sync, fail-open vs fail-closed policies.",
+              "duration": "50 min",
+              "tags": [
+                "Rate Limiter",
+                "Token Bucket",
+                "Redis Lua",
+                "Atomicity"
+              ],
+              "existingPath": "system-design-prep/lessons/22-rate-limiter.md",
+              "visualPath": "system-design-prep/visuals/22-rate-limiter.html",
+              "companies": [
+                "Amazon",
+                "Apple"
+              ]
+            },
+            {
+              "n": "23",
+              "id": "sy23",
+              "title": "Case Study: WhatsApp / Real-Time Chat",
+              "stars": 5,
+              "desc": "Persistent WebSockets, connection gateway servers, presence indicator (heartbeat vs push), message ordering and delivery receipts (sent, delivered, read).",
+              "duration": "55 min",
+              "tags": [
+                "Chat",
+                "WebSockets",
+                "Presence",
+                "Message Ordering"
+              ],
+              "existingPath": "system-design-prep/lessons/23-chat.md",
+              "visualPath": "system-design-prep/visuals/23-chat.html",
+              "companies": [
+                "Netflix",
+                "Uber"
+              ]
+            },
+            {
+              "n": "24",
+              "id": "sy24",
+              "title": "Case Study: Twitter / Instagram Newsfeed",
+              "stars": 5,
+              "desc": "Fanout-on-write vs Fanout-on-read, the celebrity/influencer problem (hybrid push-pull), timeline caching in Redis, pagination with cursor keysets.",
+              "duration": "55 min",
+              "tags": [
+                "Newsfeed",
+                "Fanout",
+                "Celebrity Problem",
+                "Timeline Cache"
+              ],
+              "existingPath": "system-design-prep/lessons/24-newsfeed.md",
+              "visualPath": "system-design-prep/visuals/24-newsfeed.html",
+              "companies": [
+                "Apple",
+                "Google"
+              ]
+            },
+            {
+              "n": "25",
+              "id": "sy25",
+              "title": "Case Study: YouTube / Netflix Video Streaming",
+              "stars": 3,
+              "desc": "Egress bandwidth cost, chunked transcoding, Adaptive Bitrate Streaming (HLS / DASH), CDN edge caching, video chunk deduplication.",
+              "duration": "45 min",
+              "tags": [
+                "Video Streaming",
+                "HLS/DASH",
+                "Transcoding",
+                "CDN"
+              ],
+              "existingPath": "system-design-prep/lessons/25-video-streaming.md",
+              "visualPath": "system-design-prep/visuals/25-video-streaming.html",
+              "companies": [
+                "Uber",
+                "Meta"
+              ]
+            },
+            {
+              "n": "26",
+              "id": "sy26",
+              "title": "Case Study: Uber / Geospatial Ride Matching",
+              "stars": 4,
+              "desc": "Geohash vs Google S2 vs Uber H3 hexagonal indexing, ephemeral driver location updates (in-memory quadtree), atomic ride dispatch claims.",
+              "duration": "50 min",
+              "tags": [
+                "Geospatial",
+                "H3 Hexagons",
+                "Quadtree",
+                "Ride Matching"
+              ],
+              "existingPath": "system-design-prep/lessons/26-uber-geospatial.md",
+              "visualPath": "system-design-prep/visuals/26-uber-geospatial.html",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            },
+            {
+              "n": "27",
+              "id": "sy27",
+              "title": "Case Study: Ad-Click Aggregator & Stream Processing",
+              "stars": 5,
+              "desc": "Exactly-once count semantics with Flink/Kafka, tumbling vs sliding windows, event time vs processing time, watermarks and late-arriving clicks.",
+              "duration": "55 min",
+              "tags": [
+                "Stream Processing",
+                "Flink",
+                "Event Time",
+                "Watermarks",
+                "Aggregator"
+              ],
+              "existingPath": "system-design-prep/lessons/27-ad-click-aggregator.md",
+              "visualPath": "system-design-prep/visuals/27-ad-click-aggregator.html",
+              "companies": [
+                "Meta",
+                "Netflix"
+              ]
+            },
+            {
+              "n": "28",
+              "id": "sy28",
+              "title": "Case Study: Time-Series Metrics System",
+              "stars": 5,
+              "desc": "Gorilla float compression (XOR delta-of-delta), timestamp delta-of-delta, inverted index for tag querying, high cardinality handling, data rollups.",
+              "duration": "50 min",
+              "tags": [
+                "Time Series",
+                "Gorilla Compression",
+                "TSDB",
+                "High Cardinality"
+              ],
+              "existingPath": "system-design-prep/lessons/28-metrics-system.md",
+              "visualPath": "system-design-prep/visuals/28-metrics-system.html",
+              "companies": [
+                "Amazon",
+                "Apple"
+              ]
+            },
+            {
+              "n": "29",
+              "id": "sy29",
+              "title": "Case Study: Payment Ledger & Digital Wallet",
+              "stars": 3,
+              "desc": "Double-entry bookkeeping, preventing negative balance with optimistic locking, third-party payment gateway timeouts, reconciliation jobs.",
+              "duration": "50 min",
+              "tags": [
+                "Payment Ledger",
+                "Double-Entry",
+                "Reconciliation",
+                "Financial Systems"
+              ],
+              "existingPath": "system-design-prep/lessons/29-payment-ledger.md",
+              "visualPath": "system-design-prep/visuals/29-payment-ledger.html",
+              "companies": [
+                "Netflix",
+                "Uber"
+              ]
+            },
+            {
+              "n": "30",
+              "id": "sy30",
+              "title": "Case Study: Distributed Task Scheduler",
+              "stars": 4,
+              "desc": "Top-of-the-hour spike mitigation, Postgres SELECT FOR UPDATE SKIP LOCKED, distributed delay queues, leader election with leases.",
+              "duration": "45 min",
+              "tags": [
+                "Scheduler",
+                "Cron",
+                "SKIP LOCKED",
+                "Delayed Queues"
+              ],
+              "existingPath": "system-design-prep/lessons/30-distributed-scheduler.md",
+              "visualPath": "system-design-prep/visuals/30-distributed-scheduler.html",
+              "companies": [
+                "Apple",
+                "Google"
+              ]
+            },
+            {
+              "n": "31",
+              "id": "sy31",
+              "title": "Case Study: Google Search Typeahead / Autocomplete",
+              "stars": 3,
+              "desc": "Prefix trie with top-k cached suggestions, offline MapReduce aggregation, client-side debouncing and caching, latency budget allocation.",
+              "duration": "40 min",
+              "tags": [
+                "Typeahead",
+                "Trie",
+                "Top-K",
+                "Autocomplete"
+              ],
+              "existingPath": "system-design-prep/lessons/31-typeahead.md",
+              "visualPath": "system-design-prep/visuals/31-typeahead.html",
+              "companies": [
+                "Uber",
+                "Meta"
+              ]
+            },
+            {
+              "n": "32",
+              "id": "sy32",
+              "title": "Low-Level Design (LLD) & Machine Coding",
+              "stars": 4,
+              "desc": "What is evaluated in 60-90 minutes, SOLID principles in code, 5 core design patterns (Strategy, Factory, Observer, State, Decorator), thread safety.",
+              "duration": "55 min",
+              "tags": [
+                "LLD",
+                "Design Patterns",
+                "SOLID",
+                "Machine Coding"
+              ],
+              "existingPath": "system-design-prep/lessons/32-lld-machine-coding.md",
+              "visualPath": "system-design-prep/visuals/32-lld-machine-coding.html",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            },
+            {
+              "n": "33",
+              "id": "sy33",
+              "title": "Case Study: Notification System",
+              "stars": 5,
+              "desc": "Multi-channel fanout (Push, SMS, Email), user opt-out preference engine, rate limiting per user, notification deduplication, delivery tracking.",
+              "duration": "50 min",
+              "tags": [
+                "Notification System",
+                "Fanout",
+                "Multi-Channel",
+                "Preferences"
+              ],
+              "existingPath": "system-design-prep/lessons/33-notification-system.md",
+              "visualPath": "system-design-prep/visuals/33-notification-system.html",
+              "companies": [
+                "Meta",
+                "Netflix"
+              ]
+            },
+            {
+              "n": "34",
+              "id": "sy34",
+              "title": "Case Study: Distributed Cache (Memcached/Redis)",
+              "stars": 4,
+              "desc": "Cache aside vs read/write-through vs write-behind, cache penetration/avalanche/stampede defenses (mutex lock, XFetch), hot key mitigation.",
+              "duration": "50 min",
+              "tags": [
+                "Distributed Cache",
+                "Cache Stampede",
+                "Invalidation",
+                "Hot Keys"
+              ],
+              "existingPath": "system-design-prep/lessons/34-distributed-cache.md",
+              "visualPath": "system-design-prep/visuals/34-distributed-cache.html",
+              "companies": [
+                "Amazon",
+                "Apple"
+              ]
+            },
+            {
+              "n": "35",
+              "id": "sy35",
+              "title": "Case Study: Distributed Object Storage (Amazon S3)",
+              "stars": 3,
+              "desc": "Data node vs metadata service, Reed-Solomon erasure coding vs 3x replication, multipart uploads, strong read-after-write consistency.",
+              "duration": "45 min",
+              "tags": [
+                "Object Storage",
+                "S3",
+                "Erasure Coding",
+                "Multipart Upload"
+              ],
+              "existingPath": "system-design-prep/lessons/35-object-storage.md",
+              "visualPath": "system-design-prep/visuals/35-object-storage.html",
+              "companies": [
+                "Netflix",
+                "Uber"
+              ]
+            },
+            {
+              "n": "36",
+              "id": "sy36",
+              "title": "Case Study: Distributed Message Queue (SQS / RabbitMQ)",
+              "stars": 4,
+              "desc": "Building the message broker from scratch: write-ahead log, partition indexing, visibility timeouts, at-least-once delivery, dead-lettering.",
+              "duration": "50 min",
+              "tags": [
+                "Message Queue",
+                "SQS",
+                "Visibility Timeout",
+                "At-Least-Once"
+              ],
+              "existingPath": "system-design-prep/lessons/36-message-queue.md",
+              "visualPath": "system-design-prep/visuals/36-message-queue.html",
+              "companies": [
+                "Apple",
+                "Google"
+              ]
+            }
+          ]
+        },
+        {
+          "k": "week 5",
+          "t": "Advanced 50LPA FAANG Bar (New)",
+          "lessons": [
+            {
+              "n": "37",
+              "id": "sy37",
+              "title": "Case Study: Distributed Search Engine (Elasticsearch at Scale)",
+              "stars": 5,
+              "desc": "Inverted index architecture, Term dictionary & Postings lists with Roaring Bitmaps, BM25 scoring, distributed segment creation, query coordinator.",
+              "duration": "60 min",
+              "tags": [
+                "Elasticsearch",
+                "Inverted Index",
+                "BM25",
+                "Search Engine",
+                "Sharding"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/sy37-distributed-search.md",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            },
+            {
+              "n": "38",
+              "id": "sy38",
+              "title": "Case Study: Real-Time Collaborative Whiteboard & Docs (Google Docs / Figma)",
+              "stars": 5,
+              "desc": "Operational Transformation (OT) vs Conflict-Free Replicated Data Types (CRDTs - Yjs/Automerge), WebSocket state syncing, undo/redo stacks, cursor broadcasting.",
+              "duration": "60 min",
+              "tags": [
+                "CRDT",
+                "Operational Transformation",
+                "WebSockets",
+                "Google Docs",
+                "Figma"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/sy38-collaborative-docs-crdt.md",
+              "companies": [
+                "Meta",
+                "Netflix"
+              ]
+            },
+            {
+              "n": "39",
+              "id": "sy39",
+              "title": "Case Study: Real-Time Gaming Leaderboard at 10M QPS",
+              "stars": 4,
+              "desc": "Redis Sorted Sets (Skiplist + Hash), memory sharding by score percentiles, tie-breaking via timestamp bit-packing, write-behind caching to ScyllaDB/Postgres.",
+              "duration": "50 min",
+              "tags": [
+                "Leaderboard",
+                "Redis Skiplist",
+                "High QPS",
+                "Gaming",
+                "Sharding"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/sy39-realtime-leaderboard.md",
+              "companies": [
+                "Amazon",
+                "Apple"
+              ]
+            },
+            {
+              "n": "40",
+              "id": "sy40",
+              "title": "Distributed Transactions, Spanner TrueTime & Multi-Region DR",
+              "stars": 5,
+              "desc": "Why 2PC blocks indefinitely on coordinator crash; Google Spanner TrueTime API and GPS/atomic clocks; Paxos groups; Active-Active multi-DC failover.",
+              "duration": "60 min",
+              "tags": [
+                "Google Spanner",
+                "TrueTime",
+                "Distributed Transactions",
+                "2PC",
+                "Multi-Region"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/sy40-spanner-truetime-dr.md",
+              "companies": [
+                "Netflix",
+                "Uber"
+              ]
+            },
+            {
+              "n": "41",
+              "id": "sy41",
+              "title": "Machine Coding: Parking Lot, Splitwise & In-Memory DB",
+              "stars": 5,
+              "desc": "Complete production-grade machine coding blueprint: class diagrams, design patterns (Strategy, Factory, Observer), thread-safety, CLI commands, unit tests.",
+              "duration": "70 min",
+              "tags": [
+                "Machine Coding",
+                "Splitwise",
+                "Parking Lot",
+                "Concurrency",
+                "Design Patterns"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/sy41-machine-coding-lld.md",
+              "companies": [
+                "Apple",
+                "Google"
+              ]
+            }
+          ]
+        },
+        {
+          "k": "creator-hld",
+          "t": "ByteByteGo & Modern Production Architectures",
+          "lessons": [
+            {
+              "n": "42",
+              "id": "sy42",
+              "title": "Flash Sale & High-Concurrency Ticket Reservation (Ticketmaster)",
+              "stars": 5,
+              "desc": "Inventory reservation under 100k QPS spikes: 10-minute hold TTLs, Redis distributed locking with fencing tokens, virtual waiting rooms, and transactional outbox idempotency.",
+              "duration": "55 min",
+              "tags": [
+                "Distributed Locks",
+                "Flash Sale",
+                "Inventory Reservation",
+                "Redlock",
+                "Fencing Tokens",
+                "Amazon"
+              ],
+              "companies": [
+                "Amazon",
+                "Apple",
+                "Booking.com"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/sy42.md"
+            },
+            {
+              "n": "43",
+              "id": "sy43",
+              "title": "Proximity Service & Location-Based Systems (Google Maps / Uber)",
+              "stars": 5,
+              "desc": "Spatial indexing deep dive: Geohash vs QuadTree vs Google S2 vs Uber H3 hexagonal hierarchy. Dynamic driver clustering, radius queries, and map tile caching.",
+              "duration": "50 min",
+              "tags": [
+                "Geohash",
+                "QuadTree",
+                "Uber H3",
+                "Spatial Index",
+                "Location Services",
+                "Google"
+              ],
+              "companies": [
+                "Google",
+                "Uber",
+                "DoorDash"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/sy43.md"
+            },
+            {
+              "n": "44",
+              "id": "sy44",
+              "title": "Ultra-Low Latency Stock Exchange & Order Matching Engine",
+              "stars": 5,
+              "desc": "Sub-microsecond deterministic order matching: LMAX Disruptor ring buffers, Price-Time priority queues, kernel bypass (DPDK), zero-GC object pools, and replicated state machines.",
+              "duration": "60 min",
+              "tags": [
+                "Disruptor",
+                "Low Latency",
+                "Order Book",
+                "Zero GC",
+                "Fintech",
+                "Robinhood"
+              ],
+              "companies": [
+                "Fintech",
+                "Robinhood",
+                "Coinbase"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/sy44.md"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ai-engineering",
+      "name": "AI Engineering & LLM Systems",
+      "shortName": "AI Engineering",
+      "badge": "Generative Systems",
+      "description": "Every measurement backed by runnable code. Production RAG, autonomous agent loops, context engineering, evals, safety guardrails, and AI interview case studies.",
+      "totalLessons": 28,
+      "color": "#ec4899",
+      "blocks": [
+        {
+          "k": "block 0",
+          "t": "Setup & Foundations",
+          "lessons": [
+            {
+              "n": "00",
+              "id": "ai00",
+              "title": "Environment & Architecture",
+              "stars": 2,
+              "desc": "Conda isolation and shadowing trap; agent vs model boundary; OpenAI-compatible server abstraction.",
+              "duration": "30 min",
+              "tags": [
+                "Setup",
+                "Virtualenv",
+                "Model Boundary"
+              ],
+              "existingPath": "ai-master-prep/lessons/00-environment.md",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            }
+          ]
+        },
+        {
+          "k": "block i",
+          "t": "Retrieval Augmented Generation (RAG)",
+          "lessons": [
+            {
+              "n": "01",
+              "id": "ai01",
+              "title": "RAG, From Scratch",
+              "stars": 5,
+              "desc": "The whole pipeline in ~150 lines, no frameworks. Chunk -> embed -> index -> retrieve -> assemble -> generate -> cite.",
+              "duration": "45 min",
+              "tags": [
+                "RAG",
+                "From Scratch",
+                "Vector Search",
+                "Citations"
+              ],
+              "existingPath": "ai-master-prep/lessons/01-rag-from-scratch.md",
+              "visualPath": "ai-master-prep/visuals/01-rag-from-scratch.html",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            },
+            {
+              "n": "02",
+              "id": "ai02",
+              "title": "Tokens & Embeddings",
+              "stars": 4,
+              "desc": "Byte-Pair Encoding (BPE), non-English token inflation, what an embedding measures, bi-encoder vs cross-encoder.",
+              "duration": "40 min",
+              "tags": [
+                "BPE",
+                "Embeddings",
+                "Cross-Encoder",
+                "Tokenization"
+              ],
+              "existingPath": "ai-master-prep/lessons/02-tokens-and-embeddings.md",
+              "visualPath": "ai-master-prep/visuals/02-tokens-and-embeddings.html",
+              "companies": [
+                "Meta",
+                "Netflix"
+              ]
+            },
+            {
+              "n": "03",
+              "id": "ai03",
+              "title": "Ingestion & Chunking Strategies",
+              "stars": 5,
+              "desc": "Parsing as the true bottleneck: fixed, recursive, structural, and semantic chunking. The encoder cliff.",
+              "duration": "45 min",
+              "tags": [
+                "Chunking",
+                "Ingestion",
+                "Semantic Splitting",
+                "Recall@K"
+              ],
+              "existingPath": "ai-master-prep/lessons/03-ingestion-and-chunking.md",
+              "visualPath": "ai-master-prep/visuals/03-ingestion-and-chunking.html",
+              "companies": [
+                "Amazon",
+                "Apple"
+              ]
+            },
+            {
+              "n": "04",
+              "id": "ai04",
+              "title": "Hybrid Retrieval & Reranking",
+              "stars": 5,
+              "desc": "The retrieval funnel: BM25 keyword search + dense vector retrieval fused via Reciprocal Rank Fusion (RRF), cross-encoder rerankers.",
+              "duration": "50 min",
+              "tags": [
+                "Hybrid Search",
+                "BM25",
+                "RRF",
+                "Cross-Encoder",
+                "Reranking"
+              ],
+              "existingPath": "ai-master-prep/lessons/04-retrieval.md",
+              "visualPath": "ai-master-prep/visuals/04-retrieval.html",
+              "companies": [
+                "Netflix",
+                "Uber"
+              ]
+            },
+            {
+              "n": "05",
+              "id": "ai05",
+              "title": "Evaluation of RAG Systems",
+              "stars": 5,
+              "desc": "The RAG Triad (Context Relevance, Groundedness, Answer Relevance); LLM-as-a-judge calibration; Cohen's kappa agreement score.",
+              "duration": "50 min",
+              "tags": [
+                "RAG Triad",
+                "Evaluation",
+                "LLM Judge",
+                "Cohen's Kappa"
+              ],
+              "existingPath": "ai-master-prep/lessons/05-evaluation.md",
+              "visualPath": "ai-master-prep/visuals/05-evaluation.html",
+              "companies": [
+                "Apple",
+                "Google"
+              ]
+            },
+            {
+              "n": "06",
+              "id": "ai06",
+              "title": "Production RAG & Security",
+              "stars": 5,
+              "desc": "Permission pre-filtering, the result-count oracle vulnerability, programmatic citation verification, long-context cost tradeoffs.",
+              "duration": "55 min",
+              "tags": [
+                "Production RAG",
+                "Permissions",
+                "Result-Count Oracle",
+                "Citation Audit"
+              ],
+              "existingPath": "ai-master-prep/lessons/06-production-rag.md",
+              "visualPath": "ai-master-prep/visuals/06-production-rag.html",
+              "companies": [
+                "Uber",
+                "Meta"
+              ]
+            }
+          ]
+        },
+        {
+          "k": "block ii",
+          "t": "Context Engineering & Autonomous Agents",
+          "lessons": [
+            {
+              "n": "07",
+              "id": "ai07",
+              "title": "Context Engineering & Structured Output",
+              "stars": 3,
+              "desc": "Five prompt variants ranked by empirical evals; structured JSON output contracts; token budgeting; memory condensation strategies.",
+              "duration": "40 min",
+              "tags": [
+                "Context Engineering",
+                "Prompt Design",
+                "Structured Outputs"
+              ],
+              "existingPath": "ai-master-prep/lessons/07-context-engineering.md",
+              "visualPath": "ai-master-prep/visuals/07-context-engineering.html",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            },
+            {
+              "n": "08",
+              "id": "ai08",
+              "title": "The Automated Eval Harness",
+              "stars": 4,
+              "desc": "Self-validating benchmark datasets, automated judges with CI regression gates, catching false regressions.",
+              "duration": "45 min",
+              "tags": [
+                "Eval Harness",
+                "CI/CD Gate",
+                "Regression Testing"
+              ],
+              "existingPath": "ai-master-prep/lessons/08-eval-harness.md",
+              "visualPath": "ai-master-prep/visuals/08-eval-harness.html",
+              "companies": [
+                "Meta",
+                "Netflix"
+              ]
+            },
+            {
+              "n": "09",
+              "id": "ai09",
+              "title": "Model Behaviour & Prefix Caching",
+              "stars": 3,
+              "desc": "Sampling mechanics (temperature, top_p, top_k) from scratch; determinism; prefix-caching economics and latency curves.",
+              "duration": "40 min",
+              "tags": [
+                "Sampling",
+                "Temperature",
+                "Prefix Caching",
+                "Latency"
+              ],
+              "existingPath": "ai-master-prep/lessons/09-model-behaviour.md",
+              "visualPath": "ai-master-prep/visuals/09-model-behaviour.html",
+              "companies": [
+                "Amazon",
+                "Apple"
+              ]
+            },
+            {
+              "n": "10",
+              "id": "ai10",
+              "title": "The Agent Loop from Scratch",
+              "stars": 5,
+              "desc": "Full autonomous agent in ~200 lines: thought, action, observation, max steps, tool registry, error recovery, stop reason validation.",
+              "duration": "55 min",
+              "tags": [
+                "ReAct Loop",
+                "Autonomous Agent",
+                "Tool Calling",
+                "Error Recovery"
+              ],
+              "existingPath": "ai-master-prep/lessons/10-agent-loop.md",
+              "visualPath": "ai-master-prep/visuals/10-agent-loop.html",
+              "companies": [
+                "Netflix",
+                "Uber"
+              ]
+            },
+            {
+              "n": "11",
+              "id": "ai11",
+              "title": "Orchestration & Durable Execution",
+              "stars": 4,
+              "desc": "Checkpointing agent state, suspend/resume patterns around human-in-the-loop approvals, message compaction.",
+              "duration": "45 min",
+              "tags": [
+                "Durable Execution",
+                "State Machine",
+                "Human-in-the-Loop"
+              ],
+              "existingPath": "ai-master-prep/lessons/11-orchestration.md",
+              "visualPath": "ai-master-prep/visuals/11-orchestration.html",
+              "companies": [
+                "Apple",
+                "Google"
+              ]
+            },
+            {
+              "n": "12",
+              "id": "ai12",
+              "title": "Model Context Protocol (MCP) Server",
+              "stars": 5,
+              "desc": "A production JSON-RPC MCP server from scratch: tools vs resources vs prompts as trust boundaries; sandboxing.",
+              "duration": "50 min",
+              "tags": [
+                "MCP",
+                "JSON-RPC",
+                "Tools vs Resources",
+                "Anthropic Standard"
+              ],
+              "existingPath": "ai-master-prep/lessons/12-mcp.md",
+              "visualPath": "ai-master-prep/visuals/12-mcp.html",
+              "companies": [
+                "Uber",
+                "Meta"
+              ]
+            },
+            {
+              "n": "13",
+              "id": "ai13",
+              "title": "Multi-Agent Architectures",
+              "stars": 4,
+              "desc": "Hierarchical supervisor vs flat peer vs pipeline; context isolation as the true advantage; token cost escalation.",
+              "duration": "50 min",
+              "tags": [
+                "Multi-Agent",
+                "Supervisor",
+                "Context Isolation",
+                "Orchestration"
+              ],
+              "existingPath": "ai-master-prep/lessons/13-multi-agent.md",
+              "visualPath": "ai-master-prep/visuals/13-multi-agent.html",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            }
+          ]
+        },
+        {
+          "k": "block iii",
+          "t": "Safety, Guardrails & Production Economics",
+          "lessons": [
+            {
+              "n": "14",
+              "id": "ai14",
+              "title": "Prompt Injection & Defense In Depth",
+              "stars": 5,
+              "desc": "Direct vs indirect prompt injection; why input regex/classifiers structurally fail; tool isolation and blast radius containment.",
+              "duration": "50 min",
+              "tags": [
+                "Prompt Injection",
+                "Indirect Injection",
+                "Defense-in-Depth",
+                "Security"
+              ],
+              "existingPath": "ai-master-prep/lessons/14-prompt-injection.md",
+              "visualPath": "ai-master-prep/visuals/14-prompt-injection.html",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            },
+            {
+              "n": "15",
+              "id": "ai15",
+              "title": "Red-Teaming & Adversarial Testing",
+              "stars": 3,
+              "desc": "30 structured attacks across 5 threat models: jailbreaks, data exfiltration, tool abuse, hallucination triggers.",
+              "duration": "45 min",
+              "tags": [
+                "Red Teaming",
+                "Jailbreaks",
+                "Adversarial",
+                "Scorecard"
+              ],
+              "existingPath": "ai-master-prep/lessons/15-red-teaming.md",
+              "visualPath": "ai-master-prep/visuals/15-red-teaming.html",
+              "companies": [
+                "Meta",
+                "Netflix"
+              ]
+            },
+            {
+              "n": "16",
+              "id": "ai16",
+              "title": "Observability, Tracing & Cost Engineering",
+              "stars": 5,
+              "desc": "Replayable traces, token burn rate alerting, dynamic model routing (cheap SLM vs frontier LLM), output token throttling.",
+              "duration": "50 min",
+              "tags": [
+                "Cost Optimization",
+                "Traces",
+                "Model Routing",
+                "Budgeting"
+              ],
+              "existingPath": "ai-master-prep/lessons/16-observability-cost.md",
+              "visualPath": "ai-master-prep/visuals/16-observability-cost.html",
+              "companies": [
+                "Amazon",
+                "Apple"
+              ]
+            },
+            {
+              "n": "17",
+              "id": "ai17",
+              "title": "Fine-Tuning vs RAG vs In-Context Learning",
+              "stars": 3,
+              "desc": "The decision ladder: when to fine-tune; LoRA and QLoRA mechanics; CPU embedding fine-tuning; model distillation.",
+              "duration": "45 min",
+              "tags": [
+                "Fine-Tuning",
+                "LoRA",
+                "QLoRA",
+                "Distillation"
+              ],
+              "existingPath": "ai-master-prep/lessons/17-fine-tuning.md",
+              "visualPath": "ai-master-prep/visuals/17-fine-tuning.html",
+              "companies": [
+                "Netflix",
+                "Uber"
+              ]
+            },
+            {
+              "n": "18",
+              "id": "ai18",
+              "title": "Senior AI Architectural Judgment",
+              "stars": 5,
+              "desc": "When NOT to use an LLM; the 17-row decision matrix; trade-offs between deterministic code and generative models.",
+              "duration": "45 min",
+              "tags": [
+                "Senior Judgment",
+                "Architecture Decision Matrix",
+                "Cost-Benefit"
+              ],
+              "existingPath": "ai-master-prep/lessons/18-senior-judgment.md",
+              "visualPath": "ai-master-prep/visuals/18-senior-judgment.html",
+              "companies": [
+                "Apple",
+                "Google"
+              ]
+            }
+          ]
+        },
+        {
+          "k": "block iv",
+          "t": "AI Interview Case Studies",
+          "lessons": [
+            {
+              "n": "19",
+              "id": "ai19",
+              "title": "The AI Engineering Interview Framework",
+              "stars": 5,
+              "desc": "The 7-phase timeline; why eval strategy must come at minute 5 BEFORE architecture; deep dive protocol for projects.",
+              "duration": "45 min",
+              "tags": [
+                "Interview Framework",
+                "Eval Strategy",
+                "Timeline",
+                "FAANG Bar"
+              ],
+              "existingPath": "ai-master-prep/lessons/19-ai-interview-framework.md",
+              "visualPath": "ai-master-prep/visuals/19-ai-interview-framework.html",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            },
+            {
+              "n": "20",
+              "id": "ai20",
+              "title": "Case Study: Enterprise RAG at Scale",
+              "stars": 5,
+              "desc": "50M documents, 100k users, strict ACL permissions, sub-second latency, zero data leak across departments.",
+              "duration": "55 min",
+              "tags": [
+                "Enterprise RAG",
+                "ACLs",
+                "Vector Scale",
+                "High Concurrency"
+              ],
+              "existingPath": "ai-master-prep/lessons/20-case-rag-at-scale.md",
+              "visualPath": "ai-master-prep/visuals/20-case-rag-at-scale.html",
+              "companies": [
+                "Meta",
+                "Netflix"
+              ]
+            },
+            {
+              "n": "21",
+              "id": "ai21",
+              "title": "Case Study: Autonomous Agent Platform",
+              "stars": 5,
+              "desc": "Tool gateway, durable execution, approval gates, blast radius containment, rate limit handling, idempotency.",
+              "duration": "55 min",
+              "tags": [
+                "Agent Platform",
+                "Tool Gateway",
+                "Blast Radius",
+                "Human Approval"
+              ],
+              "existingPath": "ai-master-prep/lessons/21-case-agent-platform.md",
+              "visualPath": "ai-master-prep/visuals/21-case-agent-platform.html",
+              "companies": [
+                "Amazon",
+                "Apple"
+              ]
+            },
+            {
+              "n": "22",
+              "id": "ai22",
+              "title": "Case Study: Universal LLM Gateway",
+              "stars": 5,
+              "desc": "Provider abstraction, intelligent semantic routing, token quotas, multi-tenant billing, streaming failover trap.",
+              "duration": "50 min",
+              "tags": [
+                "LLM Gateway",
+                "Streaming Failover",
+                "Quota Management",
+                "Fallbacks"
+              ],
+              "existingPath": "ai-master-prep/lessons/22-case-llm-gateway.md",
+              "visualPath": "ai-master-prep/visuals/22-case-llm-gateway.html",
+              "companies": [
+                "Netflix",
+                "Uber"
+              ]
+            }
+          ]
+        },
+        {
+          "k": "block v",
+          "t": "Advanced 50LPA FAANG Bar (New)",
+          "lessons": [
+            {
+              "n": "23",
+              "id": "ai23",
+              "title": "High-Throughput LLM Serving: vLLM & PagedAttention",
+              "stars": 5,
+              "desc": "Continuous dynamic batching vs static batching; PagedAttention memory fragmentation fix; KV cache offloading; Speculative decoding; TTFT vs ITL metrics.",
+              "duration": "60 min",
+              "tags": [
+                "vLLM",
+                "PagedAttention",
+                "KV Cache",
+                "Speculative Decoding",
+                "Inference"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/ai23-vllm-serving.md",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            },
+            {
+              "n": "24",
+              "id": "ai24",
+              "title": "Semantic Vector Caching & Prompt Routing",
+              "stars": 5,
+              "desc": "Exact match vs cosine similarity threshold caching (GPTCache/Redis); Embedding distance drift; Tiered model routing (8B SLM vs 70B/400B Frontier).",
+              "duration": "50 min",
+              "tags": [
+                "Semantic Cache",
+                "GPTCache",
+                "Model Routing",
+                "Cost Cutting",
+                "Vector Search"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/ai24-semantic-caching.md",
+              "companies": [
+                "Meta",
+                "Netflix"
+              ]
+            },
+            {
+              "n": "25",
+              "id": "ai25",
+              "title": "Constrained Generation & Logits Guardrails (Outlines)",
+              "stars": 5,
+              "desc": "Logit masking with Context-Free Grammars (CFG); 100% deterministic JSON extraction without retry loops; Guardrails AI and NeMo integration.",
+              "duration": "50 min",
+              "tags": [
+                "Constrained Generation",
+                "Logits Masking",
+                "CFG",
+                "Outlines",
+                "Structured JSON"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/ai25-constrained-generation.md",
+              "companies": [
+                "Amazon",
+                "Apple"
+              ]
+            },
+            {
+              "n": "26",
+              "id": "ai26",
+              "title": "Model Alignment: RLHF, DPO & Synthetic Data Distillation",
+              "stars": 4,
+              "desc": "Supervised fine-tuning (SFT) data curation; Reward modeling; Direct Preference Optimization (DPO) mathematics; Synthetic instruction distillation with LLM filtering.",
+              "duration": "60 min",
+              "tags": [
+                "DPO",
+                "RLHF",
+                "Alignment",
+                "Synthetic Data",
+                "Distillation"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/ai26-dpo-alignment.md",
+              "companies": [
+                "Netflix",
+                "Uber"
+              ]
+            }
+          ]
+        },
+        {
+          "k": "creator-mlsys",
+          "t": "Production ML System Design (Meta / Netflix / Google)",
+          "lessons": [
+            {
+              "n": "27",
+              "id": "ai27",
+              "title": "Two-Tower Recommendation System Architecture (Meta / Netflix)",
+              "stars": 5,
+              "desc": "Industry standard recommender funnel: Candidate retrieval with user/item embedding towers + ScaNN/HNSW ANN vector index -> DLRM / DeepFM Heavy Ranker -> Contextual Bandits diversity.",
+              "duration": "55 min",
+              "tags": [
+                "Two-Tower",
+                "Embeddings",
+                "Vector Search",
+                "ANN",
+                "Ranker",
+                "Meta",
+                "Netflix"
+              ],
+              "companies": [
+                "Meta",
+                "Netflix",
+                "Google",
+                "ByteDance"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/ai27.md"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "behavioral",
+      "name": "Behavioral, Leadership & Compensation",
+      "shortName": "Behavioral",
+      "badge": "Offer Multiplier",
+      "description": "The gate that decides whether you pass and what your passing is worth in INR. STAR-L stories, hard questions, Googleyness, Amazon LPs, and negotiating 50LPA+ CTC.",
+      "totalLessons": 8,
+      "color": "#f59e0b",
+      "blocks": [
+        {
+          "k": "block 1",
+          "t": "The Scored Behavioral Signals",
+          "lessons": [
+            {
+              "n": "01",
+              "id": "be01",
+              "title": "What the Behavioral Round Actually Grades",
+              "stars": 5,
+              "desc": "The six scored signals; STAR-L and the 'L' (Learning) letter everyone forgets; the 2-minute rule; story altitude; handling aggressive follow-ups.",
+              "duration": "40 min",
+              "tags": [
+                "STAR-L",
+                "Scoring Rubric",
+                "2-Minute Rule",
+                "Signals"
+              ],
+              "existingPath": "behavioral-prep/lessons/01-what-is-graded.md",
+              "visualPath": "behavioral-prep/visuals/01-what-is-graded.html",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            },
+            {
+              "n": "02",
+              "id": "be02",
+              "title": "Your Core Engineering Stories Inventory",
+              "stars": 5,
+              "desc": "Drafting 8 core stories from your actual engineering record: architecture rewrite, high-stakes migration, team leadership, production outage, conflict resolution.",
+              "duration": "60 min",
+              "tags": [
+                "Story Grid",
+                "Leadership",
+                "Production Outage",
+                "Conflict"
+              ],
+              "existingPath": "behavioral-prep/lessons/02-your-eight-stories.md",
+              "visualPath": "behavioral-prep/visuals/02-your-eight-stories.html",
+              "companies": [
+                "Meta",
+                "Netflix"
+              ]
+            }
+          ]
+        },
+        {
+          "k": "block 2",
+          "t": "The Decisive Questions & Company Specifics",
+          "lessons": [
+            {
+              "n": "03",
+              "id": "be03",
+              "title": "The High-Stakes Killer Questions",
+              "stars": 5,
+              "desc": "Why you are leaving without sounding resentful; the Manager-to-IC pivot; explain a genuine failure where you were at fault; handling gaps.",
+              "duration": "45 min",
+              "tags": [
+                "Why Leaving",
+                "Failure Story",
+                "Manager-to-IC",
+                "Vulnerability"
+              ],
+              "existingPath": "behavioral-prep/lessons/03-the-hard-questions.md",
+              "visualPath": "behavioral-prep/visuals/03-the-hard-questions.html",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            },
+            {
+              "n": "04",
+              "id": "be04",
+              "title": "Company-Specific Loops (Amazon LP & Googleyness)",
+              "stars": 4,
+              "desc": "Amazon's 16 Leadership Principles mapped to stories; Google's Googleyness & navigating ambiguity; Meta's focus on velocity and impact.",
+              "duration": "50 min",
+              "tags": [
+                "Amazon LPs",
+                "Googleyness",
+                "Meta Culture",
+                "Company Fit"
+              ],
+              "existingPath": "behavioral-prep/lessons/04-company-specific.md",
+              "visualPath": "behavioral-prep/visuals/04-company-specific.html",
+              "companies": [
+                "Meta",
+                "Netflix"
+              ]
+            }
+          ]
+        },
+        {
+          "k": "block 3",
+          "t": "Converting & Negotiating 50LPA+",
+          "lessons": [
+            {
+              "n": "05",
+              "id": "be05",
+              "title": "The Recruiter Screen & Compensation Defense",
+              "stars": 5,
+              "desc": "The 4 sentences that protect your number; why current salary should never enter the chat; reading an Indian CTC breakdown; ESOP vs RSU; competing offer leverage.",
+              "duration": "55 min",
+              "tags": [
+                "Salary Negotiation",
+                "Recruiter Screen",
+                "CTC Breakdown",
+                "RSUs vs ESOP"
+              ],
+              "existingPath": "behavioral-prep/lessons/05-recruiter-and-offers.md",
+              "visualPath": "behavioral-prep/visuals/05-recruiter-and-offers.html",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            },
+            {
+              "n": "06",
+              "id": "be06",
+              "title": "Mock Behavioral Rounds & Self-Scoring",
+              "stars": 4,
+              "desc": "Six timed mock scenarios, 7-axis rubric, time-to-first-'I' metric that turns group summaries into personal ownership.",
+              "duration": "50 min",
+              "tags": [
+                "Mock Behavioral",
+                "Scoring Sheet",
+                "Self-Audit",
+                "Ownership"
+              ],
+              "existingPath": "behavioral-prep/lessons/06-mock-rounds.md",
+              "visualPath": "behavioral-prep/visuals/06-mock-rounds.html",
+              "companies": [
+                "Meta",
+                "Netflix"
+              ]
+            }
+          ]
+        },
+        {
+          "k": "block 4",
+          "t": "Advanced 50LPA FAANG Bar (New)",
+          "lessons": [
+            {
+              "n": "07",
+              "id": "be07",
+              "title": "Leveling Matrix: Senior (L5) vs Mid (L4) Mastery",
+              "stars": 5,
+              "desc": "What separates a 25LPA L4 offer from a 50LPA+ L5 offer: driving technical RFCs, cross-team consensus without authority, proactive risk identification, blameless postmortems.",
+              "duration": "50 min",
+              "tags": [
+                "Leveling Matrix",
+                "L5 Bar",
+                "Technical Leadership",
+                "RFCs"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/be07-leveling-matrix.md",
+              "companies": [
+                "Google",
+                "Amazon"
+              ]
+            },
+            {
+              "n": "08",
+              "id": "be08",
+              "title": "India Tech 50LPA-80LPA CTC Breakdown & Equity Playbook",
+              "stars": 5,
+              "desc": "Anatomy of high-paying Indian tech offers: Base vs Performance Bonus vs Joining Bonus vs Stocks; 4-year vesting backload trap; Perquisite tax on ESOP exercise; Counter-offer scripts.",
+              "duration": "55 min",
+              "tags": [
+                "Offer Breakdown",
+                "Taxation",
+                "Vesting Schedule",
+                "Counter-Offer Scripts"
+              ],
+              "isNew": true,
+              "newPath": "new_lessons/be08-ctc-equity-playbook.md",
+              "companies": [
+                "Meta",
+                "Netflix"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

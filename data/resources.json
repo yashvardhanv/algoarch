@@ -1,0 +1,237 @@
+{
+  "system-design": {
+    "defaultArticles": [
+      {
+        "title": "Designing Data-Intensive Applications: The Principles",
+        "author": "Martin Kleppmann",
+        "org": "Cambridge University Press",
+        "readTime": "15 min",
+        "url": "https://dataintensive.net/",
+        "summary": "The gold-standard reference for distributed reliability, replication lag, linearizability, and consensus algorithms."
+      },
+      {
+        "title": "Google Spanner: Becoming a Globally Distributed Database",
+        "author": "James C. Corbett et al.",
+        "org": "Google Research (OSDI)",
+        "readTime": "25 min",
+        "url": "https://research.google/pubs/pub39966/",
+        "summary": "How TrueTime API uses atomic clocks and GPS receivers to provide external consistency without blocking reads."
+      },
+      {
+        "title": "Amazon Dynamo: High Availability Key-Value Storage",
+        "author": "Giuseppe DeCandia et al.",
+        "org": "Amazon.com (SOSP)",
+        "readTime": "20 min",
+        "url": "https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf",
+        "summary": "Consistent hashing, vector clocks, sloppy quorums, and hinted handoff for 99.9th percentile e-commerce SLA."
+      },
+      {
+        "title": "The Log: What every software engineer should know about real-time data's unifying abstraction",
+        "author": "Jay Kreps",
+        "org": "LinkedIn / Confluent",
+        "readTime": "30 min",
+        "url": "https://engineering.linkedin.com/distributed-systems/log-what-every-software-engineer-should-know-about-real-time-datas-unifying",
+        "summary": "Why append-only logs are the foundation of distributed consensus, event-driven architectures, and stream processing."
+      }
+    ],
+    "defaultRepos": [
+      {
+        "name": "redis/redis",
+        "description": "In-memory database that persists on disk. Inspect src/ae.c for the event loop and src/server.c for command processing.",
+        "stars": "65k+",
+        "language": "C",
+        "url": "https://github.com/redis/redis"
+      },
+      {
+        "name": "valkey-io/valkey",
+        "description": "High-performance data structure server, open-source fork of Redis supporting multi-threaded IO and active-active clustering.",
+        "stars": "18k+",
+        "language": "C",
+        "url": "https://github.com/valkey-io/valkey"
+      },
+      {
+        "name": "etcd-io/etcd",
+        "description": "Distributed reliable key-value store for the most critical data of a distributed system. Inspect raft/raft.go for production consensus.",
+        "stars": "48k+",
+        "language": "Go",
+        "url": "https://github.com/etcd-io/etcd"
+      },
+      {
+        "name": "apache/kafka",
+        "description": "Open-source distributed event streaming platform. Inspect core/src/main/scala/kafka/log for partition segment commit logs.",
+        "stars": "29k+",
+        "language": "Java/Scala",
+        "url": "https://github.com/apache/kafka"
+      }
+    ]
+  },
+  "dsa": {
+    "defaultArticles": [
+      {
+        "title": "Depth-First Search and Linear Graph Algorithms (Tarjan's SCC)",
+        "author": "Robert Tarjan",
+        "org": "SIAM Journal on Computing",
+        "readTime": "18 min",
+        "url": "https://epubs.siam.org/doi/10.1137/0201010",
+        "summary": "Original discovery of finding strongly connected components and articulation bridges in O(V + E) single DFS traversal."
+      },
+      {
+        "title": "Fast String Searching: The Knuth-Morris-Pratt Algorithm",
+        "author": "Donald Knuth, James H. Morris, Vaughan Pratt",
+        "org": "SIAM Journal on Computing",
+        "readTime": "15 min",
+        "url": "https://epubs.siam.org/doi/10.1137/0206024",
+        "summary": "Mathematical derivation of the prefix failure table (π table) to achieve linear O(N + M) substring matching with zero backtrack."
+      },
+      {
+        "title": "Segment Trees with Lazy Propagation Explained",
+        "author": "Competitive Programming Guide",
+        "org": "CP-Algorithms",
+        "readTime": "14 min",
+        "url": "https://cp-algorithms.com/data_structures/segment_tree.html",
+        "summary": "How lazy tags postpone O(log N) branch updates, enabling concurrent range add and range minimum queries."
+      },
+      {
+        "title": "Introduction to Amortized Complexity Analysis",
+        "author": "MIT OpenCourseWare (6.046J)",
+        "org": "MIT EECS",
+        "readTime": "20 min",
+        "url": "https://ocw.mit.edu/courses/6-046j-design-and-analysis-of-algorithms-spring-2015/",
+        "summary": "The accounting and potential methods for proving monotonic stack O(1) amortized push/pop complexity."
+      }
+    ],
+    "defaultRepos": [
+      {
+        "name": "TheAlgorithms/Python",
+        "description": "All Algorithms implemented in Python — clean, idiomatic implementations of trees, graphs, sorting, and dynamic programming.",
+        "stars": "190k+",
+        "language": "Python",
+        "url": "https://github.com/TheAlgorithms/Python"
+      },
+      {
+        "name": "neetcode-gh/leetcode",
+        "description": "Clean, optimized solutions to FAANG 150 & 75 coding interview problems in Python, C++, and Java.",
+        "stars": "14k+",
+        "language": "Python / C++",
+        "url": "https://github.com/neetcode-gh/leetcode"
+      },
+      {
+        "name": "kamyu104/LeetCode-Solutions",
+        "description": "Concise Python solutions with rigorous Big-O time and space complexity annotations for 2000+ problems.",
+        "stars": "16k+",
+        "language": "Python",
+        "url": "https://github.com/kamyu104/LeetCode-Solutions"
+      }
+    ]
+  },
+  "ai": {
+    "defaultArticles": [
+      {
+        "title": "Efficient Memory Management for Large Language Model Serving with PagedAttention (vLLM)",
+        "author": "Woosuk Kwon et al.",
+        "org": "UC Berkeley (SOSP 2023)",
+        "readTime": "22 min",
+        "url": "https://arxiv.org/abs/2309.06180",
+        "summary": "How OS-style virtual memory paging eliminates 96% of KV cache waste, enabling 2-4x higher LLM serving throughput."
+      },
+      {
+        "title": "Direct Preference Optimization: Your Language Model is Secretly a Reward Model",
+        "author": "Rafael Rafailov et al.",
+        "org": "Stanford University (NeurIPS 2023)",
+        "readTime": "20 min",
+        "url": "https://arxiv.org/abs/2305.18290",
+        "summary": "Derivation of DPO loss showing that fine-tuning directly on pairwise preferences bypasses complex RLHF PPO training."
+      },
+      {
+        "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+        "author": "Patrick Lewis et al.",
+        "org": "Meta AI / UCL (NeurIPS 2020)",
+        "readTime": "18 min",
+        "url": "https://arxiv.org/abs/2005.11401",
+        "summary": "Foundational paper combining dense passage retrieval (DPR) with sequence-to-sequence generators for grounded answers."
+      },
+      {
+        "title": "Efficient Guided Generation for LLMs with Finite-State Machines",
+        "author": "Brandon Willard, Rémi Louf",
+        "org": "Outlines / .txt",
+        "readTime": "15 min",
+        "url": "https://arxiv.org/abs/2307.09702",
+        "summary": "Compiling JSON schemas and context-free grammars into token-level regex FSMs for guaranteed 100% structured outputs with 0ms latency."
+      }
+    ],
+    "defaultRepos": [
+      {
+        "name": "vllm-project/vllm",
+        "description": "High-throughput and memory-efficient inference and serving engine for LLMs using PagedAttention.",
+        "stars": "35k+",
+        "language": "Python / CUDA",
+        "url": "https://github.com/vllm-project/vllm"
+      },
+      {
+        "name": "dottxt-ai/outlines",
+        "description": "Fast and guaranteed structured text generation with Large Language Models using grammar-constrained decoding.",
+        "stars": "12k+",
+        "language": "Python",
+        "url": "https://github.com/dottxt-ai/outlines"
+      },
+      {
+        "name": "huggingface/transformers",
+        "description": "State-of-the-art Machine Learning for Pytorch, TensorFlow, and JAX. Core framework for modern AI engineering.",
+        "stars": "135k+",
+        "language": "Python",
+        "url": "https://github.com/huggingface/transformers"
+      },
+      {
+        "name": "modelcontextprotocol/servers",
+        "description": "Anthropic's open standard for secure, bi-directional LLM tools, context, and enterprise integrations.",
+        "stars": "7k+",
+        "language": "TypeScript / Python",
+        "url": "https://github.com/modelcontextprotocol/servers"
+      }
+    ]
+  },
+  "behavioral": {
+    "defaultArticles": [
+      {
+        "title": "Amazon 16 Leadership Principles: The Operational Bar",
+        "author": "Executive Talent Council",
+        "org": "Amazon Leadership Development",
+        "readTime": "15 min",
+        "url": "https://www.aboutamazon.com/about-us/leadership-principles",
+        "summary": "Deconstruction of Customer Obsession, Ownership, Bias for Action, and Have Backbone in L5/L6 bar raiser debriefs."
+      },
+      {
+        "title": "The Staff Engineer Archetypes & Scope",
+        "author": "Will Larson",
+        "org": "StaffEng",
+        "readTime": "18 min",
+        "url": "https://staffeng.com/guides/staff-archetypes",
+        "summary": "The 4 archetypes (Tech Lead, Architect, Solver, Right Hand) and how to demonstrate cross-org business impact."
+      },
+      {
+        "title": "Radical Candor: Be a Kick-Ass Boss Without Losing Your Humanity",
+        "author": "Kim Scott",
+        "org": "Radical Candor",
+        "readTime": "12 min",
+        "url": "https://www.radicalcandor.com/our-approach/",
+        "summary": "Caring personally while challenging directly: navigating cross-functional conflict and disagree-and-commit situations."
+      }
+    ],
+    "defaultRepos": [
+      {
+        "name": "jwasham/coding-interview-university",
+        "description": "A complete multi-month study plan for becoming a software engineer for a large company like Google, Amazon, Meta.",
+        "stars": "310k+",
+        "language": "Markdown",
+        "url": "https://github.com/jwasham/coding-interview-university"
+      },
+      {
+        "name": "donnemartin/system-design-primer",
+        "description": "Learn how to design large-scale systems. Prep for the system design interview. Includes behavioral guidance.",
+        "stars": "280k+",
+        "language": "Python / Markdown",
+        "url": "https://github.com/donnemartin/system-design-primer"
+      }
+    ]
+  }
+}

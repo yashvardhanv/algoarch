@@ -1,0 +1,54 @@
+[
+  {
+    "id": "dispatch_1795331890568_i3iqs",
+    "timestamp": "2026-11-22T07:18:10.568Z",
+    "userId": "google_test_candidate_google_com",
+    "userName": "Google L5 Aspirant",
+    "recipientEmail": "test_candidate@google.com",
+    "subject": "🔥 Daily 50LPA FAANG Drill: The Recognition Engine (1-day streak)",
+    "streak": 1,
+    "targetLesson": "ds00",
+    "deliveryMethod": "DATABASE_DELIVERY_QUEUE",
+    "status": "DELIVERED",
+    "providerResponse": "Logged and delivered to database inbox queue"
+  },
+  {
+    "id": "dispatch_1795331890561_r8rqq",
+    "timestamp": "2026-11-22T07:18:10.561Z",
+    "userId": "guest_default",
+    "userName": "Staff Engineer Aspirant",
+    "recipientEmail": "candidate@faang.io",
+    "subject": "🔥 Daily 50LPA FAANG Drill: Complexity & the Recognition Reflex (3-day streak)",
+    "streak": 3,
+    "targetLesson": "ds01",
+    "deliveryMethod": "DATABASE_DELIVERY_QUEUE",
+    "status": "DELIVERED",
+    "providerResponse": "Logged and delivered to database inbox queue"
+  },
+  {
+    "id": "dispatch_1794170663059_19cai",
+    "timestamp": "2026-11-08T20:44:23.059Z",
+    "userId": "google_test_candidate_google_com",
+    "userName": "Google L5 Aspirant",
+    "recipientEmail": "test_candidate@google.com",
+    "subject": "🔥 Daily 50LPA FAANG Drill: The Recognition Engine (1-day streak)",
+    "streak": 1,
+    "targetLesson": "ds00",
+    "deliveryMethod": "DATABASE_DELIVERY_QUEUE",
+    "status": "DELIVERED",
+    "providerResponse": "Logged and delivered to database inbox queue"
+  },
+  {
+    "id": "dispatch_1794170663052_uz2lq",
+    "timestamp": "2026-11-08T20:44:23.052Z",
+    "userId": "guest_default",
+    "userName": "Staff Engineer Aspirant",
+    "recipientEmail": "candidate@faang.io",
+    "subject": "🔥 Daily 50LPA FAANG Drill: Complexity & the Recognition Reflex (3-day streak)",
+    "streak": 3,
+    "targetLesson": "ds01",
+    "deliveryMethod": "DATABASE_DELIVERY_QUEUE",
+    "status": "DELIVERED",
+    "providerResponse": "Logged and delivered to database inbox queue"
+  }
+]

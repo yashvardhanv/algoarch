@@ -1,0 +1,94 @@
+{
+  "global": {
+    "total_tokens": 1019,
+    "prompt_tokens": 41,
+    "completion_tokens": 978,
+    "total_cost_usd": 0.000334,
+    "total_requests": 4,
+    "default_limit": 25000
+  },
+  "users": {
+    "guest_default": {
+      "id": "guest_default",
+      "name": "Staff Engineer Aspirant",
+      "email": "candidate@faang.io",
+      "tokens_used": 882,
+      "token_limit": 50000,
+      "total_cost_usd": 0.000259,
+      "total_calls": 3,
+      "is_blocked": false,
+      "created_at": "2026-11-08T18:08:33.480Z",
+      "last_active": "2026-11-08T20:40:09.039Z"
+    },
+    "test_candidate_1": {
+      "id": "test_candidate_1",
+      "name": "Staff Engineer Aspirant",
+      "email": "candidate@faang.io",
+      "tokens_used": 137,
+      "token_limit": 25000,
+      "total_cost_usd": 0.000075,
+      "total_calls": 1,
+      "is_blocked": false,
+      "created_at": "2026-11-22T07:17:42.130Z",
+      "last_active": "2026-11-22T07:17:42.130Z"
+    }
+  },
+  "logs": [
+    {
+      "id": "req_1795331862130gn81",
+      "timestamp": "2026-11-22T07:17:42.130Z",
+      "userId": "test_candidate_1",
+      "userName": "Staff Engineer Aspirant",
+      "model": "gemini-3.5-flash",
+      "prompt_tokens": 17,
+      "completion_tokens": 120,
+      "total_tokens": 137,
+      "cost_usd": 0.000075,
+      "latency_ms": 9179,
+      "custom_key": false,
+      "query_snippet": "How do we prevent overselling in inventory with Redis Lua scripts?"
+    },
+    {
+      "id": "req_17941704090395j6j",
+      "timestamp": "2026-11-08T20:40:09.039Z",
+      "userId": "guest_default",
+      "userName": "Staff Engineer Aspirant",
+      "model": "gemini-1.5-flash",
+      "prompt_tokens": 5,
+      "completion_tokens": 313,
+      "total_tokens": 318,
+      "cost_usd": 0.000094,
+      "latency_ms": 120,
+      "custom_key": false,
+      "query_snippet": "token and embeddings"
+    },
+    {
+      "id": "req_17941703916787ccm",
+      "timestamp": "2026-11-08T20:39:51.678Z",
+      "userId": "guest_default",
+      "userName": "Staff Engineer Aspirant",
+      "model": "gemini-1.5-flash",
+      "prompt_tokens": 2,
+      "completion_tokens": 243,
+      "total_tokens": 245,
+      "cost_usd": 0.000073,
+      "latency_ms": 120,
+      "custom_key": false,
+      "query_snippet": "hi"
+    },
+    {
+      "id": "req_1794161313484lrnu",
+      "timestamp": "2026-11-08T18:08:33.485Z",
+      "userId": "guest_default",
+      "userName": "Staff Engineer Aspirant",
+      "model": "gemini-1.5-flash",
+      "prompt_tokens": 17,
+      "completion_tokens": 302,
+      "total_tokens": 319,
+      "cost_usd": 0.000092,
+      "latency_ms": 120,
+      "custom_key": false,
+      "query_snippet": "How do I use Redis for distributed locks and what is Redlock?"
+    }
+  ]
+}

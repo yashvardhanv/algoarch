@@ -1,0 +1,12 @@
+{
+  "name": "algoarch-50lpa-platform",
+  "version": "1.0.0",
+  "description": "The complete 50LPA FAANG career guidance and preparation web application",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": ["dsa", "system-design", "ai-engineering", "faang", "career-guidance"],
+  "author": "Yashvardhan Vyas",
+  "license": "MIT"
+}
