@@ -1,0 +1,6 @@
+node_modules/
+**/.hyperframes/
+# rendered films live in out/ (share them from the chat / releases, not git history)
+out/
+# regenerable by promo/tools/score.py (the film uses the small .m4a)
+**/assets/audio/*.wav

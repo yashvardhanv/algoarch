@@ -1,0 +1,808 @@
+<!doctype html>
+<html lang="en" data-resolution="landscape">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>AlgoArch — Yashvardhan Vyas intro</title>
+    <script src="assets/vendor/gsap.min.js"></script>
+    <style>
+      /* Fonts are vendored (latin subset) so renders are offline + repeatable. */
+      @font-face {
+        font-family: "Schibsted Grotesk";
+        src: url("assets/fonts/SchibstedGrotesk-latin.woff2") format("woff2");
+        font-weight: 400 900;
+        font-display: block;
+      }
+      @font-face {
+        font-family: "JetBrains Mono";
+        src: url("assets/fonts/JetBrainsMono-latin.woff2") format("woff2");
+        font-weight: 400 700;
+        font-display: block;
+      }
+
+      /* Palette = AlgoArch design tokens (public/style.css), converted from
+         OKLCH to sRGB and flipped onto the dark "ink" ground. */
+      :root {
+        --ground: #12161c; /* --ink */
+        --ground-deep: #090e13;
+        --panel: #191f26;
+        --line: #2d333c;
+        --paper: #f5f8fb; /* --paper */
+        --mute: #9fa5ac;
+        --accent: #c43c00; /* --accent */
+        --accent-lit: #f77e35; /* --accent lifted for dark ground */
+        --accent-hot: #ff9845;
+        --sans: "Schibsted Grotesk", system-ui, sans-serif;
+        --mono: "JetBrains Mono", ui-monospace, monospace;
+        --left: 160px;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--ground);
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--ground);
+        font-family: var(--sans);
+        color: var(--paper);
+      }
+      .abs {
+        position: absolute;
+      }
+      .mono {
+        font-family: var(--mono);
+      }
+      .ch {
+        display: inline-block;
+        will-change: transform;
+      }
+
+      /* ───────── persistent layers ───────── */
+      #bg {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        background:
+          radial-gradient(1000px 760px at 88% 6%, rgba(247, 126, 53, 0.17), transparent 62%),
+          radial-gradient(900px 700px at 4% 104%, rgba(92, 122, 178, 0.13), transparent 60%),
+          linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 96px 96px,
+          linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 96px 96px,
+          var(--ground);
+      }
+      #graph {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+      }
+      #graph svg {
+        width: 1920px;
+        height: 1080px;
+        overflow: visible;
+      }
+      #graph .edge {
+        stroke: #3a4352;
+        stroke-width: 2;
+        fill: none;
+      }
+      #graph .nd {
+        fill: #5a6372;
+      }
+      #graph .nd.hot {
+        fill: var(--accent-lit);
+      }
+
+      #hud {
+        position: absolute;
+        inset: 0;
+        z-index: 5;
+      }
+      .br {
+        position: absolute;
+        width: 56px;
+        height: 56px;
+        border: 0 solid #3a4352;
+      }
+      .br.tl {
+        left: 48px;
+        top: 48px;
+        border-top-width: 2px;
+        border-left-width: 2px;
+      }
+      .br.tr {
+        right: 48px;
+        top: 48px;
+        border-top-width: 2px;
+        border-right-width: 2px;
+      }
+      .br.bl {
+        left: 48px;
+        bottom: 48px;
+        border-bottom-width: 2px;
+        border-left-width: 2px;
+      }
+      .br.brr {
+        right: 48px;
+        bottom: 48px;
+        border-bottom-width: 2px;
+        border-right-width: 2px;
+      }
+      .hud-label {
+        position: absolute;
+        bottom: 84px;
+        font-family: var(--mono);
+        font-size: 20px;
+        letter-spacing: 0.18em;
+        color: var(--mute);
+        text-transform: uppercase;
+      }
+      #hud-l {
+        left: var(--left);
+      }
+      #hud-r {
+        right: var(--left);
+      }
+      #track {
+        position: absolute;
+        left: var(--left);
+        right: var(--left);
+        bottom: 64px;
+        height: 2px;
+        background: var(--line);
+      }
+      #prog {
+        position: absolute;
+        inset: 0;
+        background: var(--accent-lit);
+        transform-origin: 0 50%;
+      }
+
+      /* ───────── scenes ───────── */
+      .scene {
+        position: absolute;
+        inset: 0;
+        z-index: 10;
+      }
+      .eyebrow {
+        position: absolute;
+        left: var(--left);
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        font-family: var(--mono);
+        font-size: 30px;
+        letter-spacing: 0.04em;
+        color: var(--mute);
+      }
+      .tick {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        background: var(--accent-lit);
+      }
+
+      /* Scene A: who */
+      #sceneA .eyebrow {
+        top: 214px;
+      }
+      #a-type {
+        display: inline-block;
+        white-space: nowrap;
+      }
+      .a-name {
+        position: absolute;
+        left: calc(var(--left) - 10px);
+        top: 276px;
+        font-weight: 800;
+        font-size: 246px;
+        line-height: 0.94;
+        letter-spacing: -0.045em;
+        white-space: nowrap;
+      }
+      .a-name .line {
+        display: block;
+        overflow: hidden;
+        padding-bottom: 0.1em;
+        margin-bottom: -0.1em;
+      }
+      .a-name .l2 {
+        color: var(--accent-lit);
+      }
+      .a-rule {
+        position: absolute;
+        left: var(--left);
+        top: 800px;
+        width: 560px;
+        height: 6px;
+        background: var(--accent-lit);
+        transform-origin: 0 50%;
+      }
+      .a-sub {
+        position: absolute;
+        left: var(--left);
+        top: 838px;
+        font-size: 34px;
+        letter-spacing: 0.06em;
+        color: var(--mute);
+      }
+      .a-sub b {
+        color: var(--paper);
+        font-weight: 700;
+      }
+
+      /* Glyph — an "A" drawn as an arch + crossbar with graph nodes */
+      .glyph {
+        overflow: visible;
+      }
+      .glyph .arch,
+      .glyph .bar,
+      .glyph .gedge {
+        fill: none;
+        stroke: var(--accent-lit);
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-dasharray: 1;
+        stroke-dashoffset: 1;
+        opacity: 0;
+      }
+      .glyph .arch {
+        stroke-width: 12;
+      }
+      .glyph .bar {
+        stroke-width: 10;
+      }
+      .glyph .gedge {
+        stroke-width: 5;
+        stroke: var(--accent-hot);
+      }
+      .glyph .node {
+        fill: var(--ground);
+        stroke: var(--accent-hot);
+        stroke-width: 8;
+        transform-box: fill-box;
+        transform-origin: 50% 50%;
+      }
+      .glyph .node.core {
+        fill: var(--accent-hot);
+        stroke: none;
+      }
+
+      /* Scene B: what */
+      #sceneB .lockup {
+        position: absolute;
+        left: var(--left);
+        top: 236px;
+        display: flex;
+        align-items: center;
+        gap: 52px;
+      }
+      #gB {
+        width: 250px;
+        height: 250px;
+        flex: none;
+      }
+      .b-word,
+      .d-word {
+        font-weight: 800;
+        letter-spacing: -0.05em;
+        white-space: nowrap;
+        overflow: hidden;
+        line-height: 1.12;
+        padding: 0.04em 0 0.08em;
+      }
+      .b-word {
+        font-size: 228px;
+      }
+      .b-word .p2,
+      .d-word .p2 {
+        color: var(--accent-lit);
+      }
+      .b-tag {
+        position: absolute;
+        left: var(--left);
+        top: 590px;
+        width: 1600px;
+        white-space: nowrap;
+        font-size: 62px;
+        line-height: 1.12;
+        font-weight: 500;
+        letter-spacing: -0.02em;
+        color: var(--paper);
+      }
+      .b-tag em {
+        font-style: normal;
+        color: var(--accent-lit);
+      }
+      .b-chips {
+        position: absolute;
+        left: var(--left);
+        top: 786px;
+        display: flex;
+        gap: 20px;
+      }
+      .b-chips span {
+        font-family: var(--mono);
+        font-size: 28px;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: var(--paper);
+        border: 2px solid var(--line);
+        background: rgba(25, 31, 38, 0.85);
+        border-radius: 6px;
+        padding: 14px 22px;
+      }
+      .b-chips span i {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--accent-lit);
+        margin-right: 14px;
+        vertical-align: 2px;
+      }
+
+      /* Scene C: scale */
+      #sceneC .eyebrow {
+        top: 168px;
+      }
+      .c-head {
+        position: absolute;
+        left: var(--left);
+        top: 228px;
+        font-size: 92px;
+        font-weight: 750;
+        word-spacing: 0.12em;
+        letter-spacing: -0.04em;
+        line-height: 1.05;
+        white-space: nowrap;
+      }
+      .c-head .w {
+        display: inline-block;
+      }
+      .c-head .acc {
+        color: var(--accent-lit);
+      }
+      .c-cards {
+        position: absolute;
+        left: var(--left);
+        top: 440px;
+        width: 1600px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 28px;
+      }
+      .card {
+        position: relative;
+        height: 430px;
+        padding: 34px 34px 0;
+        background: var(--panel);
+        border: 2px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .card .cl {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 6px;
+        background: var(--accent-lit);
+        transform-origin: 0 50%;
+      }
+      .card-top {
+        display: flex;
+        justify-content: space-between;
+        font-family: var(--mono);
+        font-size: 26px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--mute);
+      }
+      .card-top b {
+        color: var(--paper);
+        font-weight: 700;
+      }
+      .odo {
+        display: flex;
+        margin-top: 22px;
+        height: 190px;
+        font-size: 190px;
+        line-height: 190px;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        color: var(--paper);
+      }
+      .dg {
+        width: 0.6em;
+        height: 1em;
+        overflow: hidden;
+      }
+      .strip span {
+        display: block;
+        height: 1em;
+        line-height: 1em;
+        text-align: center;
+      }
+      .card-label {
+        margin-top: 14px;
+        font-family: var(--mono);
+        font-size: 28px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--accent-lit);
+      }
+      .card-desc {
+        margin-top: 18px;
+        font-size: 30px;
+        line-height: 1.2;
+        font-weight: 500;
+        color: var(--mute);
+        letter-spacing: -0.01em;
+      }
+
+      /* Scene D: sign-off */
+      #sceneD {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+      }
+      #gD {
+        width: 210px;
+        height: 210px;
+        margin-bottom: 18px;
+      }
+      .d-word {
+        font-size: 200px;
+      }
+      .d-rule {
+        width: 160px;
+        height: 6px;
+        margin-top: 26px;
+        background: var(--accent-lit);
+        transform-origin: 50% 50%;
+      }
+      .d-by {
+        margin-top: 36px;
+        font-size: 34px;
+        letter-spacing: 0.06em;
+        color: var(--mute);
+      }
+      .d-by b {
+        color: var(--paper);
+        font-weight: 700;
+      }
+
+      /* ───────── wipes ───────── */
+      .wipe {
+        position: absolute;
+        inset: 0;
+        z-index: 50;
+        overflow: hidden;
+        pointer-events: none;
+      }
+      .wp {
+        position: absolute;
+        top: -80px;
+        left: 0;
+        width: 2400px;
+        height: 1240px;
+      }
+      .wp.lead {
+        background: linear-gradient(90deg, #8f2c00, var(--accent) 60%, var(--accent-lit));
+      }
+      .wp.follow {
+        background: var(--ground-deep);
+        border-left: 8px solid var(--accent-hot);
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="10"
+      data-width="1920"
+      data-height="1080"
+    >
+      <!-- persistent backdrop -->
+      <div id="bg" class="clip" data-start="0" data-duration="10" data-track-index="0"></div>
+
+      <div id="graph" class="clip" data-start="0" data-duration="10" data-track-index="1" data-layout-ignore>
+        <svg viewBox="0 0 1920 1080" aria-hidden="true">
+          <g class="drift">
+            <path class="edge" d="M1480 180 L1700 300 L1560 470 L1800 560 L1650 780 L1400 700 L1560 470" />
+            <path class="edge" d="M1480 180 L1250 320 L1130 560 L1400 700 L1300 900" />
+            <path class="edge" d="M1700 300 L1820 150" />
+            <path class="edge" d="M1650 780 L1740 860" />
+            <path class="edge" d="M1250 320 L900 200" />
+            <path class="edge" d="M1130 560 L1560 470" />
+            <circle class="nd" cx="1480" cy="180" r="9" />
+            <circle class="nd hot" cx="1700" cy="300" r="12" />
+            <circle class="nd" cx="1560" cy="470" r="9" />
+            <circle class="nd" cx="1800" cy="560" r="8" />
+            <circle class="nd" cx="1400" cy="700" r="10" />
+            <circle class="nd hot" cx="1650" cy="780" r="10" />
+            <circle class="nd" cx="1250" cy="320" r="8" />
+            <circle class="nd" cx="1130" cy="560" r="9" />
+            <circle class="nd" cx="1820" cy="150" r="7" />
+            <circle class="nd" cx="1300" cy="900" r="8" />
+            <circle class="nd" cx="1740" cy="860" r="8" />
+            <circle class="nd" cx="900" cy="200" r="7" />
+          </g>
+        </svg>
+      </div>
+
+      <div id="hud" class="clip" data-start="0" data-duration="10" data-track-index="2">
+        <div class="br tl"></div>
+        <div class="br tr"></div>
+        <div class="br bl"></div>
+        <div class="br brr"></div>
+        <div id="hud-l" class="hud-label" data-layout-ignore>AlgoArch / Intro</div>
+        <div id="hud-r" class="hud-label" data-layout-ignore>2026</div>
+        <div id="track"><div id="prog"></div></div>
+      </div>
+
+      <!-- Scene A — who -->
+      <section id="sceneA" class="clip scene" data-start="0" data-duration="2.4" data-track-index="3">
+        <div class="eyebrow"><span class="tick"></span><span id="a-type">// hello, world. I'm</span></div>
+        <h1 class="a-name">
+          <span class="line l1" data-split>Yashvardhan</span>
+          <span class="line l2" data-split>Vyas</span>
+        </h1>
+        <div class="a-rule"></div>
+        <p class="a-sub mono">Creator of <b>AlgoArch</b></p>
+      </section>
+
+      <!-- Scene B — what -->
+      <section id="sceneB" class="clip scene" data-start="2.4" data-duration="2.8" data-track-index="3">
+        <div class="lockup">
+          <svg id="gB" class="glyph" viewBox="0 0 200 200" aria-hidden="true">
+            <path class="gedge" pathLength="1" d="M100 48 V112" />
+            <path class="arch" pathLength="1" d="M34 172 V100 A66 66 0 0 1 166 100 V172" />
+            <path class="bar" pathLength="1" d="M34 128 H166" />
+            <circle class="node" cx="34" cy="172" r="13" />
+            <circle class="node" cx="166" cy="172" r="13" />
+            <circle class="node" cx="100" cy="34" r="13" />
+            <circle class="node core" cx="100" cy="128" r="10" />
+          </svg>
+          <div class="b-word"><span class="p1" data-split>Algo</span><span class="p2" data-split>Arch</span></div>
+        </div>
+        <p class="b-tag">Built for the <em>Senior &amp; Staff</em> bar.</p>
+        <div class="b-chips">
+          <span><i></i>AI technical mentor</span>
+          <span><i></i>Live Python IDE</span>
+          <span><i></i>Mock interview scorecard</span>
+        </div>
+      </section>
+
+      <!-- Scene C — scale -->
+      <section id="sceneC" class="clip scene" data-start="5.2" data-duration="2.6" data-track-index="3">
+        <div class="eyebrow"><span class="tick"></span>The curriculum</div>
+        <h2 class="c-head">
+          <span class="w">106+ chapters.</span>
+          <span class="w">Four tracks.</span>
+          <span class="w acc">One bar.</span>
+        </h2>
+        <div class="c-cards">
+          <article class="card">
+            <div class="cl"></div>
+            <div class="card-top"><b>01</b><span>DSA</span></div>
+            <div class="odo" data-val="26" data-layout-ignore></div>
+            <div class="card-label">lessons</div>
+            <p class="card-desc">Patterns, invariants, Big-O</p>
+          </article>
+          <article class="card">
+            <div class="cl"></div>
+            <div class="card-top"><b>02</b><span>System design</span></div>
+            <div class="odo" data-val="44" data-layout-ignore></div>
+            <div class="card-label">lessons</div>
+            <p class="card-desc">Distributed systems at scale</p>
+          </article>
+          <article class="card">
+            <div class="cl"></div>
+            <div class="card-top"><b>03</b><span>ML systems</span></div>
+            <div class="odo" data-val="28" data-layout-ignore></div>
+            <div class="card-label">lessons</div>
+            <p class="card-desc">Ranking, embeddings, LLM serving</p>
+          </article>
+          <article class="card">
+            <div class="cl"></div>
+            <div class="card-top"><b>04</b><span>Behavioral</span></div>
+            <div class="odo" data-val="08" data-layout-ignore></div>
+            <div class="card-label">lessons</div>
+            <p class="card-desc">L5 / L6 leadership signal</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- Scene D — sign-off -->
+      <section id="sceneD" class="clip scene" data-start="7.8" data-duration="2.2" data-track-index="3">
+        <svg id="gD" class="glyph" viewBox="0 0 200 200" aria-hidden="true">
+          <path class="gedge" pathLength="1" d="M100 48 V112" />
+          <path class="arch" pathLength="1" d="M34 172 V100 A66 66 0 0 1 166 100 V172" />
+          <path class="bar" pathLength="1" d="M34 128 H166" />
+          <circle class="node" cx="34" cy="172" r="13" />
+          <circle class="node" cx="166" cy="172" r="13" />
+          <circle class="node" cx="100" cy="34" r="13" />
+          <circle class="node core" cx="100" cy="128" r="10" />
+        </svg>
+        <div class="d-word"><span class="p1" data-split>Algo</span><span class="p2" data-split>Arch</span></div>
+        <div class="d-rule"></div>
+        <p class="d-by mono">Built by <b>Yashvardhan Vyas</b></p>
+      </section>
+
+      <!-- Wipes: boundary (scene swap) lands on the follow panel's midpoint -->
+      <div id="w1" class="wipe clip" data-start="1.93" data-duration="0.85" data-track-index="4">
+        <div class="wp lead"></div>
+        <div class="wp follow"></div>
+      </div>
+      <div id="w2" class="wipe clip" data-start="4.73" data-duration="0.85" data-track-index="4">
+        <div class="wp lead"></div>
+        <div class="wp follow"></div>
+      </div>
+      <div id="w3" class="wipe clip" data-start="7.33" data-duration="0.85" data-track-index="4">
+        <div class="wp lead"></div>
+        <div class="wp follow"></div>
+      </div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+
+      // ── deterministic DOM prep (no randomness, no clock) ──
+      document.querySelectorAll("[data-split]").forEach((el) => {
+        const text = el.textContent;
+        el.textContent = "";
+        for (const c of text) {
+          const s = document.createElement("span");
+          s.className = "ch";
+          s.textContent = c;
+          el.appendChild(s);
+        }
+      });
+
+      // Odometer: a 0–9 strip per digit, rolled with a transform.
+      document.querySelectorAll(".odo").forEach((odo) => {
+        for (const c of odo.dataset.val) {
+          const dg = document.createElement("div");
+          dg.className = "dg";
+          const strip = document.createElement("div");
+          strip.className = "strip";
+          strip.dataset.d = c;
+          for (let n = 0; n <= 9; n++) {
+            const s = document.createElement("span");
+            s.textContent = n;
+            strip.appendChild(s);
+          }
+          dg.appendChild(strip);
+          odo.appendChild(dg);
+        }
+      });
+
+      gsap.set(".wp", { skewX: -14 });
+
+      const S = { A: 0, B: 2.4, C: 5.2, D: 7.8 };
+      const tl = gsap.timeline({ paused: true });
+
+      // ── persistent ──
+      tl.fromTo("#bg", { opacity: 0 }, { opacity: 1, duration: 0.6, ease: "power2.out" }, 0);
+      tl.fromTo("#graph", { opacity: 0 }, { opacity: 0.6, duration: 1.3, ease: "power2.out" }, 0.1);
+      // dim the network behind the headline + cards, bring it back for the sign-off
+      tl.to("#graph", { opacity: 0.28, duration: 0.5, ease: "power2.inOut" }, S.C);
+      tl.to("#graph", { opacity: 0.6, duration: 0.5, ease: "power2.inOut" }, S.D);
+      tl.to("#graph .drift", { x: -70, y: 34, duration: 10, ease: "none" }, 0);
+      tl.fromTo(
+        ".br",
+        { opacity: 0, scale: 0.8 },
+        { opacity: 1, scale: 1, duration: 0.7, ease: "expo.out", stagger: 0.06 },
+        0.1,
+      );
+      tl.fromTo(".hud-label", { opacity: 0 }, { opacity: 1, duration: 0.6, ease: "power2.out", stagger: 0.1 }, 0.4);
+      tl.fromTo("#prog", { scaleX: 0 }, { scaleX: 1, duration: 10, ease: "none" }, 0);
+
+      // ── Scene A: who ──
+      tl.fromTo(".a-sub", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 1.3);
+      tl.fromTo("#sceneA .eyebrow", { opacity: 0 }, { opacity: 1, duration: 0.15 }, 0.15);
+      tl.fromTo(
+        "#a-type",
+        { clipPath: "inset(0 100% 0 0)" },
+        { clipPath: "inset(0 0% 0 0)", duration: 0.5, ease: "steps(19)" },
+        0.2,
+      );
+      tl.fromTo("#sceneA .tick", { scale: 0 }, { scale: 1, duration: 0.4, ease: "back.out(3)" }, 0.15);
+      tl.fromTo(
+        ".a-name .l1 .ch",
+        { yPercent: 118 },
+        { yPercent: 0, duration: 0.85, ease: "expo.out", stagger: 0.035 },
+        0.4,
+      );
+      tl.fromTo(
+        ".a-name .l2 .ch",
+        { yPercent: 118 },
+        { yPercent: 0, duration: 0.85, ease: "expo.out", stagger: 0.05 },
+        0.65,
+      );
+      tl.fromTo(".a-rule", { scaleX: 0 }, { scaleX: 1, duration: 0.9, ease: "expo.out" }, 1.1);
+
+      // ── Scene B: what ──
+      const drawGlyph = (id, t0, scale) => {
+        tl.set(`${id} .arch`, { opacity: 1 }, t0);
+        tl.fromTo(`${id} .arch`, { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 0.9 * scale, ease: "power2.inOut" }, t0);
+        tl.set(`${id} .bar`, { opacity: 1 }, t0 + 0.5 * scale);
+        tl.fromTo(`${id} .bar`, { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 0.5 * scale, ease: "power2.out" }, t0 + 0.5 * scale);
+        tl.set(`${id} .gedge`, { opacity: 1 }, t0 + 0.7 * scale);
+        tl.fromTo(`${id} .gedge`, { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 0.35 * scale, ease: "power2.out" }, t0 + 0.7 * scale);
+        tl.fromTo(`${id} .node`, { scale: 0 }, { scale: 1, duration: 0.5 * scale, ease: "back.out(2.4)", stagger: 0.09 * scale }, t0 + 0.3 * scale);
+      };
+      drawGlyph("#gB", S.B + 0.15, 1);
+      tl.fromTo(
+        "#sceneB .b-word .ch",
+        { yPercent: 118 },
+        { yPercent: 0, duration: 0.85, ease: "expo.out", stagger: 0.04 },
+        S.B + 0.35,
+      );
+      tl.fromTo(".b-tag", { opacity: 0, y: 28 }, { opacity: 1, y: 0, duration: 0.7, ease: "expo.out" }, S.B + 0.6);
+      tl.fromTo(
+        ".b-chips span",
+        { opacity: 0, y: 22 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "expo.out", stagger: 0.1 },
+        S.B + 1.0,
+      );
+
+      // ── Scene C: scale ──
+      tl.fromTo("#sceneC .eyebrow", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.5, ease: "expo.out" }, S.C + 0.1);
+      tl.fromTo(
+        ".c-head .w",
+        { opacity: 0, y: 36 },
+        { opacity: 1, y: 0, duration: 0.7, ease: "expo.out", stagger: 0.12 },
+        S.C + 0.15,
+      );
+      tl.fromTo(
+        ".card",
+        { opacity: 0, y: 56 },
+        { opacity: 1, y: 0, duration: 0.7, ease: "expo.out", stagger: 0.09 },
+        S.C + 0.4,
+      );
+      tl.fromTo(".card .cl", { scaleX: 0 }, { scaleX: 1, duration: 0.8, ease: "expo.out", stagger: 0.09 }, S.C + 0.6);
+      document.querySelectorAll(".strip").forEach((strip, i) => {
+        const d = Number(strip.dataset.d);
+        tl.fromTo(strip, { yPercent: 0 }, { yPercent: -10 * d, duration: 0.95, ease: "expo.out" }, S.C + 0.7 + i * 0.06);
+      });
+      tl.fromTo(".card-label, .card-desc", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out", stagger: 0.04 }, S.C + 0.9);
+
+      // ── Scene D: sign-off ──
+      drawGlyph("#gD", S.D + 0.1, 0.8);
+      tl.fromTo(
+        "#sceneD .d-word .ch",
+        { yPercent: 118 },
+        { yPercent: 0, duration: 0.8, ease: "expo.out", stagger: 0.04 },
+        S.D + 0.25,
+      );
+      tl.fromTo(".d-rule", { scaleX: 0 }, { scaleX: 1, duration: 0.8, ease: "expo.out" }, S.D + 0.6);
+      tl.fromTo(".d-by", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, S.D + 0.4);
+
+      // ── Wipes ──
+      [["#w1", 1.93], ["#w2", 4.73], ["#w3", 7.33]].forEach(([id, t0]) => {
+        tl.fromTo(`${id} .lead`, { x: -2800 }, { x: 2220, duration: 0.7, ease: "power3.inOut" }, t0);
+        tl.fromTo(`${id} .follow`, { x: -2800 }, { x: 2220, duration: 0.7, ease: "power3.inOut" }, t0 + 0.12);
+      });
+
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "algoarch-video",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Hyperframes video projects for AlgoArch (HTML in, MP4 out)",
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "hyperframes": "^0.9.89"
+  }
+}
