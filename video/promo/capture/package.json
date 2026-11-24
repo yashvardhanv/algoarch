@@ -1,0 +1,17 @@
+{
+  "name": "algoarch-film-capture",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Records the REAL AlgoArch UI (Chromium + CDP screencast) for the Hyperframes film",
+  "scripts": {
+    "login": "node -e \"require('./lib').Rec.login()\"",
+    "lecture": "node rec-lecture.js && ffmpeg -y -i takes/lecture.mp4 -t 12.5 -an -c:v libvpx-vp9 -b:v 0 -crf 33 -row-mt 1 takes/lecture.webm",
+    "takes": "node t1.js && node t2.js && node t3.js && node t4.js && node t5.js && node t6.js",
+    "conform": "python3 conform.py ../assets/footage"
+  },
+  "devDependencies": {
+    "monaco-editor": "0.45.0",
+    "playwright": "^1.49.0",
+    "pyodide": "0.26.4"
+  }
+}

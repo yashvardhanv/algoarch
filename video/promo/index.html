@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="en" data-resolution="landscape">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>AlgoArch — product film</title>
+    <script src="assets/vendor/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: "Schibsted Grotesk";
+        src: url("assets/fonts/SchibstedGrotesk-latin.woff2") format("woff2");
+        font-weight: 400 900;
+        font-display: block;
+      }
+      @font-face {
+        font-family: "JetBrains Mono";
+        src: url("assets/fonts/JetBrainsMono-latin.woff2") format("woff2");
+        font-weight: 400 700;
+        font-display: block;
+      }
+
+      /* Contract tokens read by the catalog primitives (logo-brand-close, ...),
+         set to AlgoArch's palette (public/style.css, dark theme). */
+      :root {
+        --bg: #0a0e13;
+        --fg: #f5f8fb;
+        --surface: #121821;
+        --border: #2d333c;
+        --brand: #f77e35;
+        --accent: #f77e35;
+        --accent-2: #79b8ff;
+        --radius: 14px;
+        --font-body: "Schibsted Grotesk", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", ui-monospace, monospace;
+        --ok: #3fb97a;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--bg);
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--bg);
+        font-family: var(--font-body);
+        color: var(--fg);
+      }
+
+      /* ───────── backdrop ───────── */
+      #bg {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(1100px 800px at 86% 4%, rgba(247, 126, 53, 0.2), transparent 62%),
+          radial-gradient(1000px 800px at 4% 104%, rgba(92, 122, 178, 0.18), transparent 60%),
+          linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px) 0 0 / 96px 96px,
+          linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px) 0 0 / 96px 96px,
+          var(--bg);
+      }
+      #dust {
+        position: absolute;
+        inset: 0;
+      }
+      #dust i {
+        position: absolute;
+        border-radius: 50%;
+        background: #f77e35;
+      }
+      #vig {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 30;
+        background: radial-gradient(ellipse at 50% 46%, transparent 55%, rgba(4, 6, 9, 0.62) 100%);
+      }
+
+      /* ───────── stage, camera, browser window ───────── */
+      #stage {
+        position: absolute;
+        inset: 0;
+        perspective: 2400px;
+        z-index: 10;
+      }
+      #cam {
+        position: absolute;
+        inset: 0;
+        transform-origin: 0 0;
+      }
+      #win {
+        position: absolute;
+        left: 160px;
+        top: 64px;
+        width: 1600px;
+        height: 952px;
+        border-radius: 18px;
+        overflow: hidden;
+        background: #0b0e13;
+        border: 1.5px solid rgba(255, 255, 255, 0.13);
+        box-shadow:
+          0 70px 160px rgba(0, 0, 0, 0.7),
+          0 0 0 1px rgba(0, 0, 0, 0.55),
+          0 0 140px rgba(247, 126, 53, 0.11);
+      }
+      .bar {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1600px;
+        height: 52px;
+        display: flex;
+        align-items: center;
+        padding: 0 22px;
+        background: #141a22;
+        border-bottom: 1px solid #232b36;
+        z-index: 8;
+      }
+      .dots {
+        width: 120px;
+        display: flex;
+        gap: 9px;
+      }
+      .dots i {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #3a4352;
+      }
+      .addr {
+        position: absolute;
+        left: 50%;
+        top: 9px;
+        transform: translateX(-50%);
+        width: 700px;
+        height: 34px;
+        border-radius: 17px;
+        background: #0c1118;
+        border: 1px solid #232b36;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 18px;
+        color: #9fa5ac;
+      }
+      .addr svg {
+        flex: none;
+      }
+      /* typewriter primitive, set for the address bar */
+      .hf-catalog-typewriter {
+        color: var(--hf-type-color, #f5f8fb);
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font: 500 20px/1 var(--font-mono);
+        letter-spacing: 0.01em;
+      }
+      .hf-catalog-typewriter span {
+        display: inline-block;
+        max-width: calc(var(--hf-type-progress, 1) * 100%);
+        overflow: hidden;
+        white-space: nowrap;
+        line-height: 1.35;
+        padding-bottom: 3px;
+      }
+      .hf-catalog-typewriter i {
+        width: 2px;
+        height: 22px;
+        border-radius: 999px;
+        background: var(--hf-type-color, #f5f8fb);
+        opacity: var(--hf-caret-opacity, 1);
+      }
+      #load {
+        position: absolute;
+        left: 0;
+        top: 51px;
+        width: 1600px;
+        height: 3px;
+        background: var(--brand);
+        transform-origin: 0 50%;
+        z-index: 9;
+        opacity: 0;
+      }
+      .screen {
+        position: absolute;
+        left: 0;
+        top: 52px;
+        width: 1600px;
+        height: 900px;
+        overflow: hidden;
+        background: #0b0e13;
+      }
+      .newtab {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(900px 500px at 50% 38%, #141a22, #0b0e13 70%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding-top: 300px;
+        gap: 54px;
+      }
+      .newtab .sb {
+        width: 640px;
+        height: 58px;
+        border-radius: 29px;
+        border: 1.5px solid #232b36;
+        background: rgba(18, 24, 33, 0.8);
+      }
+      .newtab .tiles {
+        display: flex;
+        gap: 36px;
+      }
+      .newtab .tiles i {
+        width: 64px;
+        height: 64px;
+        border-radius: 18px;
+        background: #121821;
+        border: 1.5px solid #232b36;
+      }
+      video.f {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1600px;
+        height: 900px;
+        object-fit: cover;
+        background: #0b0e13;
+      }
+      #ring {
+        position: absolute;
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        border: 3px solid var(--brand);
+        box-shadow:
+          0 0 50px rgba(247, 126, 53, 0.55),
+          inset 0 0 30px rgba(247, 126, 53, 0.25);
+        opacity: 0;
+        z-index: 12;
+      }
+      #pass {
+        position: absolute;
+        left: 686px;
+        top: 500px;
+        width: 584px;
+        height: 396px;
+        border-radius: 14px;
+        border: 3px solid var(--ok);
+        box-shadow:
+          0 0 70px rgba(63, 185, 122, 0.55),
+          inset 0 0 50px rgba(63, 185, 122, 0.12);
+        opacity: 0;
+        z-index: 12;
+        pointer-events: none;
+      }
+
+      /* ───────── captions (soft-blur-in) ───────── */
+      .hf-soft-blur-in {
+        opacity: 0;
+        transform: translate3d(0, 28px, 0);
+        filter: blur(18px);
+      }
+      #caps {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 40px;
+        height: 90px;
+        display: flex;
+        justify-content: center;
+        z-index: 40;
+        pointer-events: none;
+      }
+      .cap {
+        position: absolute;
+        bottom: 0;
+        padding: 18px 40px 20px;
+        border-radius: 22px;
+        background: rgba(10, 14, 19, 0.66);
+        backdrop-filter: blur(22px);
+        border: 1.5px solid rgba(255, 255, 255, 0.14);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        font-size: 46px;
+        font-weight: 650;
+        letter-spacing: -0.02em;
+        white-space: nowrap;
+      }
+      .cap b {
+        font-weight: 750;
+        color: var(--brand);
+      }
+      .cap.kw {
+        font-size: 64px;
+        font-weight: 800;
+        letter-spacing: -0.035em;
+        padding: 14px 54px 18px;
+      }
+      #dimL {
+        position: absolute;
+        inset: 0;
+        z-index: 15;
+        pointer-events: none;
+        opacity: 0;
+        background: linear-gradient(90deg, rgba(8, 11, 15, 0.88) 0%, rgba(8, 11, 15, 0.64) 46%, rgba(8, 11, 15, 0) 68%);
+      }
+      #cap5 {
+        left: 70px;
+      }
+      #flash {
+        position: absolute;
+        inset: 0;
+        z-index: 35;
+        pointer-events: none;
+        opacity: 0;
+        background: radial-gradient(ellipse at 50% 50%, rgba(255, 190, 140, 0.5), rgba(247, 126, 53, 0.25) 60%, transparent 100%);
+      }
+
+      /* ───────── finale ───────── */
+      #brand {
+        position: absolute;
+        inset: 0;
+        z-index: 20;
+      }
+      #mark {
+        position: absolute;
+        left: 50%;
+        top: 204px;
+        width: 136px;
+        height: 136px;
+        margin-left: -68px;
+        z-index: 22;
+        color: var(--brand);
+        opacity: 0;
+      }
+      #mark path,
+      #mark polygon,
+      #mark polyline {
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.7;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      #journey {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 826px;
+        text-align: center;
+        z-index: 22;
+        font-size: 50px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        color: #f5f8fb;
+      }
+      #journey b {
+        color: var(--brand);
+        font-weight: 750;
+      }
+      #urlpill {
+        position: absolute;
+        left: 50%;
+        top: 918px;
+        transform: translateX(-50%);
+        z-index: 22;
+        padding: 12px 40px 14px;
+        border-radius: 999px;
+        border: 2px solid rgba(247, 126, 53, 0.65);
+        background: rgba(247, 126, 53, 0.12);
+        box-shadow: 0 0 60px rgba(247, 126, 53, 0.25);
+        font: 600 44px/1 var(--font-mono);
+        letter-spacing: 0.04em;
+        color: #fff;
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="60"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div id="bg" class="clip" data-start="0" data-duration="60" data-track-index="0"></div>
+      <div id="dust" class="clip" data-start="0" data-duration="60" data-track-index="1" data-layout-ignore></div>
+
+      <div id="stage">
+        <div id="cam">
+          <div id="win">
+            <div class="bar">
+              <div class="dots"><i></i><i></i><i></i></div>
+              <div class="addr" data-layout-ignore>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+                <div class="hf-catalog-typewriter" data-site-url><span>algoarch.app</span><i></i></div>
+              </div>
+            </div>
+            <div id="load"></div>
+            <div class="screen">
+              <div class="newtab" id="newtab"><div class="sb"></div><div class="tiles"><i></i><i></i><i></i><i></i><i></i></div></div>
+              <video id="v1" class="f clip" src="assets/footage/s1-open.mp4" data-start="3.15" data-duration="3.5" muted playsinline preload="auto"></video>
+              <video id="v2" class="f clip" src="assets/footage/s2-explore.mp4" data-start="6" data-duration="9.4" muted playsinline preload="auto"></video>
+              <video id="v3" class="f clip" src="assets/footage/s3-watch.mp4" data-start="15" data-duration="8.4" muted playsinline preload="auto"></video>
+              <video id="v4" class="f clip" src="assets/footage/s4-code.mp4" data-start="23" data-duration="11.4" muted playsinline preload="auto"></video>
+              <video id="v5" class="f clip" src="assets/footage/s5-mentor.mp4" data-start="34" data-duration="12.4" muted playsinline preload="auto"></video>
+              <video id="v6" class="f clip" src="assets/footage/s6-montage.mp4" data-start="46" data-duration="8.4" muted playsinline preload="auto"></video>
+            </div>
+          </div>
+          <div id="ring"></div>
+          <div id="pass"></div>
+        </div>
+      </div>
+
+      <div id="dimL"></div>
+      <div id="flash"></div>
+      <div id="vig" data-layout-ignore></div>
+
+      <div id="caps">
+        <div id="cap1" class="cap hf-soft-blur-in">Your journey to <b>mastering technology</b> starts here.</div>
+        <div id="cap2" class="cap hf-soft-blur-in">Everything you need to become a <b>better engineer</b>.</div>
+        <div id="cap3" class="cap hf-soft-blur-in">Learn at <b>your own pace</b>.</div>
+        <div id="cap4" class="cap hf-soft-blur-in">Don’t just learn. <b>Build real understanding.</b></div>
+        <div id="cap5" class="cap hf-soft-blur-in">Stuck? Your <b>AI learning companion</b> is right there.</div>
+        <div id="kw1" class="cap kw hf-soft-blur-in">Watch.</div>
+        <div id="kw2" class="cap kw hf-soft-blur-in">Learn.</div>
+        <div id="kw3" class="cap kw hf-soft-blur-in">Practice.</div>
+        <div id="kw4" class="cap kw hf-soft-blur-in"><b>Understand.</b></div>
+      </div>
+
+      <!-- Finale: logo-brand-close (catalog) + the app's real logo mark -->
+      <div
+        id="brand"
+        class="clip"
+        data-composition-id="brand-close"
+        data-composition-src="compositions/components/logo-brand-close.html"
+        data-start="54"
+        data-duration="6"
+        data-track-index="3"
+        data-variable-values='{"wordmark":"AlgoArch","tagline":"Learn smarter. Build faster. Think deeper.","url":"","accent":"green","exit":"none"}'
+      ></div>
+      <audio id="score" src="assets/audio/score.m4a" data-start="0" data-duration="60" data-volume="1" data-track-index="9"></audio>
+      <svg id="mark" viewBox="0 0 24 24" aria-hidden="true">
+        <polygon pathLength="1" points="12 2 2 7 12 12 22 7 12 2"></polygon>
+        <polyline pathLength="1" points="2 17 12 22 22 17"></polyline>
+        <polyline pathLength="1" points="2 12 12 17 22 12"></polyline>
+      </svg>
+      <div id="journey" class="hf-soft-blur-in">Your <b>engineering journey</b> starts here.</div>
+      <div id="urlpill" class="hf-soft-blur-in" data-site-url>algoarch.app</div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+
+      // ── deterministic prep: drifting dust (seeded, no randomness at render time)
+      (function () {
+        let s = 20260601;
+        const rnd = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
+        const dust = document.getElementById("dust");
+        for (let i = 0; i < 34; i++) {
+          const d = document.createElement("i");
+          const sz = 2 + rnd() * 4;
+          d.style.cssText = `left:${(rnd() * 1920).toFixed(0)}px;top:${(rnd() * 1080).toFixed(0)}px;width:${sz.toFixed(1)}px;height:${sz.toFixed(1)}px;opacity:${(0.10 + rnd() * 0.28).toFixed(2)}`;
+          dust.appendChild(d);
+        }
+      })();
+
+      // typewriter primitive: tone=paper, caret=line
+      document.querySelectorAll(".hf-catalog-typewriter").forEach((el) => {
+        el.style.setProperty("--hf-type-color", "#f5f8fb");
+        el.style.setProperty("--hf-type-progress", 0);
+      });
+
+      const tl = gsap.timeline({ paused: true });
+
+      // page coords (1920x1080 viewport of the recorded app) → world coords (frame, camera at rest)
+      const K = 1600 / 1920;
+      const P = (u, v) => [160 + u * K, 116 + v * K];
+      // camera: put world point (cx,cy) at screen point (tx,ty) with scale s
+      const cam = (t, cx, cy, s, d = 1.0, ease = "power3.inOut", tx = 960, ty = 540) =>
+        tl.to("#cam", { x: tx - s * cx, y: ty - s * cy, scale: s, duration: d, ease }, t);
+      const camSet = (t, cx, cy, s, tx = 960, ty = 540) =>
+        tl.set("#cam", { x: tx - s * cx, y: ty - s * cy, scale: s }, t);
+      const show = (id, t, dur = 0.8) => tl.to(id, { opacity: 1, y: 0, filter: "blur(0px)", duration: dur, ease: "power3.out" }, t);
+      const hide = (id, t, dur = 0.4) => tl.to(id, { opacity: 0, y: -16, filter: "blur(10px)", duration: dur, ease: "power2.in" }, t);
+      const xfade = (id, t, d = 0.35) => tl.fromTo(id, { opacity: 0 }, { opacity: 1, duration: d, ease: "power2.out" }, t);
+
+      gsap.set("#cam", { x: 0, y: 0, scale: 1 });
+      gsap.set("#vig", { opacity: 1 });
+      gsap.set("#flash", { opacity: 0 });
+      gsap.set("#dimL", { opacity: 0 });
+
+      // ═════════ 0–6  Scene 1: the beginning ═════════
+      tl.fromTo("#bg", { opacity: 0 }, { opacity: 1, duration: 1.0, ease: "power2.out" }, 0);
+      tl.fromTo("#dust", { opacity: 0 }, { opacity: 1, duration: 1.4 }, 0.2);
+      tl.to("#dust", { y: -60, duration: 60, ease: "none" }, 0);
+      tl.fromTo(
+        "#win",
+        { y: 190, opacity: 0, rotationX: 13, scale: 0.93, transformPerspective: 2200, transformOrigin: "50% 100%" },
+        { y: 0, opacity: 1, rotationX: 0, scale: 1, duration: 1.35, ease: "expo.out" },
+        0.35,
+      );
+      // address bar types the URL, caret blinks, then Enter
+      tl.to(".hf-catalog-typewriter i", { "--hf-caret-opacity": 0, duration: 0.3, repeat: 3, yoyo: true, ease: "steps(1)" }, 1.0);
+      tl.fromTo(".hf-catalog-typewriter", { "--hf-type-progress": 0 }, { "--hf-type-progress": 1, duration: 1.2, ease: "steps(12)" }, 1.75);
+      tl.to(".hf-catalog-typewriter i", { "--hf-caret-opacity": 1, duration: 0.01 }, 3.0);
+      tl.fromTo("#load", { scaleX: 0, opacity: 1 }, { scaleX: 1, opacity: 1, duration: 0.4, ease: "power2.out" }, 3.0);
+      tl.to("#load", { opacity: 0, duration: 0.25 }, 3.45);
+      xfade("#v1", 3.15, 0.2);
+      tl.to("#newtab", { opacity: 0, duration: 0.2 }, 3.3);
+
+      // push in on the real logo, mark it, pull back to the hero
+      const [lx, ly] = P(462, 30);
+      gsap.set("#ring", { left: lx - 75, top: ly - 75 });
+      cam(3.5, lx, ly, 2.15, 1.0, "power3.inOut", 820, 400);
+      tl.fromTo("#ring", { opacity: 0, scale: 0.4 }, { opacity: 1, scale: 1, duration: 0.55, ease: "expo.out" }, 4.1);
+      tl.to("#ring", { opacity: 0, scale: 1.5, duration: 0.7, ease: "power2.in" }, 4.8);
+      cam(4.85, 960, 540, 1.04, 1.1, "power3.inOut");
+      show("#cap1", 3.55, 0.9);
+      hide("#cap1", 5.65);
+
+      // ═════════ 6–15  Scene 2: explore the learning universe ═════════
+      xfade("#v2", 6.0);
+      tl.to("#v1", { opacity: 0, duration: 0.01 }, 6.7);
+      cam(6.0, 960, 540, 1.04, 0.01);
+      cam(6.9, ...P(960, 560), 1.1, 1.3, "power2.inOut");
+      cam(9.0, ...P(960, 540), 1.2, 1.4, "power3.inOut");   // four track cards
+      cam(11.4, ...P(960, 520), 1.12, 1.4, "power3.inOut"); // curriculum filters
+      cam(13.6, 960, 540, 1.0, 1.1, "power2.inOut");
+      show("#cap2", 6.6, 0.9);
+      hide("#cap2", 14.5);
+
+      // ═════════ 15–23  Scene 3: learn by watching ═════════
+      xfade("#v3", 15.0);
+      tl.to("#v2", { opacity: 0, duration: 0.01 }, 15.5);
+      cam(15.0, ...P(960, 540), 1.08, 1.2, "power2.inOut");
+      cam(18.6, ...P(960, 560), 1.5, 1.0, "power3.inOut");   // lecture modal opens
+      cam(21.6, 960, 540, 1.0, 1.1, "power2.inOut");
+      show("#cap3", 15.8, 0.9);
+      hide("#cap3", 22.4);
+
+      // ═════════ 23–34  Scene 4: code · execute · understand ═════════
+      xfade("#v4", 23.0);
+      tl.to("#v3", { opacity: 0, duration: 0.01 }, 23.5);
+      cam(23.0, 960, 540, 1.02, 0.01);
+      cam(24.3, ...P(980, 650), 1.65, 1.2, "power3.inOut", 960, 500);  // the code cell
+      cam(30.7, ...P(980, 700), 1.6, 0.9, "power2.inOut", 960, 500);  // results below
+      // success: ring pulse around the cell when the tests pass
+      tl.fromTo("#pass", { opacity: 0, scale: 0.97 }, { opacity: 1, scale: 1, duration: 0.35, ease: "expo.out" }, 31.6);
+      tl.to("#pass", { opacity: 0, scale: 1.03, duration: 1.1, ease: "power2.in" }, 32.2);
+      cam(32.9, 960, 560, 1.12, 1.0, "power2.inOut");
+      show("#cap4", 24.4, 0.9);
+      hide("#cap4", 33.2);
+
+      // ═════════ 34–46  Scene 5: the personal AI assistant ═════════
+      xfade("#v5", 34.0);
+      tl.to("#v4", { opacity: 0, duration: 0.01 }, 34.5);
+      cam(34.0, 960, 560, 1.0, 0.01);
+      cam(34.6, 1241, 712, 1.85, 1.1, "power3.inOut");                // the mentor drawer
+      cam(44.8, 960, 540, 1.0, 1.1, "power2.inOut");
+      tl.to("#dimL", { opacity: 1, duration: 0.9, ease: "power2.out" }, 34.9);
+      tl.to("#dimL", { opacity: 0, duration: 0.8, ease: "power2.inOut" }, 44.8);
+      show("#cap5", 35.4, 0.9);
+      hide("#cap5", 45.0);
+
+      // ═════════ 46–54  Scene 6: one connected experience (beat-cut montage) ═════════
+      xfade("#v6", 46.0, 0.2);
+      tl.to("#v5", { opacity: 0, duration: 0.01 }, 46.4);
+      const cuts = [
+        [P(700, 260), 1.75, 0],      // hero headline
+        [P(960, 560), 1.5, 0],       // four tracks
+        [P(900, 520), 1.45, 0],      // curriculum
+        [P(960, 560), 1.4, 0],       // video vault
+        [P(980, 650), 1.9, 0],       // typing in the cell
+        [P(980, 720), 1.8, 0],       // tests pass
+        [[1241, 712], 1.85, 1],      // mentor streaming (world coords)
+        [P(960, 540), 1.3, 0],       // system design
+      ];
+      cuts.forEach(([c, s], i) => {
+        const t = 46.0 + i;
+        camSet(t, c[0], c[1], s);
+        tl.to("#cam", { scale: s * 1.07, x: 960 - s * 1.07 * c[0], y: 540 - s * 1.07 * c[1], duration: 1.0, ease: "none" }, t);
+        tl.fromTo("#flash", { opacity: 0.4 }, { opacity: 0, duration: 0.22, ease: "power2.out", immediateRender: false }, t);
+      });
+      tl.to("#dimL", { opacity: 1, duration: 0.12 }, 52.0);
+      tl.to("#dimL", { opacity: 0, duration: 0.12 }, 52.9);
+      [["#kw1", 46.1], ["#kw2", 48.1], ["#kw3", 50.1], ["#kw4", 52.1]].forEach(([id, t], i) => {
+        show(id, t, 0.5);
+        if (i < 3) hide(id, t + 1.75, 0.25);
+      });
+
+      // ═════════ 54–60  Scene 7: brand reveal ═════════
+      tl.to("#cam", { x: 0, y: 0, scale: 1, duration: 0.9, ease: "power2.inOut" }, 53.3);
+      tl.to("#win", { opacity: 0, scale: 0.9, y: 40, filter: "blur(16px)", duration: 0.95, ease: "power2.in" }, 53.35);
+      hide("#kw4", 53.4, 0.35);
+      tl.to("#dust", { opacity: 1, duration: 0.5 }, 54);
+      gsap.set("#mark path, #mark polygon, #mark polyline", { strokeDasharray: 1, strokeDashoffset: 1 });
+      tl.set("#mark", { opacity: 1 }, 54.5);
+      tl.to("#mark polygon, #mark polyline", { strokeDashoffset: 0, duration: 1.0, ease: "power2.inOut", stagger: 0.12 }, 54.5);
+      show("#journey", 57.0, 0.9);
+      show("#urlpill", 57.7, 0.9);
+
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

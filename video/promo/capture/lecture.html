@@ -1,0 +1,71 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Lecture</title>
+<style>
+@font-face{font-family:SG;src:url("../assets/fonts/SchibstedGrotesk-latin.woff2");font-weight:400 900}
+@font-face{font-family:JB;src:url("../assets/fonts/JetBrainsMono-latin.woff2");font-weight:400 700}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#0b0f14;color:#f5f8fb;font-family:SG,sans-serif}
+body{background:radial-gradient(1100px 700px at 85% 0%,rgba(247,126,53,.16),transparent 60%),radial-gradient(900px 700px at 0% 100%,rgba(92,122,178,.13),transparent 60%),#0b0f14}
+.h{position:absolute;left:110px;top:70px}
+.k{font:500 30px JB;letter-spacing:.14em;color:#f77e35;text-transform:uppercase}
+.t{font-weight:800;font-size:92px;letter-spacing:-.04em;margin-top:10px}
+.code{position:absolute;left:110px;top:300px;width:940px;padding:34px 0;background:#121821;border:2px solid #2d333c;border-radius:16px;font:500 40px/1.62 JB}
+.ln{padding:0 34px;display:flex;gap:26px;border-left:6px solid transparent;color:#cdd5df;white-space:pre;opacity:.55;transition:all .25s}
+.ln i{font-style:normal;color:#5a6372;width:34px;text-align:right}
+.ln.on{background:rgba(247,126,53,.14);border-left-color:#f77e35;opacity:1}
+.kw{color:#79b8ff}.fn{color:#ffd479}.nm{color:#f77e35}
+.right{position:absolute;left:1120px;top:300px;width:700px}
+.lab{font:500 28px JB;letter-spacing:.12em;color:#9fa5ac;text-transform:uppercase;margin-bottom:18px}
+.arr{display:flex;gap:16px;margin-bottom:56px}
+.cell{width:140px;height:140px;border-radius:14px;border:3px solid #2d333c;background:#121821;display:grid;place-items:center;font:700 62px JB;position:relative;transition:all .25s}
+.cell small{position:absolute;bottom:-40px;font:500 24px JB;color:#5a6372}
+.cell.cur{border-color:#f77e35;background:rgba(247,126,53,.16);transform:translateY(-8px)}
+.cell.hit{border-color:#3fb97a;background:rgba(63,185,122,.18)}
+.map{display:grid;grid-template-columns:1fr 1fr;gap:0;border:3px solid #2d333c;border-radius:14px;overflow:hidden;font:600 46px JB}
+.map div{padding:18px 28px;border-bottom:2px solid #2d333c;background:#121821}
+.map .hd{font:500 26px JB;letter-spacing:.12em;color:#9fa5ac;background:#171e28}
+.row{opacity:0;transform:translateX(-14px);transition:all .3s}
+.row.show{opacity:1;transform:none}
+.res{position:absolute;left:1120px;top:910px;font:700 54px JB;color:#3fb97a;opacity:0;transition:opacity .3s}
+.res.show{opacity:1}
+.cap{position:absolute;left:110px;top:960px;font:500 38px SG;color:#9fa5ac}
+.bar{position:absolute;left:0;bottom:0;height:8px;background:#f77e35;width:0}
+</style></head><body>
+<div class="h"><div class="k">Lecture · Hashmap as an Index</div><div class="t">Two Sum, in one pass</div></div>
+<div class="code" id="code">
+<div class="ln" data-l="0"><i>1</i><span><span class="kw">def</span> <span class="fn">two_sum</span>(nums, target):</span></div>
+<div class="ln" data-l="1"><i>2</i><span>    seen = {}</span></div>
+<div class="ln" data-l="2"><i>3</i><span>    <span class="kw">for</span> i, x <span class="kw">in</span> <span class="fn">enumerate</span>(nums):</span></div>
+<div class="ln" data-l="3"><i>4</i><span>        need = target - x</span></div>
+<div class="ln" data-l="4"><i>5</i><span>        <span class="kw">if</span> need <span class="kw">in</span> seen:</span></div>
+<div class="ln" data-l="5"><i>6</i><span>            <span class="kw">return</span> [seen[need], i]</span></div>
+<div class="ln" data-l="6"><i>7</i><span>        seen[x] = i</span></div>
+</div>
+<div class="right">
+  <div class="lab">nums · target = 9</div>
+  <div class="arr" id="arr"></div>
+  <div class="lab">seen · value → index</div>
+  <div class="map"><div class="hd">value</div><div class="hd">index</div>
+    <div class="row" id="r0">2</div><div class="row" id="r0b">0</div></div>
+</div>
+<div class="res" id="res">→ [0, 1]  ✓</div>
+<div class="cap" id="cap">Walk the array once, remembering what you have seen.</div>
+<div class="bar" id="bar"></div>
+<script>
+const nums=[2,7,11,15];const arr=document.getElementById('arr');
+nums.forEach((n,i)=>{const c=document.createElement('div');c.className='cell';c.id='c'+i;c.innerHTML=n+'<small>i='+i+'</small>';arr.appendChild(c)});
+const on=(...ls)=>document.querySelectorAll('.ln').forEach(e=>e.classList.toggle('on',ls.includes(+e.dataset.l)));
+const cap=t=>document.getElementById('cap').textContent=t;
+const steps=[
+ [300,()=>{on(0,1);cap('Start with an empty map: value → index.')}],
+ [1500,()=>{on(2);document.getElementById('c0').classList.add('cur');cap('i = 0, x = 2')}],
+ [2700,()=>{on(3);cap('need = 9 − 2 = 7')}],
+ [3900,()=>{on(4);cap('Is 7 in seen? Not yet.')}],
+ [5100,()=>{on(6);['r0','r0b'].forEach(id=>document.getElementById(id).classList.add('show'));cap('Remember it: seen[2] = 0')}],
+ [6500,()=>{on(2);document.getElementById('c0').classList.remove('cur');document.getElementById('c1').classList.add('cur');cap('i = 1, x = 7')}],
+ [7700,()=>{on(3);cap('need = 9 − 7 = 2')}],
+ [8900,()=>{on(4,5);document.getElementById('c0').classList.add('hit');document.getElementById('c1').classList.add('hit');cap('2 is already in seen → we found the pair.')}],
+ [10200,()=>{document.getElementById('res').classList.add('show')}],
+];
+const t0=performance.now();steps.forEach(([t,f])=>setTimeout(f,t));
+(function loop(){const e=(performance.now()-t0)/13000;document.getElementById('bar').style.width=Math.min(100,e*100)+'%';requestAnimationFrame(loop)})();
+</script></body></html>

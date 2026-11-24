@@ -1,0 +1,23 @@
+{
+  "assets/background.jpeg": "056cc5ffda649bc6ca15568722d808e09fca72f0a9865e215b76101ee86e38e5",
+  "assets/hyperframes-logo-white.svg": "f9f942c43b465616c3af2fb8b07daf1cc05a4776903bbb27beb2bb608060e6c7",
+  "compositions/ai-chat-reveal.html": "b4ce0e31242593d8b8d962bd6b9efd0a44aaa62473ad3405c8ed31948540dcfb",
+  "compositions/code-snippet-dark-modern.html": "9e21228af5113f0e87a067d806bccef571990436bc64021e9c527233017b0e33",
+  "compositions/components/agent-cursor.html": "3a2717e792269d0fe39b40d57e631cd7c3280c1f06be1e47a3adbbc6993d8727",
+  "compositions/components/beat-accent.html": "e72f8d23d81459b88e841b5ab9cb3eaf9b4a1a3047f1ab830bf48f769897dfdc",
+  "compositions/components/browser-device-stage.html": "59b20814d38bf58ec1c6c7727ed954e89e9f38a7392eddf6d266ce586bad6764",
+  "compositions/components/chat-thread.html": "3973e891cba4c658d19d79c8543f208ce62c84d4dd2d59a932bcfdbf10b4f2f0",
+  "compositions/components/code-terminal-run.html": "f00d6259050d2c5cb3a12fd4a43b96159263f7d38462cd6d0f845b2f83ad43b5",
+  "compositions/components/cursor-zoom-follow.html": "827327986216100b6c20c0e136dfcafa177fa247eab851514c705ef61a9afafe",
+  "compositions/components/kinetic-center-build.html": "774f75b80d82fbc0c6226b85743804fb7a2229fb038eb0d38fa2e9503072c2e0",
+  "compositions/components/logo-brand-close.html": "afd249a6bf34702f71a9bf4464adbe8f2dd3a768f9729701ee4a57f205991089",
+  "compositions/components/micro-transitions.html": "dd91b213753e97d6fd656c4f455fc8c941c7cfbdcc2c93d55ce13dba6ee2b732",
+  "compositions/components/press-ripple.html": "db9edeff080d126609c103d880c166b7aafa5bbb9f0d92fc52c6aa72407d6104",
+  "compositions/components/soft-blur-in.html": "9b732bb33aead010102a79d2f63039aaa20108619e567a0d14435c0489fcb9b2",
+  "compositions/components/titlecard-lockup.html": "6a5e54b3819357bd264337cf16240b6a4e65e1059c08ccd82554611a60cdb072",
+  "compositions/components/typewriter.html": "98b1a2780a8ce480309af4ff9773b50742a2ce6fc05f0f7307aa3f5434436379",
+  "compositions/components/ui-focus-zoom.html": "137fca93541c222f37026c8636111a1fe0d79e459546f25050d04c35638d9981",
+  "compositions/components/zoom-through-transition.html": "8201b6de2c2908e3c8d9ca8d36d1b55b8093484ec40bd37bdf7754ae7b61d97d",
+  "compositions/logo-outro.html": "d5b91c5e750e0cfca97a834e5fd16123747ef12736b889849272e14eaca09f11",
+  "TEMPLATE.md": "de62e4f1777f21b203701c2efc82ef347b5a03292844b99bc1b0af788b5cb91b"
+}

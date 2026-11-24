@@ -4,6 +4,15 @@ Video projects built with [Hyperframes](https://hyperframes.heygen.com) (HTML + 
 Needs Node >= 22 and ffmpeg. This folder is separate from the app, so the app's own
 `package.json` and Node 18 support are untouched.
 
+## What's here
+
+| Project | What it is |
+|---|---|
+| `intro/` | 10 s "Yashvardhan + AlgoArch" intro (pure motion graphics) |
+| `promo/` | 60 s product film built from **real recordings of the app** + an original score (see `promo/README.md`) |
+
+Rendered films are written to `out/`, which is git-ignored.
+
 ## intro/ — 10 s "Yashvardhan + AlgoArch" intro
 
 1920x1080, 30 fps, silent. Colors and fonts come from the app's design tokens
