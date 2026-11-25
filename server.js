@@ -219,6 +219,11 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 200, repo.getCurriculum());
   }
 
+  // GET /api/pathways
+  if (req.method === 'GET' && pathname === '/api/pathways') {
+    return sendJson(res, 200, { pathways: repo.getPathways() });
+  }
+
   // 2. GET /api/videos
   if (req.method === 'GET' && pathname === '/api/videos') {
     return sendJson(res, 200, repo.getVideos());

@@ -31,6 +31,12 @@ export interface LessonDocument { schemaVersion: number; title: string | null; l
 export interface LessonMeta {
   n: string; id: string; title: string; stars: number; desc: string; duration: string;
   tags: string[]; companies: string[]; isNew: boolean; lab?: string; hasDocument: boolean;
+  prereqs?: string[]; objectives?: string[]; level?: 'mid' | 'senior' | 'staff'; reviewedAt?: string;
+  sources?: { title: string; url: string; accessed: string }[];
+}
+export interface PathwayLesson { id: string; title: string; trackId: string; duration: string; note?: string }
+export interface Pathway {
+  id: string; title: string; description: string; kind: 'horizon' | 'goal' | 'level'; minutes: number; lessons: PathwayLesson[];
 }
 export interface Video { id: string; youtubeId: string; title: string; channel: string; duration: string; description: string; thumbnail?: string }
 export interface Article { title: string; org?: string; readTime?: string; description?: string; url?: string; link?: string }

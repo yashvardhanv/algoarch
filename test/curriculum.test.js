@@ -175,3 +175,85 @@ test('importPathways is idempotent', () => {
   assert.deepEqual(count(), first);
   assert.deepEqual(first, [1, 2]);
 });
+
+// ---- GET /api/pathways (spawns the real server on a temp copy of data/)
+const { spawn } = require('node:child_process');
+const http = require('node:http');
+const { parseMinutes: minutesOf } = require('../curriculum');
+
+const ROOT = path.join(__dirname, '..');
+const PORT = 5900 + Math.floor(Math.random() * 300);
+const FIXTURE_ID = 'api-fixture';
+let child;
+let tmpData;
+let fixtureLessons = [];
+
+function request(method, urlPath, { body, token } = {}) {
+  return new Promise((resolve, reject) => {
+    const payload = body ? JSON.stringify(body) : null;
+    const h = {};
+    if (payload) { h['Content-Type'] = 'application/json'; h['Content-Length'] = Buffer.byteLength(payload); }
+    if (token) h['Authorization'] = 'Bearer ' + token;
+    const req = http.request({ host: '127.0.0.1', port: PORT, path: urlPath, method, headers: h }, res => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => {
+        let json = null;
+        try { json = JSON.parse(data); } catch (e) { /* not json */ }
+        resolve({ status: res.statusCode, json });
+      });
+    });
+    req.on('error', reject);
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
+async function startServer() {
+  tmpData = fs.mkdtempSync(path.join(os.tmpdir(), 'algoarch-pw-'));
+  for (const f of fs.readdirSync(path.join(ROOT, 'data'))) {
+    const src = path.join(ROOT, 'data', f);
+    if (fs.statSync(src).isFile()) fs.copyFileSync(src, path.join(tmpData, f));
+    else fs.cpSync(src, path.join(tmpData, f), { recursive: true });
+  }
+  const db = openDb(tmpData);
+  fixtureLessons = db.prepare('SELECT id, duration FROM lessons ORDER BY position LIMIT 3').all();
+  importPathways(db, {
+    pathways: [{ id: FIXTURE_ID, title: 'API fixture', description: 'd', kind: 'goal', lessons: fixtureLessons.map(l => ({ id: l.id })) }],
+  }, fixtureLessons.map(l => l.id));
+  db.close();
+  const env = { ...process.env, PORT: String(PORT), ALGOARCH_DATA_DIR: tmpData, AUTH_SECRET: 'test-secret', GEMINI_API_KEY: '' };
+  delete env.RAZORPAY_KEY_ID; delete env.RAZORPAY_KEY_SECRET; delete env.ADMIN_KEY; delete env.NODE_ENV;
+  for (const k of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'PUBLIC_URL']) delete env[k]; // keep the run hermetic
+  child = spawn(process.execPath, ['server.js'], { cwd: ROOT, env, stdio: 'ignore' });
+  for (let i = 0; i < 50; i++) {
+    try { const r = await request('GET', '/api/auth/providers'); if (r.status === 200) break; } catch (e) { /* not up yet */ }
+    if (i === 49) throw new Error('server did not start');
+    await new Promise(r => setTimeout(r, 100));
+  }
+  const login = await request('POST', '/api/auth/dev-login', { body: { email: 'pathways@example.com', name: 'T' } });
+  assert.equal(login.status, 200);
+  return login.json.token;
+}
+
+function stopServer() {
+  if (child) child.kill();
+  if (tmpData) fs.rmSync(tmpData, { recursive: true, force: true });
+}
+
+test('GET /api/pathways requires a sign-in and lists pathways with summed minutes', async () => {
+  const token = await startServer();
+  try {
+    const anon = await request('GET', '/api/pathways');
+    assert.equal(anon.status, 401);
+    const r = await request('GET', '/api/pathways', { token });
+    assert.equal(r.status, 200);
+    assert.ok(Array.isArray(r.json.pathways));
+    const p = r.json.pathways.find(x => x.id === FIXTURE_ID);
+    assert.ok(p, 'fixture pathway is listed');
+    assert.equal(p.minutes, fixtureLessons.reduce((s, l) => s + minutesOf(l.duration), 0));
+    assert.deepEqual(p.lessons.map(l => l.id), fixtureLessons.map(l => l.id));
+  } finally {
+    stopServer();
+  }
+});
