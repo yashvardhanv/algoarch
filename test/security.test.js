@@ -53,6 +53,7 @@ before(async () => {
   }
   const env = { ...process.env, PORT: String(PORT), ALGOARCH_DATA_DIR: tmpData, AUTH_SECRET: 'test-secret', GEMINI_API_KEY: '' };
   delete env.RAZORPAY_KEY_ID; delete env.RAZORPAY_KEY_SECRET; delete env.ADMIN_KEY; delete env.NODE_ENV;
+  for (const k of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'PUBLIC_URL']) delete env[k]; // keep the run hermetic
   child = spawn(process.execPath, ['server.js'], { cwd: ROOT, env, stdio: 'ignore' });
   for (let i = 0; i < 50; i++) {
     try { const r = await request('GET', '/api/auth/providers', { token: false }); if (r.status === 200) break; } catch (e) { /* not up yet */ }

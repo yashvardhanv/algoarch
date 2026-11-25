@@ -41,6 +41,7 @@ before(async () => {
     else fs.cpSync(src, path.join(tmpData, f), { recursive: true });
   }
   const env = { ...process.env, PORT: String(PORT), ALGOARCH_DATA_DIR: tmpData, AUTH_SECRET: 't', GEMINI_API_KEY: 'test-key', GEMINI_BASE_URL: `http://127.0.0.1:${MOCK_PORT}` };
+  for (const k of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'PUBLIC_URL', 'ADMIN_KEY']) delete env[k];
   child = spawn(process.execPath, ['server.js'], { cwd: ROOT, env, stdio: 'ignore' });
   for (let i = 0; i < 50; i++) {
     try { await get('/api/auth/providers'); break; } catch (e) { await new Promise(r => setTimeout(r, 100)); }

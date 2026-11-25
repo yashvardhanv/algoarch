@@ -51,7 +51,7 @@ before(async () => {
     GOOGLE_CLIENT_ID: 'gid', GOOGLE_CLIENT_SECRET: 'gsecret', GITHUB_CLIENT_ID: 'hid', GITHUB_CLIENT_SECRET: 'hsecret',
     OAUTH_TEST_BASE: `http://127.0.0.1:${MOCK_PORT}`, GEMINI_API_KEY: ''
   };
-  delete env.NODE_ENV; delete env.ADMIN_KEY;
+  delete env.NODE_ENV; delete env.ADMIN_KEY; delete env.PUBLIC_URL;
   child = spawn(process.execPath, ['server.js'], { cwd: ROOT, env, stdio: 'ignore' });
   for (let i = 0; i < 50; i++) {
     try { if ((await call('GET', '/api/auth/providers')).status === 200) return; } catch (e) { /* starting */ }
