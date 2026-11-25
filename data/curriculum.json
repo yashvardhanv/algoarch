@@ -412,7 +412,7 @@
         },
         {
           "k": "block iv",
-          "t": "Advanced 50LPA FAANG Bar (New)",
+          "t": "Advanced FAANG Bar (New)",
           "lessons": [
             {
               "n": "19",
@@ -1333,7 +1333,7 @@
         },
         {
           "k": "week 5",
-          "t": "Advanced 50LPA FAANG Bar (New)",
+          "t": "Advanced FAANG Bar (New)",
           "lessons": [
             {
               "n": "37",
@@ -2015,7 +2015,7 @@
         },
         {
           "k": "block v",
-          "t": "Advanced 50LPA FAANG Bar (New)",
+          "t": "Advanced FAANG Bar (New)",
           "lessons": [
             {
               "n": "23",
@@ -2141,7 +2141,7 @@
       "name": "Behavioral, Leadership & Compensation",
       "shortName": "Behavioral",
       "badge": "Offer Multiplier",
-      "description": "The gate that decides whether you pass and what your passing is worth in INR. STAR-L stories, hard questions, Googleyness, Amazon LPs, and negotiating 50LPA+ CTC.",
+      "description": "The gate that decides whether you pass and what your passing is worth in INR. STAR-L stories, hard questions, Googleyness, Amazon LPs, and negotiating your offer.",
       "totalLessons": 8,
       "color": "#f59e0b",
       "blocks": [
@@ -2239,7 +2239,7 @@
         },
         {
           "k": "block 3",
-          "t": "Converting & Negotiating 50LPA+",
+          "t": "Converting & Negotiating Offers",
           "lessons": [
             {
               "n": "05",
@@ -2285,14 +2285,14 @@
         },
         {
           "k": "block 4",
-          "t": "Advanced 50LPA FAANG Bar (New)",
+          "t": "Advanced FAANG Bar (New)",
           "lessons": [
             {
               "n": "07",
               "id": "be07",
               "title": "Leveling Matrix: Senior (L5) vs Mid (L4) Mastery",
               "stars": 5,
-              "desc": "What separates a 25LPA L4 offer from a 50LPA+ L5 offer: driving technical RFCs, cross-team consensus without authority, proactive risk identification, blameless postmortems.",
+              "desc": "What separates an L4 offer from an L5 offer: driving technical RFCs, cross-team consensus without authority, proactive risk identification, blameless postmortems.",
               "duration": "50 min",
               "tags": [
                 "Leveling Matrix",
@@ -2310,7 +2310,7 @@
             {
               "n": "08",
               "id": "be08",
-              "title": "India Tech 50LPA-80LPA CTC Breakdown & Equity Playbook",
+              "title": "India Tech CTC Breakdown & Equity Playbook",
               "stars": 5,
               "desc": "Anatomy of high-paying Indian tech offers: Base vs Performance Bonus vs Joining Bonus vs Stocks; 4-year vesting backload trap; Perquisite tax on ESOP exercise; Counter-offer scripts.",
               "duration": "55 min",

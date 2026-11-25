@@ -10,6 +10,7 @@
     "typecheck": "tsc -p web/tsconfig.json",
     "db:import": "node tools/content/import.js --reset",
     "audit": "node tools/content/audit.js",
+    "lint:comp": "node tools/content/comp-lint.js",
     "docs:widgets": "node tools/content/build-docs.js",
     "diagrams:sync": "node tools/content/sync-diagrams.js"
   },

@@ -1,6 +1,6 @@
 # Lesson 07 — Leveling Matrix: Senior (L5) vs Mid (L4) Mastery
 
-> **Priority:** ★★★★★ (The single factor that decides between 25LPA and 50LPA+)  
+> **Priority:** ★★★★★ (The single factor that decides which level you are offered)  
 > **Estimated Study Time:** 50 minutes  
 > **Key Skills:** Navigating Ambiguity, Driving Technical RFCs, Cross-Team Influence Without Authority, Proactive Risk Identification, Blameless Post-Mortems, Mentorship.
 
@@ -8,7 +8,7 @@
 
 ## 1. What FAANG Hiring Committees Actually Grade by Level
 
-| Dimension | SDE-2 / L4 (Mid-Level: ~20–30 LPA) | SDE-3 / L5 (Senior: ~50–85 LPA) |
+| Dimension | SDE-2 / L4 (Mid-Level) | SDE-3 / L5 (Senior) |
 |---|---|---|
 | **Problem Scope** | Well-defined tasks ("Implement this Kafka consumer with retry") | **Ambiguous business problems** ("Payment failure rate in EMEA is 4%; find why and fix it") |
 | **Autonomy** | Needs architectural guidance from senior team members | **End-to-end ownership:** writes the RFC, benchmarks solutions, drives consensus |
