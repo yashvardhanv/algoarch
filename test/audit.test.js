@@ -103,3 +103,37 @@ test('hasPitfall matches pitfall vocabulary only', () => {
   assert.equal(hasPitfall('all good'), false);
   assert.equal(hasPitfall(''), false);
 });
+
+const { findOrphanVideos, findDuplicateTitles, findBrokenRefs } = require('../tools/content/audit/crosscheck');
+
+test('findOrphanVideos ignores null and blank lessonIds', () => {
+  assert.deepEqual(
+    findOrphanVideos(
+      [{ id: 'v1', lessonId: 'ds01' }, { id: 'v2', lessonId: null }, { id: 'v3', lessonId: ' ' }, { id: 'v4', lessonId: 'zz99' }],
+      new Set(['ds01'])
+    ),
+    ['v4']
+  );
+});
+
+test('findDuplicateTitles pairs near-identical normalized titles', () => {
+  assert.deepEqual(
+    findDuplicateTitles([
+      { id: 'a', title: 'Two Pointers' },
+      { id: 'b', title: 'Two Pointers: Part II' },
+      { id: 'c', title: 'Postgres I: Indexes & Scans' },
+      { id: 'd', title: 'Postgres II: MVCC & Locking' },
+    ]),
+    [['a', 'b']]
+  );
+});
+
+test('findBrokenRefs reports unknown lesson ids once per pair', () => {
+  assert.deepEqual(
+    findBrokenRefs(
+      [{ id: 'ds02', markdown: 'see [x](#open-lesson-ds01) and [y](#open-lesson-nope) [z](lesson:nope), [w](lesson:gone).' }],
+      new Set(['ds01', 'ds02'])
+    ),
+    [{ from: 'ds02', to: 'nope' }, { from: 'ds02', to: 'gone' }]
+  );
+});
