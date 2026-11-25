@@ -34,9 +34,21 @@ function findDuplicateTitles(lessons, threshold = 0.85) {
   return pairs;
 }
 
+const REF_RE = /#open-lesson-([A-Za-z0-9_-]+)|\]\(\s*lesson:([A-Za-z0-9_-]+)/g;
+
+function countRefs(guides) {
+  let n = 0;
+  for (const g of guides) {
+    for (const m of String(g.markdown || '').matchAll(REF_RE)) {
+      if ((m[1] || m[2]).replace(/[-_]+$/, '')) n++;
+    }
+  }
+  return n;
+}
+
 function findBrokenRefs(guides, lessonIds) {
   const out = [];
-  const re = /#open-lesson-([A-Za-z0-9_-]+)|\]\(\s*lesson:([A-Za-z0-9_-]+)/g;
+  const re = REF_RE;
   for (const g of guides) {
     const seen = new Set();
     for (const m of String(g.markdown || '').matchAll(re)) {
@@ -49,4 +61,4 @@ function findBrokenRefs(guides, lessonIds) {
   return out;
 }
 
-module.exports = { findOrphanVideos, findDuplicateTitles, findBrokenRefs };
+module.exports = { findOrphanVideos, findDuplicateTitles, findBrokenRefs, countRefs };

@@ -5,7 +5,7 @@ const path = require('node:path');
 const Database = require('better-sqlite3');
 const { guideStats, documentStats } = require('./metrics');
 const { flagLesson, countDrills, hasPitfall } = require('./flags');
-const { findOrphanVideos, findDuplicateTitles, findBrokenRefs } = require('./crosscheck');
+const { findOrphanVideos, findDuplicateTitles, findBrokenRefs, countRefs } = require('./crosscheck');
 
 const COLUMNS = [
   'id', 'track', 'block', 'title', 'stars', 'declared_duration', 'words', 'headings', 'code_blocks',
@@ -72,7 +72,9 @@ function buildAudit(input) {
 
   const byTrack = {};
   const byFlag = {};
-  const sourceSplit = { withSource: 0, withoutSource: 0, newLessons: 0 };
+  const sourceSplit = {
+    withSource: 0, withoutSource: 0, newLessons: 0, noSource: [], documentOnly: [], guideOnly: [],
+  };
   let totalWords = 0;
 
   const rows = lessons.map((l) => {
@@ -103,6 +105,9 @@ function buildAudit(input) {
       bf[l.track] = (bf[l.track] || 0) + 1;
     }
     if (hasSource) sourceSplit.withSource += 1; else sourceSplit.withoutSource += 1;
+    if (!hasSource) sourceSplit.noSource.push(l.id);
+    else if (!l.hasGuide) sourceSplit.documentOnly.push(l.id);
+    else if (!l.hasDocument) sourceSplit.guideOnly.push(l.id);
     if (l.isNew) sourceSplit.newLessons += 1;
     totalWords += words;
     return row;
@@ -117,6 +122,8 @@ function buildAudit(input) {
     orphanVideos: findOrphanVideos(videos, ids),
     duplicateTitles: findDuplicateTitles(lessons.map((l) => ({ id: l.id, title: l.title }))),
     brokenRefs: findBrokenRefs(guides, ids),
+    refsChecked: countRefs(guides),
+    guidesScanned: guides.length,
   };
   return { rows, summary };
 }
@@ -134,6 +141,7 @@ function toCsv(rows) {
 
 function renderSummary(summary) {
   const out = ['# Curriculum audit', ''];
+  const list = (arr) => (arr.length ? arr.join(', ') : 'none');
   const none = (arr) => (arr.length ? arr : ['None']);
 
   out.push('## Totals', '', `- Lessons: ${summary.totals.lessons}`, `- Total words: ${summary.totals.words}`, '');
@@ -159,11 +167,31 @@ function renderSummary(summary) {
   out.push('');
 
   const s = summary.sourceSplit;
-  out.push('## Source coverage', '', `- With source: ${s.withSource}`, `- Without source: ${s.withoutSource}`, `- New lessons: ${s.newLessons}`, '');
+  out.push('## Source coverage', '', `- With source: ${s.withSource}`, `- Without source: ${s.withoutSource}`, `- New lessons: ${s.newLessons}`,
+    `- No source: ${list(s.noSource)}`, `- Document only (no guide): ${list(s.documentOnly)}`,
+    `- Guide only (no document): ${list(s.guideOnly)}`, '');
 
   out.push('## Orphan videos', '', ...none(summary.orphanVideos.map((id) => `- ${id}`)), '');
-  out.push('## Duplicate topics', '', ...none(summary.duplicateTitles.map((p) => `- ${p[0]} and ${p[1]}`)), '');
-  out.push('## Broken cross-references', '', ...none(summary.brokenRefs.map((r) => `- ${r.from} links to missing ${r.to}`)), '');
+  out.push(
+    '## Duplicate topics', '',
+    'Title-only check (word-set similarity 0.85 or higher): ' + (summary.duplicateTitles.length
+      ? summary.duplicateTitles.map((p) => `${p[0]} and ${p[1]}`).join('; ') : 'none'),
+    'Topic overlap between differently titled lessons needs manual review in Phase 1.', ''
+  );
+  out.push('## Broken cross-references', '');
+  if (summary.brokenRefs.length) out.push(...summary.brokenRefs.map((r) => `- ${r.from} links to missing ${r.to}`));
+  else {
+    out.push(`None found. Checked ${summary.refsChecked} lesson references in ${summary.guidesScanned} guides. `
+      + 'The importer strips .md cross-links from guides, so links in the original sources are not checked.');
+  }
+  out.push('');
+  out.push(
+    '## Method and limits', '',
+    '- The audit reads the database as imported. Recorded interactive-widget frames are only included if they were imported, so `no-visual` and `no-practice` can be overstated for lessons whose widgets were not imported or not yet ported.',
+    "- Unported widgets and dropped SVG figures are not counted as visuals. ASCII diagrams (code blocks marked diagram) are not counted as visuals either; whether they should be is the owner's call.",
+    '- Word counts are guide words plus document words, and code text counts as words.',
+    '- `drills` is capped at 10 per lesson to mirror the server.', ''
+  );
   out.push('## Owner gate', '', ...OWNER_DECISIONS.map((d) => `- ${d}`), '');
   return out.join('\n');
 }

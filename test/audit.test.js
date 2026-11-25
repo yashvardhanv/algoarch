@@ -241,3 +241,76 @@ test('countDrills accepts numbered section headings', () => {
   assert.equal(countDrills('### 3. Homework\n- x\n- y\n- z'), 3);
   assert.equal(countDrills('## Drills\n1. a\n2. b\n## Next\n1. c'), 2);
 });
+
+const { countRefs } = require('../tools/content/audit/crosscheck');
+
+test('countRefs counts every lesson reference in both forms', () => {
+  assert.equal(
+    countRefs([
+      { id: 'a', markdown: 'see [x](#open-lesson-ds01) and [y](#open-lesson-ds01) [z](lesson:nope).' },
+      { id: 'b', markdown: 'no links here' },
+      { id: 'c', markdown: null },
+    ]),
+    3
+  );
+});
+
+test('summary renders method and limits section before the owner gate', () => {
+  const md = renderSummary(buildAudit(loadAuditInput(makeFixture())).summary);
+  const i = md.indexOf('## Method and limits');
+  assert.ok(i > 0 && i < md.indexOf('## Owner gate'));
+  for (const s of [
+    'as imported',
+    'no-visual',
+    'no-practice',
+    'overstated',
+    'not counted as visuals',
+    'ASCII diagrams',
+    "owner's call",
+    'guide words plus document words',
+    'code text counts as words',
+    'capped at 10 per lesson',
+  ]) assert.ok(md.includes(s), s);
+});
+
+test('empty results state what was checked', () => {
+  const { summary } = buildAudit(loadAuditInput(makeFixture()));
+  assert.equal(summary.guidesScanned, 2);
+  assert.equal(summary.refsChecked, 0);
+  const md = renderSummary(summary);
+  assert.ok(md.includes('None found. Checked 0 lesson references in 2 guides. The importer strips .md cross-links from guides, so links in the original sources are not checked.'));
+  assert.ok(md.includes('Title-only check (word-set similarity 0.85 or higher): L2 and L3'));
+  assert.ok(md.includes('Topic overlap between differently titled lessons needs manual review in Phase 1.'));
+  assert.ok(md.includes('## Orphan videos'));
+});
+
+test('source coverage names lessons without source', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-src-'));
+  const db = openDb(tmp);
+  db.prepare("INSERT INTO tracks (id, name, position) VALUES ('t1', 'T', 1)").run();
+  db.prepare("INSERT INTO course_blocks (id, track_id, key, title, position) VALUES (1, 't1', 'b1', 'B', 1)").run();
+  const ins = db.prepare("INSERT INTO lessons (id, track_id, block_id, position, title, stars, duration, is_new) VALUES (?, 't1', 1, ?, ?, 3, '10 min', 0)");
+  ['both', 'none', 'doc', 'guide'].forEach((id, i) => ins.run(id, i + 1, 'Title ' + id));
+  const g = db.prepare("INSERT INTO lesson_guides (lesson_id, markdown, updated_at) VALUES (?, 'hello', 'x')");
+  g.run('both'); g.run('guide');
+  const d = db.prepare("INSERT INTO lesson_documents (lesson_id, schema_version, document, updated_at) VALUES (?, 1, '{\"sections\":[]}', 'x')");
+  d.run('both'); d.run('doc');
+  db.close();
+  const { summary } = buildAudit(loadAuditInput(tmp));
+  assert.deepEqual(summary.sourceSplit.noSource, ['none']);
+  assert.deepEqual(summary.sourceSplit.documentOnly, ['doc']);
+  assert.deepEqual(summary.sourceSplit.guideOnly, ['guide']);
+  const md = renderSummary(summary);
+  assert.ok(md.includes('- No source: none'));
+  assert.ok(md.includes('- Document only (no guide): doc'));
+  assert.ok(md.includes('- Guide only (no document): guide'));
+  const empty = renderSummary(buildAudit(loadAuditInput(makeFixtureEmptyLists())).summary);
+  assert.ok(empty.includes('similarity 0.85 or higher): none'));
+  assert.ok(empty.includes('- Document only (no guide): none'));
+});
+
+function makeFixtureEmptyLists() {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-e2-'));
+  openDb(tmp).close();
+  return tmp;
+}
