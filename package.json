@@ -12,7 +12,9 @@
     "audit": "node tools/content/audit.js",
     "lint:comp": "node tools/content/comp-lint.js",
     "docs:widgets": "node tools/content/build-docs.js",
-    "diagrams:sync": "node tools/content/sync-diagrams.js"
+    "diagrams:sync": "node tools/content/sync-diagrams.js",
+    "pathways": "node tools/content/build-pathways.js --write",
+    "validate:curriculum": "node tools/content/validate-curriculum.js"
   },
   "keywords": [
     "dsa",

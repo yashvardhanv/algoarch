@@ -1,0 +1,1143 @@
+{
+  "pathways": [
+    {
+      "id": "crash",
+      "title": "Crash",
+      "description": "Every lesson rated 5 stars, in course order.",
+      "kind": "horizon",
+      "lessons": [
+        {
+          "id": "ds00"
+        },
+        {
+          "id": "ds01"
+        },
+        {
+          "id": "ds02"
+        },
+        {
+          "id": "ds03"
+        },
+        {
+          "id": "ds04"
+        },
+        {
+          "id": "ds06"
+        },
+        {
+          "id": "ds08"
+        },
+        {
+          "id": "ds10"
+        },
+        {
+          "id": "ds11"
+        },
+        {
+          "id": "ds18"
+        },
+        {
+          "id": "ds19"
+        },
+        {
+          "id": "ds20"
+        },
+        {
+          "id": "ds24"
+        },
+        {
+          "id": "ds25"
+        },
+        {
+          "id": "sy01"
+        },
+        {
+          "id": "sy05"
+        },
+        {
+          "id": "sy06"
+        },
+        {
+          "id": "sy07"
+        },
+        {
+          "id": "sy08"
+        },
+        {
+          "id": "sy10"
+        },
+        {
+          "id": "sy11"
+        },
+        {
+          "id": "sy18"
+        },
+        {
+          "id": "sy20"
+        },
+        {
+          "id": "sy22"
+        },
+        {
+          "id": "sy23"
+        },
+        {
+          "id": "sy24"
+        },
+        {
+          "id": "sy27"
+        },
+        {
+          "id": "sy28"
+        },
+        {
+          "id": "sy33"
+        },
+        {
+          "id": "sy37"
+        },
+        {
+          "id": "sy38"
+        },
+        {
+          "id": "sy40"
+        },
+        {
+          "id": "sy41"
+        },
+        {
+          "id": "sy42"
+        },
+        {
+          "id": "sy43"
+        },
+        {
+          "id": "sy44"
+        },
+        {
+          "id": "ai01"
+        },
+        {
+          "id": "ai03"
+        },
+        {
+          "id": "ai04"
+        },
+        {
+          "id": "ai05"
+        },
+        {
+          "id": "ai06"
+        },
+        {
+          "id": "ai10"
+        },
+        {
+          "id": "ai12"
+        },
+        {
+          "id": "ai14"
+        },
+        {
+          "id": "ai16"
+        },
+        {
+          "id": "ai18"
+        },
+        {
+          "id": "ai19"
+        },
+        {
+          "id": "ai20"
+        },
+        {
+          "id": "ai21"
+        },
+        {
+          "id": "ai22"
+        },
+        {
+          "id": "ai23"
+        },
+        {
+          "id": "ai24"
+        },
+        {
+          "id": "ai25"
+        },
+        {
+          "id": "ai27"
+        },
+        {
+          "id": "be01"
+        },
+        {
+          "id": "be02"
+        },
+        {
+          "id": "be03"
+        },
+        {
+          "id": "be05"
+        },
+        {
+          "id": "be07"
+        },
+        {
+          "id": "be08"
+        }
+      ]
+    },
+    {
+      "id": "standard",
+      "title": "Standard",
+      "description": "Every lesson rated 4 stars or more, in course order.",
+      "kind": "horizon",
+      "lessons": [
+        {
+          "id": "ds00"
+        },
+        {
+          "id": "ds01"
+        },
+        {
+          "id": "ds02"
+        },
+        {
+          "id": "ds03"
+        },
+        {
+          "id": "ds04"
+        },
+        {
+          "id": "ds05"
+        },
+        {
+          "id": "ds06"
+        },
+        {
+          "id": "ds07"
+        },
+        {
+          "id": "ds08"
+        },
+        {
+          "id": "ds09"
+        },
+        {
+          "id": "ds10"
+        },
+        {
+          "id": "ds11"
+        },
+        {
+          "id": "ds13"
+        },
+        {
+          "id": "ds14"
+        },
+        {
+          "id": "ds16"
+        },
+        {
+          "id": "ds18"
+        },
+        {
+          "id": "ds19"
+        },
+        {
+          "id": "ds20"
+        },
+        {
+          "id": "ds21"
+        },
+        {
+          "id": "ds22"
+        },
+        {
+          "id": "ds23"
+        },
+        {
+          "id": "ds24"
+        },
+        {
+          "id": "ds25"
+        },
+        {
+          "id": "sy01"
+        },
+        {
+          "id": "sy02"
+        },
+        {
+          "id": "sy05"
+        },
+        {
+          "id": "sy06"
+        },
+        {
+          "id": "sy07"
+        },
+        {
+          "id": "sy08"
+        },
+        {
+          "id": "sy09"
+        },
+        {
+          "id": "sy10"
+        },
+        {
+          "id": "sy11"
+        },
+        {
+          "id": "sy12"
+        },
+        {
+          "id": "sy16"
+        },
+        {
+          "id": "sy17"
+        },
+        {
+          "id": "sy18"
+        },
+        {
+          "id": "sy19"
+        },
+        {
+          "id": "sy20"
+        },
+        {
+          "id": "sy21"
+        },
+        {
+          "id": "sy22"
+        },
+        {
+          "id": "sy23"
+        },
+        {
+          "id": "sy24"
+        },
+        {
+          "id": "sy26"
+        },
+        {
+          "id": "sy27"
+        },
+        {
+          "id": "sy28"
+        },
+        {
+          "id": "sy30"
+        },
+        {
+          "id": "sy32"
+        },
+        {
+          "id": "sy33"
+        },
+        {
+          "id": "sy34"
+        },
+        {
+          "id": "sy36"
+        },
+        {
+          "id": "sy37"
+        },
+        {
+          "id": "sy38"
+        },
+        {
+          "id": "sy39"
+        },
+        {
+          "id": "sy40"
+        },
+        {
+          "id": "sy41"
+        },
+        {
+          "id": "sy42"
+        },
+        {
+          "id": "sy43"
+        },
+        {
+          "id": "sy44"
+        },
+        {
+          "id": "ai01"
+        },
+        {
+          "id": "ai02"
+        },
+        {
+          "id": "ai03"
+        },
+        {
+          "id": "ai04"
+        },
+        {
+          "id": "ai05"
+        },
+        {
+          "id": "ai06"
+        },
+        {
+          "id": "ai08"
+        },
+        {
+          "id": "ai10"
+        },
+        {
+          "id": "ai11"
+        },
+        {
+          "id": "ai12"
+        },
+        {
+          "id": "ai13"
+        },
+        {
+          "id": "ai14"
+        },
+        {
+          "id": "ai16"
+        },
+        {
+          "id": "ai18"
+        },
+        {
+          "id": "ai19"
+        },
+        {
+          "id": "ai20"
+        },
+        {
+          "id": "ai21"
+        },
+        {
+          "id": "ai22"
+        },
+        {
+          "id": "ai23"
+        },
+        {
+          "id": "ai24"
+        },
+        {
+          "id": "ai25"
+        },
+        {
+          "id": "ai26"
+        },
+        {
+          "id": "ai27"
+        },
+        {
+          "id": "be01"
+        },
+        {
+          "id": "be02"
+        },
+        {
+          "id": "be03"
+        },
+        {
+          "id": "be04"
+        },
+        {
+          "id": "be05"
+        },
+        {
+          "id": "be06"
+        },
+        {
+          "id": "be07"
+        },
+        {
+          "id": "be08"
+        }
+      ]
+    },
+    {
+      "id": "deep",
+      "title": "Deep",
+      "description": "Every lesson in the course, in course order.",
+      "kind": "horizon",
+      "lessons": [
+        {
+          "id": "ds00"
+        },
+        {
+          "id": "ds01"
+        },
+        {
+          "id": "ds02"
+        },
+        {
+          "id": "ds03"
+        },
+        {
+          "id": "ds04"
+        },
+        {
+          "id": "ds05"
+        },
+        {
+          "id": "ds06"
+        },
+        {
+          "id": "ds07"
+        },
+        {
+          "id": "ds08"
+        },
+        {
+          "id": "ds09"
+        },
+        {
+          "id": "ds10"
+        },
+        {
+          "id": "ds11"
+        },
+        {
+          "id": "ds12"
+        },
+        {
+          "id": "ds13"
+        },
+        {
+          "id": "ds14"
+        },
+        {
+          "id": "ds15"
+        },
+        {
+          "id": "ds16"
+        },
+        {
+          "id": "ds17"
+        },
+        {
+          "id": "ds18"
+        },
+        {
+          "id": "ds19"
+        },
+        {
+          "id": "ds20"
+        },
+        {
+          "id": "ds21"
+        },
+        {
+          "id": "ds22"
+        },
+        {
+          "id": "ds23"
+        },
+        {
+          "id": "ds24"
+        },
+        {
+          "id": "ds25"
+        },
+        {
+          "id": "sy01"
+        },
+        {
+          "id": "sy02"
+        },
+        {
+          "id": "sy03"
+        },
+        {
+          "id": "sy04"
+        },
+        {
+          "id": "sy05"
+        },
+        {
+          "id": "sy06"
+        },
+        {
+          "id": "sy07"
+        },
+        {
+          "id": "sy08"
+        },
+        {
+          "id": "sy09"
+        },
+        {
+          "id": "sy10"
+        },
+        {
+          "id": "sy11"
+        },
+        {
+          "id": "sy12"
+        },
+        {
+          "id": "sy13"
+        },
+        {
+          "id": "sy14"
+        },
+        {
+          "id": "sy15"
+        },
+        {
+          "id": "sy16"
+        },
+        {
+          "id": "sy17"
+        },
+        {
+          "id": "sy18"
+        },
+        {
+          "id": "sy19"
+        },
+        {
+          "id": "sy20"
+        },
+        {
+          "id": "sy21"
+        },
+        {
+          "id": "sy22"
+        },
+        {
+          "id": "sy23"
+        },
+        {
+          "id": "sy24"
+        },
+        {
+          "id": "sy25"
+        },
+        {
+          "id": "sy26"
+        },
+        {
+          "id": "sy27"
+        },
+        {
+          "id": "sy28"
+        },
+        {
+          "id": "sy29"
+        },
+        {
+          "id": "sy30"
+        },
+        {
+          "id": "sy31"
+        },
+        {
+          "id": "sy32"
+        },
+        {
+          "id": "sy33"
+        },
+        {
+          "id": "sy34"
+        },
+        {
+          "id": "sy35"
+        },
+        {
+          "id": "sy36"
+        },
+        {
+          "id": "sy37"
+        },
+        {
+          "id": "sy38"
+        },
+        {
+          "id": "sy39"
+        },
+        {
+          "id": "sy40"
+        },
+        {
+          "id": "sy41"
+        },
+        {
+          "id": "sy42"
+        },
+        {
+          "id": "sy43"
+        },
+        {
+          "id": "sy44"
+        },
+        {
+          "id": "ai00"
+        },
+        {
+          "id": "ai01"
+        },
+        {
+          "id": "ai02"
+        },
+        {
+          "id": "ai03"
+        },
+        {
+          "id": "ai04"
+        },
+        {
+          "id": "ai05"
+        },
+        {
+          "id": "ai06"
+        },
+        {
+          "id": "ai07"
+        },
+        {
+          "id": "ai08"
+        },
+        {
+          "id": "ai09"
+        },
+        {
+          "id": "ai10"
+        },
+        {
+          "id": "ai11"
+        },
+        {
+          "id": "ai12"
+        },
+        {
+          "id": "ai13"
+        },
+        {
+          "id": "ai14"
+        },
+        {
+          "id": "ai15"
+        },
+        {
+          "id": "ai16"
+        },
+        {
+          "id": "ai17"
+        },
+        {
+          "id": "ai18"
+        },
+        {
+          "id": "ai19"
+        },
+        {
+          "id": "ai20"
+        },
+        {
+          "id": "ai21"
+        },
+        {
+          "id": "ai22"
+        },
+        {
+          "id": "ai23"
+        },
+        {
+          "id": "ai24"
+        },
+        {
+          "id": "ai25"
+        },
+        {
+          "id": "ai26"
+        },
+        {
+          "id": "ai27"
+        },
+        {
+          "id": "be01"
+        },
+        {
+          "id": "be02"
+        },
+        {
+          "id": "be03"
+        },
+        {
+          "id": "be04"
+        },
+        {
+          "id": "be05"
+        },
+        {
+          "id": "be06"
+        },
+        {
+          "id": "be07"
+        },
+        {
+          "id": "be08"
+        }
+      ]
+    },
+    {
+      "id": "dsa",
+      "title": "Data Structures & Algorithms",
+      "description": "Every lesson in the Data Structures & Algorithms track, in course order.",
+      "kind": "goal",
+      "lessons": [
+        {
+          "id": "ds00"
+        },
+        {
+          "id": "ds01"
+        },
+        {
+          "id": "ds02"
+        },
+        {
+          "id": "ds03"
+        },
+        {
+          "id": "ds04"
+        },
+        {
+          "id": "ds05"
+        },
+        {
+          "id": "ds06"
+        },
+        {
+          "id": "ds07"
+        },
+        {
+          "id": "ds08"
+        },
+        {
+          "id": "ds09"
+        },
+        {
+          "id": "ds10"
+        },
+        {
+          "id": "ds11"
+        },
+        {
+          "id": "ds12"
+        },
+        {
+          "id": "ds13"
+        },
+        {
+          "id": "ds14"
+        },
+        {
+          "id": "ds15"
+        },
+        {
+          "id": "ds16"
+        },
+        {
+          "id": "ds17"
+        },
+        {
+          "id": "ds18"
+        },
+        {
+          "id": "ds19"
+        },
+        {
+          "id": "ds20"
+        },
+        {
+          "id": "ds21"
+        },
+        {
+          "id": "ds22"
+        },
+        {
+          "id": "ds23"
+        },
+        {
+          "id": "ds24"
+        },
+        {
+          "id": "ds25"
+        }
+      ]
+    },
+    {
+      "id": "system-design",
+      "title": "System Design (HLD & LLD)",
+      "description": "Every lesson in the System Design (HLD & LLD) track, in course order.",
+      "kind": "goal",
+      "lessons": [
+        {
+          "id": "sy01"
+        },
+        {
+          "id": "sy02"
+        },
+        {
+          "id": "sy03"
+        },
+        {
+          "id": "sy04"
+        },
+        {
+          "id": "sy05"
+        },
+        {
+          "id": "sy06"
+        },
+        {
+          "id": "sy07"
+        },
+        {
+          "id": "sy08"
+        },
+        {
+          "id": "sy09"
+        },
+        {
+          "id": "sy10"
+        },
+        {
+          "id": "sy11"
+        },
+        {
+          "id": "sy12"
+        },
+        {
+          "id": "sy13"
+        },
+        {
+          "id": "sy14"
+        },
+        {
+          "id": "sy15"
+        },
+        {
+          "id": "sy16"
+        },
+        {
+          "id": "sy17"
+        },
+        {
+          "id": "sy18"
+        },
+        {
+          "id": "sy19"
+        },
+        {
+          "id": "sy20"
+        },
+        {
+          "id": "sy21"
+        },
+        {
+          "id": "sy22"
+        },
+        {
+          "id": "sy23"
+        },
+        {
+          "id": "sy24"
+        },
+        {
+          "id": "sy25"
+        },
+        {
+          "id": "sy26"
+        },
+        {
+          "id": "sy27"
+        },
+        {
+          "id": "sy28"
+        },
+        {
+          "id": "sy29"
+        },
+        {
+          "id": "sy30"
+        },
+        {
+          "id": "sy31"
+        },
+        {
+          "id": "sy32"
+        },
+        {
+          "id": "sy33"
+        },
+        {
+          "id": "sy34"
+        },
+        {
+          "id": "sy35"
+        },
+        {
+          "id": "sy36"
+        },
+        {
+          "id": "sy37"
+        },
+        {
+          "id": "sy38"
+        },
+        {
+          "id": "sy39"
+        },
+        {
+          "id": "sy40"
+        },
+        {
+          "id": "sy41"
+        },
+        {
+          "id": "sy42"
+        },
+        {
+          "id": "sy43"
+        },
+        {
+          "id": "sy44"
+        }
+      ]
+    },
+    {
+      "id": "ai-engineering",
+      "title": "AI Engineering & LLM Systems",
+      "description": "Every lesson in the AI Engineering & LLM Systems track, in course order.",
+      "kind": "goal",
+      "lessons": [
+        {
+          "id": "ai00"
+        },
+        {
+          "id": "ai01"
+        },
+        {
+          "id": "ai02"
+        },
+        {
+          "id": "ai03"
+        },
+        {
+          "id": "ai04"
+        },
+        {
+          "id": "ai05"
+        },
+        {
+          "id": "ai06"
+        },
+        {
+          "id": "ai07"
+        },
+        {
+          "id": "ai08"
+        },
+        {
+          "id": "ai09"
+        },
+        {
+          "id": "ai10"
+        },
+        {
+          "id": "ai11"
+        },
+        {
+          "id": "ai12"
+        },
+        {
+          "id": "ai13"
+        },
+        {
+          "id": "ai14"
+        },
+        {
+          "id": "ai15"
+        },
+        {
+          "id": "ai16"
+        },
+        {
+          "id": "ai17"
+        },
+        {
+          "id": "ai18"
+        },
+        {
+          "id": "ai19"
+        },
+        {
+          "id": "ai20"
+        },
+        {
+          "id": "ai21"
+        },
+        {
+          "id": "ai22"
+        },
+        {
+          "id": "ai23"
+        },
+        {
+          "id": "ai24"
+        },
+        {
+          "id": "ai25"
+        },
+        {
+          "id": "ai26"
+        },
+        {
+          "id": "ai27"
+        }
+      ]
+    },
+    {
+      "id": "behavioral",
+      "title": "Behavioral, Leadership & Compensation",
+      "description": "Every lesson in the Behavioral, Leadership & Compensation track, in course order.",
+      "kind": "goal",
+      "lessons": [
+        {
+          "id": "be01"
+        },
+        {
+          "id": "be02"
+        },
+        {
+          "id": "be03"
+        },
+        {
+          "id": "be04"
+        },
+        {
+          "id": "be05"
+        },
+        {
+          "id": "be06"
+        },
+        {
+          "id": "be07"
+        },
+        {
+          "id": "be08"
+        }
+      ]
+    }
+  ]
+}

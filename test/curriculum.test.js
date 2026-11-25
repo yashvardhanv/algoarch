@@ -257,3 +257,49 @@ test('GET /api/pathways requires a sign-in and lists pathways with summed minute
     stopServer();
   }
 });
+
+// ---- generated pathways and real-data checks ----
+const { buildPathways } = require('../tools/content/build-pathways');
+
+const genFixture = {
+  tracks: [
+    { id: 'ta', name: 'Track A', blocks: [{ k: 'b1', t: 'B1', lessons: [
+      { id: 'a1', title: 'A1', stars: 5, duration: '10 min' },
+      { id: 'a2', title: 'A2', stars: 3, duration: '10 min' },
+    ] }] },
+    { id: 'tb', name: 'Track B', blocks: [{ k: 'b2', t: 'B2', lessons: [
+      { id: 'b1', title: 'B1', stars: 4, duration: '10 min' },
+      { id: 'b2', title: 'B2', stars: 5, duration: '10 min' },
+    ] }] },
+  ],
+};
+
+test('buildPathways applies the fixed rules in curriculum order', () => {
+  const { pathways } = buildPathways(genFixture);
+  const ids = (id) => pathways.find((p) => p.id === id).lessons.map((l) => l.id);
+  assert.deepEqual(ids('crash'), ['a1', 'b2']);
+  assert.deepEqual(ids('standard'), ['a1', 'b1', 'b2']);
+  assert.deepEqual(ids('deep'), ['a1', 'a2', 'b1', 'b2']);
+  assert.deepEqual(ids('ta'), ['a1', 'a2']);
+  assert.deepEqual(ids('tb'), ['b1', 'b2']);
+  assert.deepEqual(pathways.filter((p) => p.kind === 'goal').map((p) => p.id), ['ta', 'tb']);
+  assert.deepEqual(pathways.filter((p) => p.kind === 'horizon').map((p) => p.id), ['crash', 'standard', 'deep']);
+  for (const p of pathways) assert.equal(typeof p.description, 'string');
+});
+
+test('buildPathways is deterministic', () => {
+  assert.equal(JSON.stringify(buildPathways(genFixture)), JSON.stringify(buildPathways(genFixture)));
+});
+
+test('real data: pathways, prerequisites and the id baseline are consistent', () => {
+  const read = (f) => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', f), 'utf8'));
+  const curriculum = read('curriculum.json');
+  const pathways = read('pathways.json').pathways;
+  const baseline = read('migrations/2026-11-26-curriculum-map.json');
+  const lessons = curriculum.tracks.flatMap((t) => t.blocks.flatMap((b) => b.lessons));
+  assert.deepEqual(checkPathways(pathways, lessons).errors, []);
+  assert.deepEqual(unreachableLessons(pathways, lessons), []);
+  assert.deepEqual(findPrereqProblems(lessons), { unknown: [], selfLoops: [], cycles: [] });
+  assert.deepEqual(checkMigrationMap(baseline.ids, lessons.map((l) => l.id)).missing, []);
+  assert.equal(baseline.ids.length, 106);
+});
