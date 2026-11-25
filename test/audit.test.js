@@ -44,3 +44,62 @@ test('documentStats walks nested blocks and counts widgets', () => {
   assert.equal(s.quizzes, 1);
   assert.equal(s.visuals, 1);
 });
+
+const { flagLesson, countDrills, hasPitfall } = require('../tools/content/audit/flags');
+
+function row(over = {}) {
+  const doc = Object.assign({
+    words: 0, codeCells: 0, widgets: 0, widgetsPorted: 0, quizzes: 0, checklists: 0, visuals: 0,
+  }, over.doc);
+  return Object.assign({
+    guide: { words: 0, headings: 0, codeBlocks: 0 },
+    drills: 0, badDocument: false, guidePitfall: true, docPitfall: false,
+  }, over, { doc });
+}
+
+test('flagLesson marks 599 words without cell or widget as thin', () => {
+  assert.ok(flagLesson(row({ guide: { words: 599 } })).includes('thin'));
+});
+
+test('flagLesson: one code cell removes thin', () => {
+  assert.ok(!flagLesson(row({ guide: { words: 599 }, doc: { codeCells: 1 } })).includes('thin'));
+});
+
+test('flagLesson: exactly 600 words is not thin', () => {
+  assert.ok(!flagLesson(row({ guide: { words: 300 }, doc: { words: 300 } })).includes('thin'));
+});
+
+test('flagLesson: lone ported widget avoids no-visual but has no-practice', () => {
+  const flags = flagLesson(row({ doc: { widgets: 1, widgetsPorted: 1 } }));
+  assert.ok(!flags.includes('no-visual'));
+  assert.ok(flags.includes('no-practice'));
+});
+
+test('flagLesson: ported widget plus a quiz has neither no-visual nor no-practice', () => {
+  const flags = flagLesson(row({ doc: { widgets: 1, widgetsPorted: 1, quizzes: 1 } }));
+  assert.ok(!flags.includes('no-visual'));
+  assert.ok(!flags.includes('no-practice'));
+});
+
+test('flagLesson: no-pitfalls only when neither source mentions one', () => {
+  assert.ok(flagLesson(row({ guidePitfall: false, docPitfall: false })).includes('no-pitfalls'));
+  assert.ok(!flagLesson(row({ guidePitfall: false, docPitfall: true })).includes('no-pitfalls'));
+});
+
+test('flagLesson: badDocument yields bad-document, result is sorted', () => {
+  const flags = flagLesson(row({ badDocument: true, guidePitfall: false }));
+  assert.ok(flags.includes('bad-document'));
+  assert.deepEqual(flags, [...flags].sort());
+});
+
+test('countDrills counts list items up to the next heading', () => {
+  assert.equal(countDrills('## Drills\n1. a\n2. b\n## Next\n1. c'), 2);
+  assert.equal(countDrills(null), 0);
+  assert.equal(countDrills('## Other\n- a'), 0);
+});
+
+test('hasPitfall matches pitfall vocabulary only', () => {
+  assert.equal(hasPitfall('a common mistake'), true);
+  assert.equal(hasPitfall('all good'), false);
+  assert.equal(hasPitfall(''), false);
+});
