@@ -184,7 +184,7 @@ const http = require('node:http');
 const { parseMinutes: minutesOf } = require('../curriculum');
 
 const ROOT = path.join(__dirname, '..');
-const PORT = 5900 + Math.floor(Math.random() * 300);
+const PORT = 7000 + Math.floor(Math.random() * 300);
 const FIXTURE_ID = 'api-fixture';
 let child;
 let tmpData;
@@ -238,14 +238,16 @@ async function startServer() {
   return login.json.token;
 }
 
-function stopServer() {
-  if (child) child.kill();
-  if (tmpData) fs.rmSync(tmpData, { recursive: true, force: true });
+async function stopServer() {
+  if (child && child.exitCode === null && child.signalCode === null) {
+    await new Promise(r => { child.once('exit', r); child.kill(); });
+  }
+  if (tmpData) fs.rmSync(tmpData, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 }
 
 test('GET /api/pathways requires a sign-in and lists pathways with summed minutes', async () => {
-  const token = await startServer();
   try {
+    const token = await startServer();
     const anon = await request('GET', '/api/pathways');
     assert.equal(anon.status, 401);
     const r = await request('GET', '/api/pathways', { token });
@@ -256,7 +258,7 @@ test('GET /api/pathways requires a sign-in and lists pathways with summed minute
     assert.equal(p.minutes, fixtureLessons.reduce((s, l) => s + minutesOf(l.duration), 0));
     assert.deepEqual(p.lessons.map(l => l.id), fixtureLessons.map(l => l.id));
   } finally {
-    stopServer();
+    await stopServer();
   }
 });
 
