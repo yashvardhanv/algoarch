@@ -137,3 +137,101 @@ test('findBrokenRefs reports unknown lesson ids once per pair', () => {
     [{ from: 'ds02', to: 'nope' }, { from: 'ds02', to: 'gone' }]
   );
 });
+
+// ---------------------------------------------------------------- build (integration)
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { openDb } = require('../db');
+const { loadAuditInput, buildAudit, toCsv, renderSummary } = require('../tools/content/audit/build');
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let field = '';
+  let q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"' && text[i + 1] === '"') { field += '"'; i++; } else if (c === '"') q = false; else field += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') { row.push(field); field = ''; }
+    else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+    else field += c;
+  }
+  return rows;
+}
+
+function makeFixture() {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-'));
+  const db = openDb(tmp);
+  db.prepare("INSERT INTO tracks (id, name, position) VALUES ('t1', 'Track One', 1)").run();
+  db.prepare("INSERT INTO course_blocks (id, track_id, key, title, position) VALUES (1, 't1', 'b1', 'Block One', 1)").run();
+  const ins = db.prepare('INSERT INTO lessons (id, track_id, block_id, position, title, stars, duration, is_new) VALUES (?, \'t1\', 1, ?, ?, 4, \'30 min\', ?)');
+  ins.run('L1', 1, 'Alpha', 0);
+  ins.run('L2', 2, 'Review Focus 1', 1);
+  ins.run('L3', 3, 'Review Focus 2', 0);
+  ins.run('L4', 4, 'Cache, "Aside" \u00b7 \u20b950\nLPA', 0);
+  ins.run('L5', 5, 'Zeta', 0);
+  const words = (n) => Array.from({ length: n }, (_, i) => 'word' + i).join(' ');
+  const guide = db.prepare("INSERT INTO lesson_guides (lesson_id, markdown, updated_at) VALUES (?, ?, 'x')");
+  guide.run('L1', '## Intro\n' + words(700));
+  guide.run('L3', '## Intro\n' + words(10));
+  const doc = db.prepare("INSERT INTO lesson_documents (lesson_id, schema_version, document, updated_at) VALUES (?, 1, ?, 'x')");
+  doc.run('L1', JSON.stringify({ sections: [{ blocks: [
+    { type: 'widget', kind: 'frames', ported: true, blocks: [] },
+    { type: 'code_cell', title: 't', language: 'py', starter: '', tests: 'assert 1' },
+    { type: 'widget', kind: 'quiz', ported: false, blocks: [] },
+  ] }] }));
+  doc.run('L3', 'not json');
+  db.prepare("INSERT INTO videos (id, youtube_id, track_id, lesson_id, title, position) VALUES ('v1', 'y1', 't1', 'L1', 'V', 1)").run();
+  db.prepare("INSERT INTO videos (id, youtube_id, track_id, lesson_id, title, position) VALUES ('v2', 'y2', 't1', 'GONE', 'V', 2)").run();
+  db.close();
+  return tmp;
+}
+
+test('buildAudit computes rows and flags from the database', () => {
+  const tmp = makeFixture();
+  const { rows, summary } = buildAudit(loadAuditInput(tmp));
+  const by = Object.fromEntries(rows.map((r) => [r.id, r]));
+  assert.equal(rows.length, 5);
+  assert.equal(by.L1.has_source, 'true');
+  assert.equal(by.L1.videos_linked, 1);
+  for (const f of ['thin', 'no-visual', 'no-practice']) assert.ok(!by.L1.flags.split(';').includes(f), f);
+  assert.equal(by.L2.has_source, 'false');
+  assert.equal(by.L2.words, 0);
+  assert.ok(by.L2.flags.split(';').includes('thin'));
+  assert.ok(by.L3.flags.split(';').includes('bad-document'));
+  assert.equal(by.L3.words, 11); // guide only: heading word plus ten words
+  assert.equal(by.L1.manual_flags, '');
+  assert.deepEqual(summary.orphanVideos, ['v2']);
+  assert.equal(summary.sourceSplit.withSource, 2);
+  assert.equal(summary.sourceSplit.withoutSource, 3);
+});
+
+test('toCsv round-trips awkward titles and has the exact header', () => {
+  const { rows } = buildAudit(loadAuditInput(makeFixture()));
+  const parsed = parseCsv(toCsv(rows));
+  assert.equal(parsed[0].join(','), 'id,track,block,title,stars,declared_duration,words,headings,code_blocks,code_cells,cells_with_tests,widgets,widgets_ported,quizzes,checklists,visuals,drills,videos_linked,has_source,is_new,flags,manual_flags');
+  const l4 = parsed.find((r) => r[0] === 'L4');
+  assert.equal(l4[3], 'Cache, "Aside" \u00b7 \u20b950\nLPA');
+});
+
+test('empty database yields no rows and a full summary', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-empty-'));
+  openDb(tmp).close();
+  const { rows, summary } = buildAudit(loadAuditInput(tmp));
+  assert.deepEqual(rows, []);
+  const md = renderSummary(summary);
+  for (const h of ['# Curriculum audit', '## Totals', '## Flags by course', '## Source coverage', '## Orphan videos', '## Duplicate topics', '## Broken cross-references', '## Owner gate']) {
+    assert.ok(md.includes(h), h);
+  }
+});
+
+test('output is deterministic and loadAuditInput rejects a missing database', () => {
+  const tmp = makeFixture();
+  const a = toCsv(buildAudit(loadAuditInput(tmp)).rows);
+  const b = toCsv(buildAudit(loadAuditInput(tmp)).rows);
+  assert.equal(a, b);
+  assert.throws(() => loadAuditInput(path.join(tmp, 'nope')), /not found/i);
+});
