@@ -235,3 +235,9 @@ test('output is deterministic and loadAuditInput rejects a missing database', ()
   assert.equal(a, b);
   assert.throws(() => loadAuditInput(path.join(tmp, 'nope')), /not found/i);
 });
+
+test('countDrills accepts numbered section headings', () => {
+  assert.equal(countDrills('## 8. Drills\n1. a\n2. b\n## 9. Next\n1. c'), 2);
+  assert.equal(countDrills('### 3. Homework\n- x\n- y\n- z'), 3);
+  assert.equal(countDrills('## Drills\n1. a\n2. b\n## Next\n1. c'), 2);
+});

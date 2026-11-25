@@ -1,7 +1,7 @@
 'use strict';
 
 const PITFALL_RE = /pitfall|mistake|gotcha|failure mode|common error|anti-?pattern/i;
-const DRILL_HEADING_RE = /^#{2,3}\s+(Drills|Homework|Mock Drills|Practice Exercises)/i;
+const DRILL_HEADING_RE = /^#{2,3}\s+(?:\d+\.\s*)?(Drills|Homework|Mock Drills|Practice Exercises)/i;
 const MAX_DRILLS = 10;
 
 function hasPitfall(text) {
