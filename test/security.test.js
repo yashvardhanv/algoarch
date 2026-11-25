@@ -63,9 +63,10 @@ before(async () => {
   defaultToken = await login('default-tester@example.com');
 });
 
-after(() => {
-  if (child) child.kill();
-  if (tmpData) fs.rmSync(tmpData, { recursive: true, force: true });
+after(async () => {
+  // wait for the server to exit before deleting its database (Windows holds the file open briefly)
+  if (child && child.exitCode === null && child.signalCode === null) await new Promise((r) => { child.once('exit', r); child.kill(); });
+  if (tmpData) fs.rmSync(tmpData, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 });
 
 test('forged or tampered tokens are rejected, never mapped to another user', async () => {

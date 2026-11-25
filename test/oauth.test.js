@@ -60,10 +60,11 @@ before(async () => {
   throw new Error('server did not start');
 });
 
-after(() => {
-  child && child.kill();
+after(async () => {
+  // wait for the server to exit before deleting its database (Windows holds the file open briefly)
+  if (child && child.exitCode === null && child.signalCode === null) await new Promise((r) => { child.once('exit', r); child.kill(); });
   mock && mock.close();
-  tmpData && fs.rmSync(tmpData, { recursive: true, force: true });
+  if (tmpData) fs.rmSync(tmpData, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 });
 
 // Walk start -> (provider approves) -> callback, returning the callback response.

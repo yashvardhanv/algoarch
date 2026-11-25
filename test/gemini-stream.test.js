@@ -50,10 +50,11 @@ before(async () => {
   token = JSON.parse((await post('/api/auth/dev-login', { email: 'mentor-test@example.com' }, false)).raw).token;
 });
 
-after(() => {
-  child && child.kill();
+after(async () => {
+  // wait for the server to exit before deleting its database (Windows holds the file open briefly)
+  if (child && child.exitCode === null && child.signalCode === null) await new Promise((r) => { child.once('exit', r); child.kill(); });
   mock && mock.close();
-  tmpData && fs.rmSync(tmpData, { recursive: true, force: true });
+  if (tmpData) fs.rmSync(tmpData, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 });
 
 function get(p) {
