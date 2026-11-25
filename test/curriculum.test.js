@@ -9,6 +9,7 @@ const {
   unreachableLessons,
   checkMigrationMap,
   mergeBaseline,
+  validatePathwaysFile,
 } = require('../curriculum');
 
 test('parseMinutes reads the first integer before min', () => {
@@ -343,6 +344,58 @@ test('validate-curriculum --write-baseline refuses to rewrite when a lesson id w
     assert.equal(r.status, 1);
     assert.ok(r.stdout.includes('lost lesson ids: ' + removed), r.stdout);
     assert.ok(Buffer.from(fs.readFileSync(path.join(tmp, BASE))).equals(before), 'baseline unchanged');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  }
+});
+
+// ---- pathways file validated before the import resets the database (I-2)
+const PW_LESSONS = [{ id: 'a' }, { id: 'b' }];
+const okPw = () => ({ pathways: [{ id: 'p', title: 'P', kind: 'goal', lessons: [{ id: 'a' }, { id: 'b' }] }] });
+
+test('validatePathwaysFile accepts a valid file', () => {
+  assert.deepEqual(validatePathwaysFile(okPw(), PW_LESSONS), []);
+});
+
+test('validatePathwaysFile reports an unknown lesson id', () => {
+  const f = okPw(); f.pathways[0].lessons.push({ id: 'zzz' });
+  assert.ok(validatePathwaysFile(f, PW_LESSONS).includes('pathway p references unknown lesson zzz'));
+});
+
+test('validatePathwaysFile reports a duplicate lesson in a pathway', () => {
+  const f = okPw(); f.pathways[0].lessons.push({ id: 'a' });
+  assert.ok(validatePathwaysFile(f, PW_LESSONS).some((e) => e.includes('duplicate lesson a')));
+});
+
+test('validatePathwaysFile reports an empty pathway', () => {
+  const f = okPw(); f.pathways[0].lessons = [];
+  assert.ok(validatePathwaysFile(f, PW_LESSONS).some((e) => e.includes('empty pathway p')));
+});
+
+test('validatePathwaysFile reports a missing title', () => {
+  const f = okPw(); f.pathways[0].title = '  ';
+  assert.ok(validatePathwaysFile(f, PW_LESSONS).some((e) => e.includes('pathway p has no title')));
+});
+
+test('validatePathwaysFile reports a bad kind', () => {
+  const f = okPw(); f.pathways[0].kind = 'nope';
+  assert.ok(validatePathwaysFile(f, PW_LESSONS).some((e) => e.includes('pathway p has invalid kind')));
+});
+
+test('db:import with a bad pathways.json exits non-zero and leaves the database untouched', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'algoarch-imp-'));
+  try {
+    copyDataFiles(tmp, ['curriculum.json', 'videos.json', 'resources.json']);
+    const pw = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'pathways.json'), 'utf8'));
+    pw.pathways[0].lessons.push({ id: 'no-such-lesson' });
+    fs.writeFileSync(path.join(tmp, 'pathways.json'), JSON.stringify(pw));
+    const sentinel = Buffer.from([1, 2, 3, 4, 5, 250, 251]);
+    fs.writeFileSync(path.join(tmp, 'algoarch.db'), sentinel);
+    const r = runNode(['tools/content/import.js', '--data', tmp, '--reset']);
+    assert.notEqual(r.status, 0);
+    assert.ok((r.stdout + r.stderr).includes('unknown lesson no-such-lesson'), r.stdout + r.stderr);
+    assert.ok(fs.existsSync(path.join(tmp, 'algoarch.db')), 'database still exists');
+    assert.ok(fs.readFileSync(path.join(tmp, 'algoarch.db')).equals(sentinel), 'database is byte-identical');
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }

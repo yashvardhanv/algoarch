@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { openDb } = require('../../db');
 const { convertPage } = require('./convert');
+const { validatePathwaysFile } = require('../../curriculum');
 
 const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf('--' + name); return i >= 0 ? args[i + 1] : def; };
@@ -50,6 +51,18 @@ function importPathways(db, pathwaysJson, lessonIds) {
 }
 
 function main() {
+  // Validate pathways.json before --reset deletes anything, so a bad file cannot leave an empty site.
+  const pathwaysPath = path.join(DATA_DIR, 'pathways.json');
+  if (fs.existsSync(pathwaysPath)) {
+    const cur = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'curriculum.json'), 'utf8'));
+    const allLessons = cur.tracks.flatMap(t => t.blocks.flatMap(b => b.lessons));
+    const problems = validatePathwaysFile(JSON.parse(fs.readFileSync(pathwaysPath, 'utf8')), allLessons);
+    if (problems.length) {
+      for (const e of problems) console.error(e);
+      console.error('pathways.json is invalid; nothing was imported and the database is untouched');
+      process.exit(1);
+    }
+  }
   if (args.includes('--reset')) {
     for (const f of ['algoarch.db', 'algoarch.db-wal', 'algoarch.db-shm']) fs.rmSync(path.join(DATA_DIR, f), { force: true });
   }

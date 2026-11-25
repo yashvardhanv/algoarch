@@ -133,8 +133,27 @@ function mergeBaseline(existingIds, currentIds) {
   return { ids, missing };
 }
 
+function validatePathwaysFile(pathwaysJson, lessons) {
+  const known = new Set(lessons.map((l) => l.id));
+  const pathways = (pathwaysJson && pathwaysJson.pathways) || [];
+  const errors = [];
+  for (const p of pathways) {
+    if (typeof p.title !== 'string' || !p.title.trim()) errors.push(`pathway ${p.id} has no title`);
+    if (!['horizon', 'goal', 'level'].includes(p.kind)) errors.push(`pathway ${p.id} has invalid kind ${p.kind}`);
+    for (const l of p.lessons || []) {
+      if (!known.has(l.id)) errors.push(`pathway ${p.id} references unknown lesson ${l.id}`);
+    }
+  }
+  const shaped = pathways.map((p) => ({ ...p, lessons: (p.lessons || []).filter((l) => known.has(l.id)) }));
+  // an all-unknown pathway is reported as unknown ids, not also as empty
+  const nonEmpty = shaped.filter((p, i) => p.lessons.length > 0 || (pathways[i].lessons || []).length === 0);
+  errors.push(...checkPathways(nonEmpty, lessons).errors);
+  return errors;
+}
+
 module.exports = {
   mergeBaseline,
+  validatePathwaysFile,
   parseMinutes,
   findPrereqProblems,
   checkPathways,
