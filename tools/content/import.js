@@ -29,6 +29,26 @@ const capIdx = args.indexOf('--capture');
 const CAPTURE_DIR = capIdx >= 0 ? path.resolve(args[capIdx + 1]) : path.join(DATA_DIR, 'capture');
 const readIf = (p) => (p && fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null);
 
+// Replace both pathway tables from data/pathways.json. Validates before any write.
+function importPathways(db, pathwaysJson, lessonIds) {
+  const valid = new Set(lessonIds);
+  const pathways = (pathwaysJson && pathwaysJson.pathways) || [];
+  for (const p of pathways) {
+    for (const l of p.lessons || []) {
+      if (!valid.has(l.id)) throw new Error(`pathway ${p.id} references unknown lesson ${l.id}`);
+    }
+  }
+  const insPathway = db.prepare('INSERT INTO pathways (id, title, description, kind, position) VALUES (?,?,?,?,?)');
+  const insPL = db.prepare('INSERT INTO pathway_lessons (pathway_id, lesson_id, position, note) VALUES (?,?,?,?)');
+  db.transaction(() => {
+    db.exec('DELETE FROM pathways; DELETE FROM pathway_lessons;');
+    pathways.forEach((p, i) => {
+      insPathway.run(p.id, p.title, p.description || null, p.kind, i);
+      (p.lessons || []).forEach((l, j) => insPL.run(p.id, l.id, j, l.note || null));
+    });
+  })();
+}
+
 function main() {
   if (args.includes('--reset')) {
     for (const f of ['algoarch.db', 'algoarch.db-wal', 'algoarch.db-shm']) fs.rmSync(path.join(DATA_DIR, f), { force: true });
@@ -42,8 +62,8 @@ function main() {
 
   const insTrack = db.prepare('INSERT OR REPLACE INTO tracks (id, name, short_name, badge, description, color, position) VALUES (?,?,?,?,?,?,?)');
   const insBlock = db.prepare('INSERT INTO course_blocks (track_id, key, title, position) VALUES (?,?,?,?)');
-  const insLesson = db.prepare(`INSERT OR REPLACE INTO lessons (id, track_id, block_id, position, num, title, stars, description, duration, is_new, tags, companies, lab_file)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+  const insLesson = db.prepare(`INSERT OR REPLACE INTO lessons (id, track_id, block_id, position, num, title, stars, description, duration, is_new, tags, companies, lab_file, prereqs, objectives, sources, level, reviewed_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
   const insGuide = db.prepare('INSERT OR REPLACE INTO lesson_guides (lesson_id, markdown, updated_at) VALUES (?,?,?)');
   const insDoc = db.prepare('INSERT OR REPLACE INTO lesson_documents (lesson_id, schema_version, document, updated_at) VALUES (?,?,?,?)');
   const insLab = db.prepare('INSERT OR REPLACE INTO lesson_labs (lesson_id, file_name, code) VALUES (?,?,?)');
@@ -59,7 +79,8 @@ function main() {
         const blockId = insBlock.run(t.id, b.k, b.t, bi).lastInsertRowid;
         b.lessons.forEach((l, li) => {
           insLesson.run(l.id, t.id, blockId, li, l.n || null, l.title, l.stars ?? 5, l.desc || null, l.duration || null, l.isNew ? 1 : 0,
-            JSON.stringify(l.tags || []), JSON.stringify(l.companies || []), l.lab || null);
+            JSON.stringify(l.tags || []), JSON.stringify(l.companies || []), l.lab || null,
+            JSON.stringify(l.prereqs || []), JSON.stringify(l.objectives || []), JSON.stringify(l.sources || []), l.level || null, l.reviewedAt || null);
           report.lessons++;
 
           const mdPath = l.isNew && l.newPath ? path.join(DATA_DIR, l.newPath) : l.existingPath ? path.join(PROJECTS, l.existingPath) : null;
@@ -95,10 +116,17 @@ function main() {
       (r.defaultArticles || []).forEach((a, i) => { insRes.run(trackId, 'article', i, JSON.stringify(a)); report.resources++; });
       (r.defaultRepos || []).forEach((a, i) => { insRes.run(trackId, 'repo', i, JSON.stringify(a)); report.resources++; });
     }
+    const pathwaysFile = path.join(DATA_DIR, 'pathways.json');
+    if (fs.existsSync(pathwaysFile)) {
+      const lessonIds = curriculum.tracks.flatMap(t => t.blocks.flatMap(b => b.lessons.map(l => l.id)));
+      importPathways(db, JSON.parse(fs.readFileSync(pathwaysFile, 'utf8')), lessonIds);
+    }
   })();
 
   console.log(JSON.stringify(report, null, 2));
   console.log(`\nImported into ${path.join(DATA_DIR, 'algoarch.db')}`);
 }
 
-main();
+if (require.main === module) main();
+
+module.exports = { importPathways };

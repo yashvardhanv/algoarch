@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
 const { lessonToText } = require('./lessonText');
+const { parseMinutes } = require('./curriculum');
 
 const MIGRATIONS = [
   {
@@ -84,6 +85,25 @@ const MIGRATIONS = [
       );
       CREATE INDEX idx_diagrams_lesson ON lesson_diagrams(lesson_id);
     `
+  },
+  {
+    // Optional lesson metadata and curated pathways. Pathway tables carry no foreign keys:
+    // the importer rebuilds lessons, and getPathways skips lessons that no longer exist.
+    id: 4,
+    sql: `
+      ALTER TABLE lessons ADD COLUMN prereqs TEXT NOT NULL DEFAULT '[]';
+      ALTER TABLE lessons ADD COLUMN objectives TEXT NOT NULL DEFAULT '[]';
+      ALTER TABLE lessons ADD COLUMN sources TEXT NOT NULL DEFAULT '[]';
+      ALTER TABLE lessons ADD COLUMN level TEXT;
+      ALTER TABLE lessons ADD COLUMN reviewed_at TEXT;
+      CREATE TABLE pathways (
+        id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT, kind TEXT NOT NULL, position INTEGER NOT NULL
+      );
+      CREATE TABLE pathway_lessons (
+        pathway_id TEXT NOT NULL, lesson_id TEXT NOT NULL, position INTEGER NOT NULL, note TEXT,
+        PRIMARY KEY (pathway_id, lesson_id)
+      );
+    `
   }
 ];
 
@@ -127,11 +147,18 @@ function openDb(dataDir) {
 const parseJson = (s, fallback) => { try { return JSON.parse(s); } catch (e) { return fallback; } };
 
 function lessonRow(r) {
-  return {
+  const row = {
     n: r.num, id: r.id, title: r.title, stars: r.stars, desc: r.description, duration: r.duration,
     tags: parseJson(r.tags, []), companies: parseJson(r.companies, []), isNew: !!r.is_new,
     lab: r.lab_file || undefined, hasDocument: !!r.has_document
   };
+  for (const k of ['prereqs', 'objectives', 'sources']) {
+    const arr = parseJson(r[k], []);
+    if (Array.isArray(arr) && arr.length) row[k] = arr;
+  }
+  if (r.level) row.level = r.level;
+  if (r.reviewed_at) row.reviewedAt = r.reviewed_at;
+  return row;
 }
 
 // Splice stored diagrams into the lesson document as ordinary blocks.
@@ -206,6 +233,18 @@ function createRepo(db) {
         prev: i > 0 ? { id: order[i - 1].id, title: order[i - 1].title, trackId: order[i - 1].track_id } : null,
         next: i >= 0 && i < order.length - 1 ? { id: order[i + 1].id, title: order[i + 1].title, trackId: order[i + 1].track_id } : null
       };
+    },
+    getPathways() {
+      const lessons = db.prepare(`SELECT pl.pathway_id, pl.note, l.id, l.title, l.track_id, l.duration
+        FROM pathway_lessons pl JOIN lessons l ON l.id = pl.lesson_id ORDER BY pl.pathway_id, pl.position`).all();
+      return db.prepare('SELECT * FROM pathways ORDER BY position').all().map(p => {
+        const ls = lessons.filter(x => x.pathway_id === p.id).map(x => {
+          const o = { id: x.id, title: x.title, trackId: x.track_id, duration: x.duration };
+          if (x.note != null) o.note = x.note;
+          return o;
+        });
+        return { id: p.id, title: p.title, description: p.description, kind: p.kind, minutes: ls.reduce((n, x) => n + parseMinutes(x.duration), 0), lessons: ls };
+      });
     },
     getVideos() { return q.allVideos.all().map(videoRow); },
     // Plain text of a lesson (document + guide) used to ground the AI mentor.
