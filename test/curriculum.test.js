@@ -8,6 +8,7 @@ const {
   checkPathways,
   unreachableLessons,
   checkMigrationMap,
+  mergeBaseline,
 } = require('../curriculum');
 
 test('parseMinutes reads the first integer before min', () => {
@@ -301,5 +302,48 @@ test('real data: pathways, prerequisites and the id baseline are consistent', ()
   assert.deepEqual(unreachableLessons(pathways, lessons), []);
   assert.deepEqual(findPrereqProblems(lessons), { unknown: [], selfLoops: [], cycles: [] });
   assert.deepEqual(checkMigrationMap(baseline.ids, lessons.map((l) => l.id)).missing, []);
-  assert.equal(baseline.ids.length, 106);
+  assert.ok(baseline.ids.length >= 106);
+});
+
+// ---- baseline can only grow (I-1)
+test('mergeBaseline reports a rename as missing and keeps both ids', () => {
+  assert.deepEqual(mergeBaseline(['a', 'b'], ['a', 'c']), { ids: ['a', 'b', 'c'], missing: ['b'] });
+});
+
+test('mergeBaseline on pure growth has nothing missing', () => {
+  assert.deepEqual(mergeBaseline(['a', 'b'], ['a', 'b', 'c', 'd']), { ids: ['a', 'b', 'c', 'd'], missing: [] });
+});
+
+test('mergeBaseline sorts and de-duplicates', () => {
+  assert.deepEqual(mergeBaseline(['z', 'b', 'b', 'a'], ['c', 'a', 'c', 'y']), { ids: ['a', 'b', 'c', 'y', 'z'], missing: ['b', 'z'] });
+});
+
+function copyDataFiles(dest, files) {
+  for (const f of files) {
+    const src = path.join(ROOT, 'data', f);
+    fs.mkdirSync(path.dirname(path.join(dest, f)), { recursive: true });
+    fs.copyFileSync(src, path.join(dest, f));
+  }
+}
+
+function runNode(args) {
+  return require('node:child_process').spawnSync(process.execPath, args, { cwd: ROOT, encoding: 'utf8' });
+}
+
+test('validate-curriculum --write-baseline refuses to rewrite when a lesson id was lost', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'algoarch-bl-'));
+  try {
+    const BASE = 'migrations/2026-11-26-curriculum-map.json';
+    copyDataFiles(tmp, ['curriculum.json', 'pathways.json', BASE]);
+    const cur = JSON.parse(fs.readFileSync(path.join(tmp, 'curriculum.json'), 'utf8'));
+    const removed = cur.tracks[0].blocks[0].lessons.shift().id;
+    fs.writeFileSync(path.join(tmp, 'curriculum.json'), JSON.stringify(cur));
+    const before = fs.readFileSync(path.join(tmp, BASE));
+    const r = runNode(['tools/content/validate-curriculum.js', '--data', tmp, '--write-baseline']);
+    assert.equal(r.status, 1);
+    assert.ok(r.stdout.includes('lost lesson ids: ' + removed), r.stdout);
+    assert.ok(Buffer.from(fs.readFileSync(path.join(tmp, BASE))).equals(before), 'baseline unchanged');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  }
 });

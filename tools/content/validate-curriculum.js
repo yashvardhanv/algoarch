@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
-// Usage: node tools/content/validate-curriculum.js [--write-baseline]
+// Usage: node tools/content/validate-curriculum.js [--write-baseline] [--data <dir>]
 const fs = require('fs');
 const path = require('path');
 const {
@@ -9,9 +9,11 @@ const {
   checkPathways,
   unreachableLessons,
   checkMigrationMap,
+  mergeBaseline,
 } = require('../../curriculum');
 
-const DATA_DIR = path.join(__dirname, '..', '..', 'data');
+const dataIdx = process.argv.indexOf('--data');
+const DATA_DIR = dataIdx >= 0 ? path.resolve(process.argv[dataIdx + 1]) : path.join(__dirname, '..', '..', 'data');
 const BASELINE = path.join(DATA_DIR, 'migrations', '2026-11-26-curriculum-map.json');
 const read = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 
@@ -20,8 +22,15 @@ const lessons = curriculum.tracks.flatMap((t) => t.blocks.flatMap((b) => b.lesso
 const currentIds = lessons.map((l) => l.id);
 
 if (process.argv.includes('--write-baseline')) {
+  const existing = fs.existsSync(BASELINE) ? read(BASELINE).ids : [];
+  const merged = mergeBaseline(existing, currentIds);
+  if (merged.missing.length) {
+    console.log(`lost lesson ids: ${merged.missing.join(', ')}`);
+    console.log('the baseline is not rewritten');
+    process.exit(1);
+  }
   fs.mkdirSync(path.dirname(BASELINE), { recursive: true });
-  const body = { version: 1, date: '2026-11-26', ids: currentIds.slice().sort() };
+  const body = { version: 1, date: '2026-11-26', ids: merged.ids };
   fs.writeFileSync(BASELINE, JSON.stringify(body, null, 2) + '\n');
   console.log(`wrote baseline with ${body.ids.length} ids`);
 }

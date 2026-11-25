@@ -126,7 +126,15 @@ function checkMigrationMap(baselineIds, currentIds) {
   };
 }
 
+function mergeBaseline(existingIds, currentIds) {
+  const cur = new Set(currentIds);
+  const missing = [...new Set(existingIds.filter((id) => !cur.has(id)))].sort();
+  const ids = [...new Set([...existingIds, ...currentIds])].sort();
+  return { ids, missing };
+}
+
 module.exports = {
+  mergeBaseline,
   parseMinutes,
   findPrereqProblems,
   checkPathways,
