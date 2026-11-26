@@ -1,8 +1,8 @@
 # Lesson 07 — Leveling: Mid-Level vs Senior in the Behavioral Round
 
 > **Priority:** ★★★★★ — the level you are offered is decided here more than anywhere else.
-> **Estimated study time:** 50 minutes.
-> **Do this after:** Lessons 01 and 02. You need your stories before you can level them.
+>
+> **Study time:** 50 minutes. **Do this after:** Lessons 01 and 02. You need your stories before you can level them.
 
 You can pass every round and still receive the wrong offer. Interviewers do not only decide *whether*
 to hire you; they decide *at what level*, and the behavioral round is where that decision is
