@@ -335,3 +335,12 @@ test('sy52 lesson code matches fault-injected upload, task-store and event-strea
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.match(r.stdout, /sy52 code checks passed/);
 });
+
+test('sy50 lesson code matches datetime arithmetic, a minute-by-minute budget count and a second action-item linter', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'sy50_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'sy50-incident-response-postmortems.md'),
+  ], { encoding: 'utf8', timeout: 180000 });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /sy50 code checks passed/);
+});
