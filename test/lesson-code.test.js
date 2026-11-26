@@ -281,3 +281,12 @@ test('ai31 lesson code matches brute-force dedup, contamination and compute-opti
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.match(r.stdout, /ai31 code checks passed/);
 });
+
+test('sy45 lesson code matches brute-force ring lookups, exhaustive cache-aside interleavings and the printed figures', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'sy45_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'sy45-caching-consistent-hashing.md'),
+  ], { encoding: 'utf8', timeout: 180000 });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /sy45 code checks passed/);
+});
