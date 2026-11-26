@@ -166,6 +166,29 @@ test('sy41 lesson code matches reference models and threaded checks', { skip: py
   assert.match(r.stdout, /sy41 code checks passed/);
 });
 
+test('sy42 lesson code matches reference models under random and threaded interleavings', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'sy42_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'sy42.md'),
+  ], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /sy42 code checks passed/);
+});
+
+const CAPACITY_LESSONS_B = [
+  'sy42.md',
+];
+
+test('sy42-sy44 capacity estimates are reproduced by script', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'capacity_check_b.py'),
+    ...CAPACITY_LESSONS_B.map((f) => path.join(__dirname, '..', 'data', 'new_lessons', f)),
+  ], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /capacity checks passed/);
+  for (const f of CAPACITY_LESSONS_B) assert.match(r.stdout, new RegExp(f.slice(0, 4)));
+});
+
 test('sy37-sy40 capacity estimates are reproduced by script', { skip: py ? false : 'python not installed' }, () => {
   const r = spawnSync(py, [
     path.join(__dirname, 'lesson_code', 'capacity_check.py'),
