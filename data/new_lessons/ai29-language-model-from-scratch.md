@@ -19,7 +19,7 @@ What follows from it:
 - **Loss is surprise.** Average `-ln p(true next token)` in nats. A model that knows nothing and guesses uniformly over `V` tokens scores exactly `ln V`; its perplexity (`e^loss`) is `V`. Every real loss is read against that.
 - **There is a floor.** Text is partly random, so even the perfect model has a loss above zero. A loss lower than the floor on held-out text means something leaked.
 - **More context fits the training set better, always.** Whether it helps on new text depends on how much data you have to estimate that many contexts. That tension is the whole of overfitting.
-- **Counting and gradient descent are the same estimator.** For a model whose parameters are the table itself, the loss is minimised exactly at the table of observed frequencies. Gradient descent just gets there iteratively (section 5).
+- **Counting and gradient descent are the same estimator.** For a model whose parameters are the table itself, the training loss is minimised exactly at the table of observed frequencies. Gradient descent just gets there iteratively (section 5). That is a statement about training loss only; on held-out text any model, trained or counted, can come out ahead.
 
 ---
 
@@ -123,7 +123,7 @@ def sample_word(prob_fn, ctx, rnd, max_len=12):
 
 ## 4. The Counting Model, Smoothing, and Honest Evaluation
 
-A model with context length `ctx` keeps counts of how often each character followed each `ctx`-character context. The maximum-likelihood estimate is `count / total`. It fails on anything unseen: probability zero means infinite loss, and one unseen context in the validation set ruins the average. The fix used since the early days is additive smoothing: `(count + alpha) / (total + alpha * V)`. Chen and Goodman's 1996 smoothing study describes it as the simplest smoothing in practice and compares it against more elaborate schemes by the cross-entropy of test data, which is also how this lesson scores models.
+A model with context length `ctx` keeps counts of how often each character followed each `ctx`-character context. The maximum-likelihood estimate is `count / total`. It fails on anything unseen: probability zero means infinite loss, and one unseen context in the validation set ruins the average. The simplest fix is additive smoothing: `(count + alpha) / (total + alpha * V)`. Chen and Goodman's 1996 smoothing study describes it as the simplest smoothing used in practice and compares it against more elaborate schemes by the cross-entropy of test data, which is also how this lesson scores models. Their results find additive smoothing performs poorly next to methods such as Katz and held-out interpolation, so it is the teaching choice here, not the practical one.
 
 `ctx = 0` is a unigram model, `ctx = 1` a bigram, `ctx = 2` a trigram, and so on.
 
@@ -136,7 +136,7 @@ Give each context position a table of learned scores (logits) and add them up: t
 Two facts worth stating, both verified by the check script:
 
 1. At zero weights every probability is `1/V`, so the starting loss is exactly `ln V`. If your first loss is far from that, the model or the loss is wrong before training even starts.
-2. For `ctx = 1`, put the logarithms of the count-based probabilities in the table and the gradient is zero. Counting is the minimiser; the trained model can at best match it.
+2. For `ctx = 1`, put the logarithms of the count-based probabilities in the table and the gradient is zero. Counting is the minimiser of the training loss, so a trained model can at best match it there; held-out loss carries no such guarantee, because smoothing and the optimizer each act as a different regulariser.
 
 ```python
 def softmax(z):
@@ -235,6 +235,7 @@ def demo():
     c1 = fit_counts(train_w, 1)
     cv = mean_nll(lambda a, b: count_prob(c1, a, b, 0.0), val_w, 1)
     RESULTS["bigram"] = (h1[-1][2], cv)
+    RESULTS["bigram_train"] = (h1[-1][1], mean_nll(lambda a, b: count_prob(c1, a, b, 0.0), train_w, 1))
     L.append(f"bigram: trained log-linear val {h1[-1][2]:.3f} vs counting val {cv:.3f}")
 
     rnd = random.Random(5)
@@ -281,7 +282,7 @@ Read it in this order, which is also the order to read a real run:
 3. **Overfitting in plain sight.** With only 40 training words the same sequence is dramatic: training loss falls to `1.036` at context 3 while validation loss climbs to `2.377`, a gap over one nat. A training loss alone would have said the opposite.
 4. **The loss curve.** The log-linear model with context 2 and `lr = 1.0` starts at `2.485` (equal on train and val, as predicted) and falls every hundred steps; train and val stay close because this model is small relative to the data. A curve whose training line falls while the validation line flattens or rises is the picture of the previous point.
 5. **The learning-rate sweep.** After 300 steps, `lr = 0.01` has barely moved (`2.430`), `0.1` is slow (`2.085`), `1` and `10` are good (`1.635`, `1.603`), and `100` is worse than guessing (`5.283`). Too small looks like a healthy loss that does not go anywhere; too large looks like a loss that jumps up. Sweep by factors of ten before you tune anything else.
-6. **Counting versus training.** The trained bigram reaches `1.761` validation loss against `1.738` for the closed-form counts, close but not equal: SGD with 64-example batches and a fixed learning rate keeps jittering around the minimum. The trained context-2 model (`1.590`) lands near the context-2 counts (`1.573`) but cannot beat them; it is additive across positions, a restriction counts do not have.
+6. **Counting versus training.** The trained bigram reaches `1.761` validation loss against `1.738` for the closed-form counts, close but not equal: SGD with 64-example batches and a fixed learning rate keeps jittering around the minimum. The trained context-2 model (`1.590`) lands near the context-2 counts (`1.573`) and, in this run, does not beat them; it is additive across positions, a restriction counts do not have. Do not read that ordering as a law: with different smoothing or fewer steps a trained model can win on validation data.
 7. **Loss is not the whole story.** Sample 2000 words and count how many mix the two vowel groups, which the real language never does. The bigram model, whose loss looks only 0.17 nats worse than context 2, mixes them `51.4%` of the time; context 2 does it `3.0%` of the time. Reading samples catches what an average hides, and a loss gap of a fraction of a nat can be the difference between a model that has learned a rule and one that has not.
 
 None of these numbers belongs to a real language, and the toy is far smaller than any real corpus. What carries over are the procedures: start-of-training loss against `ln V`, compare to simple baselines, read validation not training, sweep the learning rate, look at samples.
@@ -330,7 +331,7 @@ None of these numbers belongs to a real language, and the toy is far smaller tha
 
 Read on 26 November 2026:
 
-- Chen and Goodman, "An Empirical Study of Smoothing Techniques for Language Modeling", arXiv:cmp-lg/9606011 (ACL 1996), full text from the arXiv PDF. Used for the definition of additive smoothing, the use of test-set cross-entropy as the measure, and the statement that the relative performance of techniques depends on training-set size and n-gram order. The invented language, the numbers and every other claim are this lesson's own and are produced by its script.
+- Chen and Goodman, "An Empirical Study of Smoothing Techniques for Language Modeling", arXiv:cmp-lg/9606011 (ACL 1996), full text from the arXiv PDF. Used for the definition of additive smoothing, the use of test-set cross-entropy as the measure, the statement that the relative performance of techniques depends on training-set size and n-gram order, and their finding that additive smoothing performs poorly relative to the better methods (Katz, interpolated held-out). The invented language, the numbers and every other claim are this lesson's own and are produced by its script.
 
 Not consulted, and nothing above relies on them: Bengio et al.'s neural probabilistic language model paper, textbook treatments of perplexity, any real-corpus measurement. Statements about "real" language models in this lesson are limited to the general structure (next-token prediction with a cross-entropy loss), which section 6 shows on a toy and does not measure at scale.
 

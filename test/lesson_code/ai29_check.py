@@ -130,6 +130,7 @@ assert abs(hist[0][1] - hist[0][2]) < 1e-9 and abs(hist[0][1] - math.log(V)) < 1
 assert all(hist[i][1] > hist[i + 1][1] for i in range(len(hist) - 1))
 sw = R['sweep']
 assert sw[0.01] > 2.3 and sw[100.0] > math.log(V) and min(sw, key=sw.get) in (1.0, 10.0)
-assert abs(R['bigram'][0] - R['bigram'][1]) < 0.05 and R['bigram'][0] >= R['bigram'][1] - 1e-9
+assert abs(R['bigram'][0] - R['bigram'][1]) < 0.05                      # close on validation (an observation, not a theorem)
+assert R['bigram_train'][0] >= R['bigram_train'][1] - 1e-9                # counting minimises TRAINING loss: this one is a theorem
 assert R[("mix", 1)] > 0.3 and R[("mix", 2)] < 0.1
 print("ai29 code checks passed")
