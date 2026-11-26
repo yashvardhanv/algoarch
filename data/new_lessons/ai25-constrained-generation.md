@@ -63,9 +63,27 @@ def masked_softmax(logits, allowed):
     return {t: (w[t] / z if t in w else 0.0) for t in logits}
 ```
 
-Masking is not the same as rejecting a bad sample and retrying: retry-until-valid can loop for a long time
-and changes the distribution in a way you do not control. Masking is one pass, and the distribution over
-valid outputs at each step is exactly the model's, renormalised.
+Masking is not the same as rejecting a bad sample and retrying, and the difference runs the opposite way
+to what people expect. **Retry-until-valid is exact but can be slow:** it samples whole outputs from the
+model and keeps the valid ones, so what you get is exactly `p(y | y is valid)`, at the cost of an expected
+`1 / P(valid)` attempts. **Masking is fast but not exact at the sequence level:** it renormalises each step
+separately, so a prefix keeps its full probability even when most of its continuations are invalid. Mass
+moves towards prefixes that have few valid continuations.
+
+**Worked example (illustrative, computed exactly by the check).** Two tokens, `a` and `b`, two steps, and
+the grammar forbids `aa`. The model gives `p(a) = p(b) = 0.5` at step one, then `p(a | a) = 0.9`,
+`p(b | a) = 0.1` and `p(a | b) = p(b | b) = 0.5`.
+
+| Output | Model probability | `p(y \| valid)` (rejection sampling) | Per-step masking |
+|---|---|---|---|
+| `ab` | 0.05 | 0.091 | 0.5 |
+| `ba` | 0.25 | 0.455 | 0.25 |
+| `bb` | 0.25 | 0.455 | 0.25 |
+
+Rejection sampling accepts 55% of tries, so it needs about 1.82 tries on average. Masking needs one pass,
+but it makes `ab` (an output the model barely wanted) the most likely result. Masking guarantees the
+format; it does not guarantee that you sample what the model would have said if it had stayed valid on
+its own.
 
 ---
 
@@ -109,7 +127,7 @@ class SegmentDFA:
             return (i, p) if any(o.startswith(p) for o in seg[1]) else None
         if prog == 'start':                              # 'int'
             return (i, 'zero') if ch == '0' else (i, 'digits') if ch in '123456789' else None
-        if prog == 'digits' and ch.isdigit():
+        if prog == 'digits' and ch in '0123456789':     # not str.isdigit(), which accepts '²' and '٣'
             return (i, 'digits')
         return self.step(self._enter(i + 1), ch)        # the number ended; ch must start the next segment
 
@@ -173,9 +191,9 @@ Two details matter:
    vocabulary* can never finish. With a vocabulary that has `po` but no `s`, `po` is a legal prefix of `pos`, yet
    choosing it strands the model. The second loop keeps only states that can still reach acceptance.
 
-The index is built once per (grammar, tokenizer) pair, then reused for every request. That is why hosted APIs
-can be slower on the first request with a new schema: OpenAI's structured-outputs guide says the first request
-with a new schema takes longer while it is processed, and later ones do not.
+The index is built once per (grammar, tokenizer) pair, then reused for every request. This is consistent with
+what OpenAI's structured-outputs guide says: the first request with a new schema has extra latency while the
+schema is processed, and later requests with the same schema do not.
 
 ---
 
@@ -192,6 +210,8 @@ def allowed_tokens(index, dfa, state, eos):
 def constrained_decode(logits_fn, index, dfa, eos, max_tokens):
     """Greedy decoding under the grammar. logits_fn(prefix) -> {token: score} over the whole vocabulary.
     Returns (token ids, finished)."""
+    if dfa.start not in index:
+        raise ValueError("this tokenizer cannot produce any string of this grammar")
     state, out = dfa.start, []
     for _ in range(max_tokens):
         moves = allowed_tokens(index, dfa, state, eos)
@@ -290,7 +310,7 @@ designs to test, not as settled fixes.
    field emulated with `null`.
 4. Take ten reasoning questions you can grade. Answer them free-form and with a strict JSON answer field, with and
    without a preceding reasoning field. Report all three accuracies.
-5. Read section 4 of the Willard and Louf paper and explain, aloud, how their index differs from per-step masking.
+5. Read section 3 of the Willard and Louf paper (including 3.2, the comparison with current methods) and explain, aloud, how their index differs from per-step masking.
 
 ---
 

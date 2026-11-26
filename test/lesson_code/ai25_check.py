@@ -25,7 +25,7 @@ def ref_viable(s):
     return s in PREFIXES
 
 # --- DFA vs regex and prefix set, on members, on mutations of members, and on random strings
-alphabet = '{}":,labeposngx0123456789 '
+alphabet = '{}":,labeposngx0123456789 ²٣'
 def run(text):
     st = walk(dfa, dfa.start, text)
     return st
@@ -150,10 +150,47 @@ assert build_index(dfa, {0: '{"label":"', 1: 'pos', 2: '","n":', 3: '7'}) == {}
 
 # random vocabularies of fragments
 fragments = ['{', '"', 'label', ':', 'pos', 'neg', ',', 'n', '0', '3', '9', '30', '}', '{"', '":"', '","', '":',
-             'po', 's', 'ne', 'g', 'p', 'o', 'e', 'l', 'a', 'b', '"label', 'n":', '0}', '9}', 'x', 'lab', 'el']
+             'po', 's', 'ne', 'g', 'p', 'o', 'e', 'l', 'a', 'b', '"label', 'n":', '0}', '9}', 'x', 'lab', 'el', '²', '٣', '1²']
 for _ in range(25):
     vocab = dict(enumerate(random.sample(fragments, random.randint(6, len(fragments)))))
     check_vocab(vocab, 40)
+
+# non-ASCII digits are rejected (str.isdigit would accept them), and a vocabulary that has them cannot sneak them in
+for bad in ['{"label":"pos","n":1²', '{"label":"pos","n":1٣}', '{"label":"pos","n":²}']:
+    assert walk(dfa, dfa.start, bad) is None, bad
+uv = {0: '{"label":"', 1: 'pos', 2: '","n":', 3: '1', 4: '²', 5: '٣', 6: '1²', 7: '}'}
+uidx = check_vocab(uv, 200)
+for s, moves in uidx.items():
+    assert not any(t in moves for t in (4, 5, 6)), s
+
+# an empty index (the tokenizer cannot finish the grammar) is rejected up front, not with a KeyError
+empty = build_index(dfa, {0: '{"label":"', 1: 'pos', 2: '","n":', 3: '7'})
+try:
+    constrained_decode(lambda p: {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0, EOS: 0.0}, empty, dfa, EOS, 10)
+    raise SystemExit("empty index was not rejected")
+except ValueError:
+    pass
+
+# per-step masking vs rejection sampling, enumerated exactly on a two-step toy model where "aa" is invalid
+P1 = {'a': 0.5, 'b': 0.5}
+P2 = {'a': {'a': 0.9, 'b': 0.1}, 'b': {'a': 0.5, 'b': 0.5}}
+valid = lambda y: y != 'aa'
+model = {x + y: P1[x] * P2[x][y] for x in 'ab' for y in 'ab'}
+p_valid = sum(v for y, v in model.items() if valid(y))
+rejection = {y: v / p_valid for y, v in model.items() if valid(y)}          # exactly p(y | valid)
+masked = {}
+for x in 'ab':
+    first = masked_softmax({t: math.log(P1[t]) for t in 'ab'},
+                           {t for t in 'ab' if any(valid(t + u) for u in 'ab')})
+    second = masked_softmax({u: math.log(P2[x][u]) for u in 'ab'}, {u for u in 'ab' if valid(x + u)})
+    for u in 'ab':
+        if valid(x + u):
+            masked[x + u] = first[x] * second[u]
+assert abs(sum(masked.values()) - 1) < 1e-12
+assert abs(p_valid - 0.55) < 1e-12 and round(1 / p_valid, 2) == 1.82
+assert {y: round(v, 3) for y, v in rejection.items()} == {'ab': 0.091, 'ba': 0.455, 'bb': 0.455}
+assert {y: round(v, 3) for y, v in masked.items()} == {'ab': 0.5, 'ba': 0.25, 'bb': 0.25}
+assert abs(model['ab'] - 0.05) < 1e-12 and abs(model['ba'] - 0.25) < 1e-12
 
 # an unconstrained random model almost never produces a valid object (why masking exists)
 valid = 0
