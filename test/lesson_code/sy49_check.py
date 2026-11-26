@@ -162,6 +162,18 @@ assert dt_['operator cuts load to 140 QPS from t = 60 s to 140 s'] is None
 for name, v in dt_.items():
     need('| %s | %s |' % (name, cell(v)))
 
+# smallest fatal outage, in 0.1 s steps (the table's columns are coarser)
+def smallest_fatal(load):
+    for tenth in range(1, 40):
+        d = tenth / 10
+        if recovery_seconds(simulate(load, outage=(20, 20 + d), seconds=330), load, math.ceil(20 + d)) is None:
+            return d
+assert smallest_fatal(151) == 1.5 and smallest_fatal(250) == 1.0 and smallest_fatal(299) == 1.0
+# prose numbers that were not otherwise enforced
+assert 280 * 10 == 2800 and (2800 - 300) / (300 - 280) == 125 and round(280 * 1.1) == 308 and 308 > 300
+assert round(1000 * 0.95 * 0.1 + 1000 * 0.05 * 10) == 595
+need('about 308', '2,800', '125 s', '595 threads', '1.5 s at 151 QPS', 'several orders of magnitude longer')
+
 # ---------------------------------------------------------------- figures in the prose
 need('300 QPS', '150 QPS', '20 QPS', '560 QPS', '10x', '5,000')
 print('sy49 code checks passed')
