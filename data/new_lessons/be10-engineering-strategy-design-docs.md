@@ -21,8 +21,10 @@ Will Larson's guide on strategy gives the recipe in two sentences: write five de
 | Document | Question it answers | Written from | Typical length | Who reads it |
 |---|---|---|---|---|
 | **Design doc** | What are we building, and why this way and not another? | The problem in front of you | A page or three for a mini doc; Google's article says ten to twenty pages is the sweet spot for a larger project | The people who must agree, build or rely on it |
-| **Strategy** | How do we decide this kind of question here, and why? | Several design docs and the arguments that repeated | A few pages | People about to write the next design doc |
+| **Strategy** | How do we decide this kind of question here, and why? | Several design docs and the arguments that repeated | Short; no source gives a length, so aim for what a new author reads before writing | People about to write the next design doc |
 | **Vision** | What should the technical shape of the company look like in two or three years? | Several strategies and their contradictions | One to two pages, per Larson | Mostly the people writing strategies |
+
+Visual (planned): a three-rung ladder with five boxes under each rung, showing five design docs feeding one strategy and five strategies feeding one vision, with the audience and length beside each rung.
 
 The audience of a strategy is mostly future authors. That is why its success is quiet, a point §6 returns to.
 
@@ -135,10 +137,10 @@ What this extract does that a weak doc does not: the non-goals are real options 
 A strategy extracted from the pattern might read:
 
 > **Diagnosis.** We keep re-arguing which stores may hold the only copy of data, because we lack a rule.
-> **Guiding policy.** A store may be the only copy if (a) it is append-only or transactional, (b) it has a documented recovery path, and (c) an owner is named. Caches and indexes must be rebuildable from another source and never accepted as the record. Exceptions need a short doc.
-> **Why.** In four of the five reviews the deciding question was recovery, not speed. Writing the rule once saves one meeting per future design.
+> **Guiding policy.** A store may be the only copy of data if an owner is named and either (a) it is append-only or transactional and has a documented recovery path, or (b) losing the data is an accepted outcome, written down with its limit (for example, a few seconds of session state). Caches and indexes must be rebuildable from another source and are never accepted as the record. Anything else needs a short doc.
+> **Why.** In four of the five reviews the deciding question was recovery, not speed; in the fifth (sessions) it was whether loss was acceptable. Route (a) covers the queue and the audit log, route (b) covers sessions, and the cache and index rows fall under the rebuildable rule, so the same text decides all five. Writing the rule once saves one meeting per future design.
 
-It is opinionated (it rules things out), specific (three conditions) and shows its work (the pattern in the docs). The tests from §5 pass: two engineers cannot easily read it differently. What it deliberately does not do: pick a database product. Strategy guides the trade-off, and the design docs choose.
+It is opinionated (it rules things out), specific (a named owner plus two routes) and shows its work (the pattern in the docs). Apply it back to all five precedents before you publish it: if one approved decision would be rejected by your own rule, either the rule or that precedent is wrong, and finding out is the point of writing the rule. With that check passing, the §5 test (could two engineers read it differently?) holds. What it deliberately does not do: pick a database product. Strategy guides the trade-off, and the design docs choose.
 
 ### 6.3 Rewriting a generic strategy into a real one
 
@@ -195,7 +197,7 @@ It is opinionated (it rules things out), specific (three conditions) and shows i
 All read on 2026-11-26.
 
 - Will Larson, "Writing engineering strategy", staffeng.com/guides/engineering-strategy, read in full. Used for: the five-docs-to-strategy-to-vision recipe, when to write strategy, the advice on writing design docs and strategies, and the vision focus points. The recipe and rules are his recommendations, not measured results.
-- "Design Docs at Google", industrialempathy.com/posts/design-docs-at-google, read in full. Used for: the anatomy, goals and non-goals, alternatives considered, cross-cutting concerns, the ten-to-twenty page guideline and mini docs, when not to write one, and the lifecycle phases. The text I read describes practice at Google as of its writing; the page shows no date in the text I read, and I did not confirm the byline, so this lesson names no author and draws no claim about current Google practice.
+- Malte Ubl, "Design Docs at Google", industrialempathy.com/posts/design-docs-at-google, published 6 July 2020 as shown on the page, read in full. Used for: the anatomy, goals and non-goals, alternatives considered, cross-cutting concerns, the ten-to-twenty page guideline and mini docs, when not to write one, and the lifecycle phases. It describes Google practice as of 2020; this lesson draws no claim about current Google practice.
 **Not consulted:** *Good Strategy, Bad Strategy* (cited by Larson; I rely only on his description of its diagnosis and guiding-policy parts), the other design doc references Larson links (the Markdown and Git approach, and the remote-culture article), and the two example strategies he links. Examples of real strategies were not read.
 
 *Last reviewed: 2026-11-26. This lesson states no compensation figures.*
