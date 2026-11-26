@@ -30,3 +30,28 @@ test('rubric verdicts carry no compensation figures', () => {
   const text = lines.slice(start, end).join('\n');
   assert.deepEqual(findCompClaims(text), []);
 });
+
+// Stricter than findCompClaims: also rejects currency symbols followed by a number and
+// percentages tied to pay (e.g. "15% of base", "10-20% of salary"), which read as market norms.
+const STRICT_COMP_RE = /[$€£₹]\s?\d|\b\d+(?:\.\d+)?\s?(?:[-–]\s?\d+(?:\.\d+)?\s?)?%\s*(?:of\s+)?(?:(?:your|the|annual|base|target)\s+)*(?:base|salary|pay|CTC|compensation|bonus|equity|grant)\b/gi;
+
+function findStrictCompClaims(text) {
+  return String(text || '').match(STRICT_COMP_RE) || [];
+}
+
+test('the strict pattern catches currency symbols and pay percentages', () => {
+  const bad = 'A sign-on of $40,000, €5k, £3 000 or ₹10 plus a 15% of base bonus and 10-20% of salary in RSUs';
+  assert.equal(findStrictCompClaims(bad).length, 6);
+  assert.deepEqual(findStrictCompClaims('Vest X/4 shares each year; a cliff of one year; 25 items'), []);
+});
+
+test('be08 lesson carries no compensation figures', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const md = fs.readFileSync(path.join(__dirname, '..', 'data', 'new_lessons', 'be08-ctc-equity-playbook.md'), 'utf8');
+  assert.deepEqual(findCompClaims(md), []);
+  assert.deepEqual(findStrictCompClaims(md), []);
+  assert.match(md.split(/\r?\n/)[0], /^# Lesson 08 — Offer Structure and Equity Playbook$/);
+  assert.match(md, /^## Sources$/m);
+  assert.match(md, /not tax advice/i);
+});
