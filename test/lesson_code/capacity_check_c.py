@@ -74,7 +74,42 @@ def sy55(src):
          '34,722 notifications per second', '4,000 seconds, about 67 minutes', 'about 19%')
     return 'sy55'
 
-SECTIONS = {'sy54': sy54, 'sy55': sy55}
+def sy56(src):
+    views, peak, vids, id_b, count_b, cell_b, ss_b = 5e9, 3, 1e9, 8, 8, 4, 24
+    eps, delta, minutes, m = 1e-4, 0.01, 60, 10000
+    avg = views / 86400
+    n_hour = views / 24
+    exact_gb = vids * (id_b + count_b) / 1e9
+    width, depth = math.ceil(math.e / eps), math.ceil(math.log(1 / delta))
+    cells = width * depth
+    sketch_kb = cells * cell_b / 1e3
+    sketches_mb = cells * cell_b * minutes / 1e6
+    err = eps * n_hour
+    ss_kb = m * ss_b / 1e3
+    ss_mb = m * ss_b * minutes / 1e6
+    h = math.log(vids) + 0.5772156649                       # harmonic number H(n), n large
+    rank = lambda r: n_hour / (r * h)
+    cutoff = 1 / (eps * h)
+    hot = avg * peak / h
+    assert round(avg) == 57870 and round(avg * peak) == 173611 and round(n_hour) == 208333333
+    assert exact_gb == 16 and exact_gb * minutes == 960
+    assert (width, depth, cells) == (27183, 5, 135915) and round(sketch_kb) == 544 and round(sketches_mb, 1) == 32.6
+    assert round(err) == 20833 and m == round(1 / eps) and round(ss_kb) == 240 and round(ss_mb, 1) == 14.4
+    assert round(h, 1) == 21.3 and round(rank(10), -3) == 978000 and round(rank(100), -2) == 97800
+    assert round(rank(1000), -1) == 9780 and int(cutoff) == 469
+    assert round(100 / h, 1) == 4.7 and round(hot, -1) == 8150
+    assert minutes * m == 600000
+    # the per-minute bucket guarantee: N_minute / m per bucket, and 60 buckets add up to the hourly bound
+    assert round(60 * (views / 1440) / m) == 20833
+    # drill 5: the same sketch at epsilon 1e-3 has a 10x wider error and a 10x smaller width
+    assert math.ceil(math.e / 1e-3) == 2719
+    need(src, '57,870 views per second', '173,611 views per second', '208,333,333 views', '| 16 GB |', '| 960 GB |',
+         '27,183', '135,915 cells', '| 544 KB |', '| 32.6 MB |', '| 20,833 views |', '10,000 counters', '| 240 KB |', '| 14.4 MB |',
+         'H = 21.3', 'about 978,000 views', 'about 97,800 views', 'about 9,780 views', 'rank 469', '4.7%',
+         '8,150 views per second', '600,000 candidates')
+    return 'sy56'
+
+SECTIONS = {'sy54': sy54, 'sy55': sy55, 'sy56': sy56}
 
 if __name__ == '__main__':
     done = []

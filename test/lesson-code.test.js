@@ -363,9 +363,19 @@ test('sy55 lesson code matches a from-scratch window hash, journal replay, every
   assert.match(r.stdout, /sy55 code checks passed/);
 });
 
+test('sy56 lesson code matches exact counting, the count-min bounds, the Space-Saving invariants, window bounds and shard-merge counterexamples', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'sy56_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'sy56-top-k-trending.md'),
+  ], { encoding: 'utf8', timeout: 180000 });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /sy56 code checks passed/);
+});
+
 const CAPACITY_LESSONS_C = [
   'sy54-web-crawler.md',
   'sy55-file-sync-storage.md',
+  'sy56-top-k-trending.md',
 ];
 
 test('sy54-sy56 capacity estimates are reproduced by script', { skip: py ? false : 'python not installed' }, () => {
