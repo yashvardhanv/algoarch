@@ -1208,79 +1208,11 @@ function updateSubscriptionDisplay() {
 // Dynamic Grind 75 Study Schedule Planner & Mock Rubric Scorecard
 // --------------------------------------------------------------------------
 function setupPlannerAndRubric() {
-  // Planner Modal
-  const plannerModal = document.getElementById('planner-modal');
-  const openPlannerBtn = document.getElementById('btn-open-planner');
-  const triggerPlannerBtn = document.getElementById('btn-trigger-planner');
-  const closePlannerBtn = document.getElementById('btn-close-planner');
-  const generateBtn = document.getElementById('btn-generate-schedule');
-  const plannerContainer = document.getElementById('planner-results-container');
-
-  const openPlanner = () => {
-    if (plannerModal) plannerModal.classList.add('active');
-  };
-  if (openPlannerBtn) openPlannerBtn.onclick = openPlanner;
-  if (triggerPlannerBtn) triggerPlannerBtn.onclick = openPlanner;
-  if (closePlannerBtn) closePlannerBtn.onclick = () => plannerModal && plannerModal.classList.remove('active');
-
-  if (generateBtn) {
-    generateBtn.onclick = () => {
-      let weeks = parseInt(document.getElementById('planner-select-weeks')?.value || '4');
-      const hours = parseInt(document.getElementById('planner-select-hours')?.value || '10');
-      let focus = document.getElementById('planner-select-focus')?.value || 'all';
-      // Free tier: basic 2-week all-track plan. Pro+ unlocks custom length and track focus.
-      const plannerLimited = !can('plannerFull') && (weeks > 2 || focus !== 'all');
-      if (!can('plannerFull')) { weeks = Math.min(weeks, 2); focus = 'all'; }
-
-      // Build prioritized dynamic curriculum
-      let pool = [...state.allLessons];
-      if (focus !== 'all') {
-        pool = pool.filter(l => l.trackId === focus);
-      }
-      // Sort by 5 stars first
-      pool.sort((a, b) => (b.stars || 5) - (a.stars || 5));
-
-      // Calculate total lessons to assign based on weeks * (hours / 1.5)
-      const lessonsPerWeek = Math.max(3, Math.min(10, Math.round(hours / 1.5)));
-      const totalLessons = Math.min(pool.length, weeks * lessonsPerWeek);
-      const selected = pool.slice(0, totalLessons);
-
-      let html = `
-        <div class="planner-summary-header" style="margin-bottom: 16px; padding: 12px 16px; background: var(--bg-tertiary); border-radius: 6px; border: 1px solid var(--border-color);">
-          <h4 style="margin: 0 0 4px; font-size: 15px; color: var(--color-text-primary);">Custom ${weeks}-Week FAANG Sprint (${hours} hrs/week)</h4>
-          <p style="margin: 0; font-size: 12.5px; color: var(--color-text-secondary);">Total Targeted Modules: <strong>${selected.length} high-signal lessons</strong> · Optimized for Tier-1 interview loops.${plannerLimited ? ' <a href="#" onclick="window.openPricingModal();return false;">Upgrade to Pro</a> for longer plans and track focus.' : ''}</p>
-        </div>
-        <div class="planner-weeks-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px;">
-      `;
-
-      for (let w = 1; w <= weeks; w++) {
-        const weekLessons = selected.slice((w - 1) * lessonsPerWeek, w * lessonsPerWeek);
-        if (weekLessons.length === 0) break;
-
-        html += `
-          <div class="planner-week-card" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
-            <div class="planner-week-title" style="font-weight: 700; font-size: 13px; color: var(--color-primary); margin-bottom: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 6px;">
-              Week ${w} · High Priority Target
-            </div>
-            <ul class="planner-lesson-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;">
-              ${weekLessons.map(l => `
-                <li class="planner-lesson-item" style="cursor: pointer; padding: 8px 10px; background: var(--bg-tertiary); border-radius: 4px; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 2px;" onclick="openLesson('${l.id}', '${l.trackId}'); document.getElementById('planner-modal').classList.remove('active');">
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: 700; font-size: 11px; color: var(--color-primary);">${l.id.toUpperCase()}</span>
-                    <span style="font-size: 11px; color: var(--color-text-muted);">${l.duration || '45m'} · ${'★'.repeat(l.stars || 5)}</span>
-                  </div>
-                  <span style="font-size: 12.5px; font-weight: 500; color: var(--color-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(l.title)}</span>
-                </li>
-              `).join('')}
-            </ul>
-          </div>
-        `;
-      }
-
-      html += '</div>';
-      if (plannerContainer) plannerContainer.innerHTML = html;
-    };
-  }
+  // Planner entry points open the Pathways view
+  ['btn-open-planner', 'btn-trigger-planner'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.onclick = () => switchView('pathways');
+  });
 
   // Rubric Modal
   const rubricModal = document.getElementById('rubric-modal');
@@ -1896,5 +1828,5 @@ document.addEventListener('click', async (e) => {
   const start = document.getElementById('hero-start');
   const plan = document.getElementById('hero-plan');
   if (start) start.addEventListener('click', () => document.querySelector('.nav-item[data-view="library"]')?.click());
-  if (plan) plan.addEventListener('click', () => document.getElementById('btn-open-planner')?.click());
+  if (plan) plan.addEventListener('click', () => switchView('pathways'));
 })();

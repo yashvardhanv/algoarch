@@ -93,3 +93,5 @@
 @media (prefers-reduced-motion: reduce) {
   .pw-card, .pw-bar-fill, .pw-open, .pw-check::before { transition: none; }
 }
+
+.pw-controls[hidden] { display: none; }

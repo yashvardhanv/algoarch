@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
   <link rel="stylesheet" href="style.css?v=3.4">
   <link rel="stylesheet" href="reader/reader.css?v=2">
+  <link rel="stylesheet" href="pathways.css?v=1">
 </head>
 <body class="auth-checking">
 
@@ -27,6 +28,7 @@
       </div>
       <nav class="nav-links" aria-label="Primary">
         <button class="nav-item active" data-view="roadmap">Overview</button>
+        <button class="nav-item" data-view="pathways">Pathways</button>
         <button class="nav-item" data-view="library">Curriculum</button>
         <button class="nav-item" data-view="videos">Lectures</button>
         <button class="nav-item" data-view="calculator">Offer calculator</button>
@@ -140,6 +142,36 @@
           <span class="comp-tag">OpenAI / Anthropic</span>
         </div>
       </div>
+    </section>
+
+    <!-- VIEW: PATHWAYS -->
+    <section id="view-pathways" class="app-view">
+      <div class="videos-header">
+        <h2 class="videos-title">Pathways</h2>
+        <p class="videos-desc">Pick a pathway, set the hours you have each week, and get a lesson-by-lesson plan. Marking lessons done updates the plan.</p>
+      </div>
+      <div class="pw-grid" id="pw-grid"></div>
+      <div class="pw-controls" id="pw-controls" hidden>
+        <label>Hours per week
+          <select id="pw-hours">
+            <option value="5">5 hours</option>
+            <option value="10" selected>10 hours</option>
+            <option value="15">15 hours</option>
+            <option value="20">20 hours</option>
+          </select>
+        </label>
+        <label>Target weeks
+          <select id="pw-weeks">
+            <option value="">No target</option>
+            <option value="2">2 weeks</option>
+            <option value="4">4 weeks</option>
+            <option value="8">8 weeks</option>
+            <option value="12">12 weeks</option>
+            <option value="16">16 weeks</option>
+          </select>
+        </label>
+      </div>
+      <div id="pw-schedule" aria-live="polite"></div>
     </section>
 
     <!-- VIEW 2: CURRICULUM EXPLORER -->
@@ -704,59 +736,6 @@
     </div>
   </div>
 
-  <!-- Dynamic Study Schedule Planner Modal (Grind 75 Style) -->
-  <div class="modal-backdrop modal-xl" id="planner-modal">
-    <div class="planner-modal-box">
-      <div class="planner-header">
-        <div>
-          <h3>Dynamic FAANG Study Schedule Generator</h3>
-          <p>Personalized day-by-day curriculum tailored to your remaining interview timeline.</p>
-        </div>
-        <button class="btn-close-modal" id="btn-close-planner">✕</button>
-      </div>
-
-      <div class="planner-controls-grid">
-        <div class="planner-field">
-          <label>Weeks Until Interview</label>
-          <select id="planner-select-weeks" class="cms-input">
-            <option value="2">2 Weeks (Crash Sprint)</option>
-            <option value="4" selected>4 Weeks (Intensive Core)</option>
-            <option value="8">8 Weeks (Comprehensive Mastery)</option>
-            <option value="12">12 Weeks (Zero-to-Staff L5/L6)</option>
-          </select>
-        </div>
-        <div class="planner-field">
-          <label>Study Hours Per Week</label>
-          <select id="planner-select-hours" class="cms-input">
-            <option value="5">5 Hours / week (1 hr/day)</option>
-            <option value="10" selected>10 Hours / week (2 hrs/day)</option>
-            <option value="20">20 Hours / week (Full-time Prep)</option>
-          </select>
-        </div>
-        <div class="planner-field">
-          <label>Target Track Focus</label>
-          <select id="planner-select-focus" class="cms-input">
-            <option value="all" selected>Balanced (DSA + System Design + AI)</option>
-            <option value="dsa">DSA & Recognition Core</option>
-            <option value="system-design">High-Scale Distributed Systems</option>
-            <option value="ai-engineering">Production ML & GenAI</option>
-          </select>
-        </div>
-        <div class="planner-field-action">
-          <button class="btn-action-primary" id="btn-generate-schedule" style="margin-top: 18px; width: 100%;">
-            <span>Generate My Schedule</span>
-          </button>
-        </div>
-      </div>
-
-      <div class="planner-results-wrapper" id="planner-results-container">
-        <div class="planner-empty-state">
-          Select your target timeline above and click <strong>Generate My Schedule</strong> to receive your prioritized weekly assignments.
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- FAANG Mock Interview Rubric Scorecard Modal -->
   <div class="modal-backdrop" id="rubric-modal">
     <div class="rubric-modal-box">
@@ -870,7 +849,10 @@
   <script src="vendor/marked.min.js"></script>
   <script>if (!window.marked) document.write('<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\\/script>')</script>
   <script src="reader/reader.js?v=2"></script>
-  <script src="app.js?v=3.5"></script>
+  <script src="planner-core.js?v=1"></script>
+  <script src="pathways-view.js?v=1"></script>
+  <script src="app.js?v=3.6"></script>
   <script src="home.js?v=1"></script>
+  <script src="pathways.js?v=1"></script>
 </body>
 </html>
