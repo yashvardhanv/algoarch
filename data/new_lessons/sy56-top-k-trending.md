@@ -79,8 +79,9 @@ Survives a node restart by rebuilding from the event log.
 | average rate | 5 billion / 86,400 | 57,870 views per second |
 | peak rate | x 3 | 173,611 views per second |
 | views in the window | 5 billion / 24 | 208,333,333 views |
-| exact counters, one window | 1 billion x 16 B | 16 GB |
-| exact, 60 minute buckets | x 60 | 960 GB |
+| exact counters, one hour (ceiling) | min(1 billion keys, 208,333,333 views) x 16 B | 3.3 GB |
+| exact counters, one minute bucket (ceiling) | min(1 billion keys, 3,472,222 views) x 16 B | 55.6 MB |
+| exact, 60 minute buckets (ceiling) | x 60 | 3.3 GB |
 | sketch width, depth | ceil(e / 0.0001), ceil(ln 100) | 27,183 by 5 = 135,915 cells |
 | one sketch | 135,915 x 4 B | 544 KB |
 | 60 sketches | x 60 | 32.6 MB |
@@ -91,16 +92,25 @@ Survives a node restart by rebuilding from the event log.
 | views of rank 10 | 208,333,333 / (10 x 21.3) | about 978,000 views |
 | views of rank 100 | 208,333,333 / (100 x 21.3) | about 97,800 views |
 | views of rank 1,000 | 208,333,333 / (1,000 x 21.3) | about 9,780 views |
-| last rank above the error bound | 1 / (0.0001 x 21.3) | rank 469 |
+| last rank whose count is above the error bound | 1 / (0.0001 x 21.3) | rank 469 |
+| gap between ranks 100 and 101 | 208,333,333 / (21.3 x 100 x 101) | about 968 views |
+| last rank that can be ordered from its neighbour | largest r with r(r+1) below 469.5 | rank 21 |
 | share of the top key | 1 / 21.3 | 4.7%, which is 8,150 views per second at the peak rate |
 | candidates to rank in a query | 60 buckets x 10,000 | 600,000 candidates |
 
-Four conclusions. **Exact counting is 960 GB for the window; the summary is tens of megabytes:** about four orders of
-magnitude. **The error is absolute, not relative:** 20,833 views either way. That resolves ranks 10 and 100, where
-counts are around 978,000 and 97,800, and cannot order ranks beyond about 469, where counts fall below the bound. The
-shape assumption matters: with a flatter distribution the summary resolves fewer ranks. **The hot key is the first
-bottleneck:** the top key alone draws 8,150 views per second, so pre-aggregate before touching a shared counter.
-**Answering a query is cheap:** 600,000 candidates is a sort, and the top-K list can be materialised every minute anyway.
+Four conclusions. **Exact counting is cheaper than it first looks, and the sketch still wins on bounds.** A window cannot
+hold more distinct keys than events: at most 3.3 GB for the hour and 55.6 MB for a minute bucket, never the 16 GB a
+billion-key table would suggest (real Zipf traffic has far fewer distinct keys than events, so these are ceilings). The
+summaries (14.4 MB to 32.6 MB) are about 100 to 230 times smaller than that ceiling, not thousands of times. The honest
+argument for a sketch is that its size is fixed in advance whatever the key cardinality, that it merges across servers,
+and that the saving multiplies once you keep one per region, category and window. **The error is absolute, not relative:**
+20,833 views either way. A key is *detectable* (its count is above the bound) up to about rank 469, but two *adjacent*
+ranks can be put in the right order only while their gap exceeds the error, which here ends at rank 21: ranks 100 and
+101 differ by about 968 views, so positions 22 and below can come out in any order. Promise "the top 20, ordered, and
+the next few hundred as a set". The shape assumption matters: a flatter distribution shrinks both numbers. **The hot
+key is the first bottleneck:** the top key alone draws 8,150 views per second, so pre-aggregate before touching a
+shared counter. **Answering a query is cheap:** 600,000 candidates is a sort, and the top-K list can be materialised
+every minute anyway.
 
 Visual (planned): events into a partitioned log; per-partition aggregators filling one-minute buckets; a merger combining the last 60 buckets into the top-K list that the API serves from a cache.
 
@@ -318,24 +328,28 @@ class WindowTopK:
 The check drives 300 random streams with random bucket counts, `m` and ticks, and for 11 keys (one never seen) asserts
 `lower <= true <= upper` against an exact count of the same window, and that every key above `N / m` is a candidate.
 When every bucket has room the answer is exact, and after enough ticks the window is empty. The result is a list of
-`(key, lower, upper)`: serve the lower bound as "at least" and the upper bound as "at most", and do not claim a rank
-order the intervals do not support.
+`(key, lower, upper)`, ranked by upper bound (so no key that might be heavy is ranked below one that is not), with ties by
+key; the check asserts that rule against a recomputation. Serve the lower bound as "at least" and the upper bound as "at
+most", and do not claim a rank order the intervals do not support.
 
 **Trending is a ratio, not a count.** A giant video with a steady million views an hour is popular, not trending. A
-simple score divides the recent window's count by the key's own recent average, with smoothing so a key going from 0 to
-3 does not look infinitely hot. This one is **illustrative; no platform's real formula was read**, and a
-production version adds a minimum volume, handles seasonality (a Monday has a different baseline from a Sunday) and
-demotes content that trended before.
+simple score divides the recent window's count by the key's own recent average. Smoothing stops a zero baseline from
+giving an infinite score, but it does not stop a tiny key outranking a big one, so there is also a minimum volume below
+which a key is not trending at all. This one is **illustrative; no platform's real formula was read**, and a production
+version also handles seasonality (a Monday has a different baseline from a Sunday) and demotes content that trended before.
 
 ```python
-def trend_score(recent, history, smoothing=5.0):
+def trend_score(recent, history, smoothing=5.0, min_volume=20):
+    if recent < min_volume:
+        return 0.0                                   # too small to call a trend, whatever the ratio
     baseline = sum(history) / len(history) if history else 0.0
     return (recent + smoothing) / (baseline + smoothing)
 ```
 
-The check fixes the behaviour: a steady key scores exactly 1.0, a key rising from about 10 to 200 per window scores about
-13.7, a key rising from 0 to 3 scores 1.6, a key growing from 1,000 to 1,500 scores about 1.5, and a key falling scores
-below 1. The spike beats everything and noise does not. To get *candidates* for trending, you still need per-key
+The check asserts the printed values: a steady key scores exactly 1.0, a key rising from about 10 to 200 per window
+scores 205/15, about 13.7, a key growing from 1,000 to 1,500 scores about 1.5, and a key falling scores below 1. A key
+going from 0 to 3 scores 1.6 with `min_volume=0`, above the 1,000 to 1,500 key, which is exactly what the volume rule
+removes (it scores 0.0 by default). New keys with real volume score high: 30 views against no history is 7.0. To get *candidates* for trending, you still need per-key
 counts; run this score over the candidates of the recent window, which is why the window summaries above come first.
 
 ---
@@ -343,7 +357,8 @@ counts; run this score over the candidates of the recent window, which is why th
 ## 7. Deep Dive 3: Many Servers, Hot Keys and the Shard-Merge Trap
 
 **Partition by key.** If events are routed so that every event for a key goes to one aggregator, the key's whole count
-lives in one place, and the global top-K is exactly the top-K of the union of the shards' local top-K lists. **Partition by
+lives in one place, and the global top-K is exactly the top-K of the union of the shards' local top-K lists (sy39 shows
+this for leaderboards; here it is repeated only to contrast it with the case that breaks). **Partition by
 arrival** (round robin, or whichever server received the event) does not have that property. Three shards where item `a`
 has 3 views on each and shards' own leaders have 4 each: every local top-1 is a different item with 4 views, the merged
 top-1 is one of them, and `a`, with 9 views in total, is lost. Asking each shard for more than K helps here, but no fixed
@@ -413,12 +428,12 @@ path. Deduplicate by event id where the same view can arrive twice, since both s
 
 1. **A global counter updated per event:** the hot key serialises everything.
 2. **Sorting all keys on every query** instead of keeping candidates and materialising the list.
-3. **Exact counts for a billion keys in memory** with no estimate of the bill (960 GB per hour of buckets here).
+3. **Sizing exact counts from the key universe instead of the window:** a window holds at most as many keys as events (3.3 GB for the hour here, not 16 GB).
 4. **Using a sketch without stating its error,** or quoting the error as relative when it is absolute (`epsilon * N`).
 5. **Merging local top-K lists from arrival-partitioned shards.**
 6. **A single long window** instead of buckets, so expiring old counts is impossible.
 7. **Calling the most viewed "trending"** and showing a permanent giant.
-8. **No smoothing in the ratio,** so 0 to 3 views beats 1,000 to 1,500.
+8. **No minimum volume in the trend score:** even with smoothing, 0 to 3 views scores 1.6, above 1,000 to 1,500 at about 1.5.
 9. **Mixing sketches built with different seeds or sizes.**
 10. **Ignoring duplicate and late events,** which inflate or misplace counts silently.
 
@@ -427,16 +442,16 @@ path. Deduplicate by event id where the same view can arrive twice, since both s
 ## Drills
 
 1. State the guarantee a count-min sketch gives for a point query, and what `epsilon` and `delta` control.
-2. From the capacity table: why can the sketch order ranks 10 and 100 but not rank 1,000, and what changes if the
-   popularity curve is flatter?
+2. From the capacity table: why can the sketch detect rank 100 yet not order it against rank 101, and where does ordering
+   stop? What changes if the popularity curve is flatter?
 3. Why can Space-Saving say "these top 5 are certain" when a count-min sketch cannot, and what does it record to do so?
 4. Work the paper's example: with 2 counters, stream X, Z, Y, Y versus X, Y, Y, Z. What is the smallest counter in each,
    and what does that show about bounding it?
 5. A count-min sketch at epsilon 0.001 instead of 0.0001: what are the width and the absolute error on 208,333,333 views?
 6. Show a three-shard example where merging local top-1 lists returns the wrong global top-1, and give two ways to fix it.
 7. Why does a 60-bucket window of Space-Saving summaries guarantee that any key above `N_window / m` is a candidate?
-8. A key goes from 0 to 3 views and another from 1,000 to 1,500. Compute `trend_score` for both and explain why
-   smoothing is in the formula.
+8. A key goes from 0 to 3 views and another from 1,000 to 1,500. Compute `trend_score` for both with `min_volume=0` and
+   with the default, and explain what smoothing fixes and what only the minimum volume fixes.
 
 ---
 

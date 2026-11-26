@@ -135,6 +135,7 @@ for seed in range(300):
     assert all(item in cands for item, f in true.items() if f > n / m), seed               # heavy in the window => candidate
     top = w.top(3)
     assert all(lo <= true.get(item, 0) <= hi for item, lo, hi in top)
+    assert top == sorted(((e, *w.bounds(e)) for e in cands), key=lambda r: (-r[2], r[0]))[:3], seed     # rank by upper bound
 # when every bucket has room, the window answer is exact
 w = WindowTopK(3, 10)
 for x in 'aabbbc': w.add(x)
@@ -163,12 +164,29 @@ for seed in range(150):
 assert all(0 <= shard_of(x, 7) < 7 and shard_of(x, 7) == shard_of(x, 7) for x in ['a', 'b', 'video:42'])
 
 # ---- 7. trend score -----------------------------------------------------------------------------------------------
+near = lambda x, y: abs(x - y) < 1e-3
 steady = trend_score(1000, [1000, 1000, 1000])
 spike = trend_score(200, [10, 12, 8])
-noise = trend_score(3, [0, 0, 0])
 growth = trend_score(1500, [1000, 1000, 1000])
-assert abs(steady - 1.0) < 1e-9
-assert spike > growth > steady and spike > noise > steady, (steady, spike, noise, growth)
-assert trend_score(5, [100, 100]) < 1                              # falling
-assert trend_score(0, []) == 1.0                                   # no history, no recent: neutral
+assert steady == 1.0 and near(spike, 205 / 15) and near(growth, 1505 / 1005)        # the values the lesson prints
+assert near(trend_score(3, [0, 0, 0], min_volume=0), 8 / 5)                         # smoothing alone: 0 -> 3 scores 1.6
+assert trend_score(3, [0, 0, 0], min_volume=0) > growth                             # ... above 1,000 -> 1,500 (the lesson says so)
+assert trend_score(3, [0, 0, 0]) == 0.0 < growth                                    # the minimum-volume rule removes it
+assert trend_score(19, [0]) == 0.0 and near(trend_score(20, [0]), 25 / 5)           # exactly at the threshold counts
+assert spike > growth > steady
+assert trend_score(50, [1000, 1000]) < 1                                           # falling
+assert trend_score(0, []) == 0.0 and near(trend_score(30, []), 7.0)                # new key with real volume
+assert trend_score(100, [10], smoothing=0.0) == 10.0 and near(trend_score(100, [10], smoothing=10.0), 110 / 20)   # smoothing is a parameter
+
+# window ranking rule: by upper bound, key as tiebreak (a key whose lower bound is high but upper low cannot outrank)
+w = WindowTopK(1, 2)
+for x in 'aaaabbbbbcd': w.add(x)         # a:4 b:5 then c and d evict: bounds differ from counts
+rows = w.top(2)
+assert rows == sorted(((e, *w.bounds(e)) for e in w.candidates()), key=lambda r: (-r[2], r[0]))[:2], rows
+assert [r[2] for r in rows] == sorted((r[2] for r in rows), reverse=True)
+w = WindowTopK(1, 2)
+for x in ['p'] * 3 + ['q'] * 3 + ['r']: w.add(x)     # r evicts the smaller of p/q and inherits its count
+lo_hi = {e: (lo, hi) for e, lo, hi in w.top(2)}
+best_by_hi = max(lo_hi, key=lambda e: (lo_hi[e][1], e))
+assert w.top(2)[0][0] == best_by_hi and any(lo < hi for lo, hi in lo_hi.values())
 print('sy56 code checks passed')
