@@ -1,7 +1,7 @@
 """Runs the python code blocks from data/new_lessons/sy42.md (real SQL in SQLite, and the GA counter) against
 reference models that keep every hold in a list and decide availability by scanning them, under random
 interleavings; then a 16-thread test against one database file."""
-import re, sys, random, sqlite3, threading, tempfile, os, time
+import re, sys, random, sqlite3, threading, tempfile, os, time, shutil
 src = open(sys.argv[1], encoding='utf-8').read()
 blocks = re.findall(r"```python\n(.*?)```", src, re.S)
 ns = {}
@@ -27,9 +27,9 @@ class Ref:
                    for h in self.holds.values())
     def can_hold(self, seats, t):
         return not any(self.taken(s, t) for s in seats)
-    def add(self, hid, key, seats, t, ttl):
+    def add(self, hid, user, key, seats, t, ttl):
         self.holds[hid] = {'seats': set(seats), 'exp': t + ttl, 'state': 'ACTIVE'}
-        self.by_key[key] = hid
+        self.by_key[(user, key)] = hid              # idempotency keys are scoped to the user
     def confirm(self, hid, t):
         h = self.holds.get(hid)
         if h is None or h['state'] == 'RELEASED':
@@ -60,16 +60,22 @@ for trial in range(60):
             want = random.sample(seats, random.randint(1, min(4, n)))
             ttl = random.randint(1, 8)
             if ref.by_key and random.random() < 0.15:            # a client retry with an old key
-                key = random.choice(list(ref.by_key))
-                assert hold(conn, 'u', want, t, ttl, key) == ref.by_key[key]
+                user, key = random.choice(list(ref.by_key))
+                assert hold(conn, user, want, t, ttl, key) == ref.by_key[(user, key)]
             else:
-                key_no += 1
-                key = 'k%d' % key_no
+                user = 'u%d' % random.randint(1, 5)
+                used = [k for (u, k) in ref.by_key if u != user and (user, k) not in ref.by_key]
+                if used and random.random() < 0.2:
+                    key = random.choice(used)                    # another user's key: not a retry for this user
+                else:
+                    key_no += 1
+                    key = 'k%d' % key_no
                 expect = ref.can_hold(want, t)
-                got = hold(conn, 'u%d' % random.randint(1, 5), want, t, ttl, key)
+                got = hold(conn, user, want, t, ttl, key)
                 assert (got is not None) == expect, (want, t, got, expect)
                 if got:
-                    ref.add(got, key, want, t, ttl)
+                    assert got not in ref.holds
+                    ref.add(got, user, key, want, t, ttl)
                     ids.append(got)
         elif r < 0.65 and ids:
             hid = random.choice(ids)
@@ -104,7 +110,13 @@ b = hold(conn, 'B', ['s01'], 10, 10, 'b2')                          # A expired 
 assert b and confirm(conn, a, 11) is False and confirm(conn, b, 11) is True and confirm(conn, b, 99) is True
 assert hold(conn, 'A', ['s01', 's02'], 0, 10, 'a') == a             # same key: same answer
 
-# 16 threads, one database file: no seat ever confirmed to two holds
+# two users who happen to send the same idempotency key get two different holds
+conn = new_db(':memory:', 4)
+h1, h2 = hold(conn, 'A', ['s00'], 0, 10, 'same'), hold(conn, 'B', ['s01'], 0, 10, 'same')
+assert h1 and h2 and h1 != h2 and hold(conn, 'A', ['s03'], 0, 10, 'same') == h1
+
+# 16 threads, one database file: no seat ever confirmed to two holds.
+# Threaded tests find races probabilistically: a pass means no race showed up in these interleavings.
 tmp = tempfile.mkdtemp()
 path = os.path.join(tmp, 'inv.db')
 new_db(path, 30).close()
@@ -131,18 +143,33 @@ def buyer(w):
             errs.append(repr(e))
     finally:
         conn.close()
-ts = [threading.Thread(target=buyer, args=(w,)) for w in range(16)]
-[x.start() for x in ts]
-[x.join() for x in ts]
-assert not errs, errs[:3]
-allseats = [s for _, ss in wins for s in ss]
-assert len(allseats) == len(set(allseats)), 'a seat was confirmed to two holds'
-conn = sqlite3.connect(path, isolation_level=None)
-sold = {r[0] for r in conn.execute("SELECT seat_id FROM seats WHERE status = 'SOLD'")}
-assert sold == set(allseats)
-for hid, ss in wins:
-    assert {r[0] for r in conn.execute('SELECT seat_id FROM seats WHERE hold_id = ?', (hid,))} == ss
-conn.close()
+try:
+    ts = [threading.Thread(target=buyer, args=(w,)) for w in range(16)]
+    [x.start() for x in ts]
+    [x.join() for x in ts]
+    assert not errs, errs[:3]
+    allseats = [s for _, ss in wins for s in ss]
+    assert len(allseats) == len(set(allseats)), 'a seat was confirmed to two holds'
+    conn = sqlite3.connect(path, isolation_level=None)
+    try:
+        sold = {r[0] for r in conn.execute("SELECT seat_id FROM seats WHERE status = 'SOLD'")}
+        assert sold == set(allseats)
+        for hid, ss in wins:
+            assert {r[0] for r in conn.execute('SELECT seat_id FROM seats WHERE hold_id = ?', (hid,))} == ss
+    finally:
+        conn.close()
+finally:
+    shutil.rmtree(tmp, ignore_errors=True)
+
+# GA: non-positive quantities are rejected, so a negative hold cannot mint stock (reviewer's case)
+ga = GaCounter(2)
+for bad in (-5, 0):
+    try:
+        ga.hold('neg', bad, 0, 10)
+        raise AssertionError('non-positive qty accepted')
+    except ValueError:
+        pass
+assert ga.stock == 2 and ga.hold('h1', 7, 0, 10) is False and ga.confirm('h1', 1) is False and ga.sold == 0
 
 # ---------------- general admission counter vs a scan of all holds
 ga_ops = 0
