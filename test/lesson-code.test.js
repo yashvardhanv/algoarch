@@ -245,3 +245,12 @@ test('ds28 lesson code matches reference checks', { skip: py ? false : 'python n
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.match(r.stdout, /ds28 code checks passed/);
 });
+
+test('ai28 lesson code matches finite differences and reference optimizers', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'ai28_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'ai28-autodiff-gradient-descent.md'),
+  ], { encoding: 'utf8', timeout: 120000 });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /ai28 code checks passed/);
+});
