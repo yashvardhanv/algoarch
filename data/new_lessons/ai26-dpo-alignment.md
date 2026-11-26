@@ -17,10 +17,11 @@ checked against an independent computation.
 
 ## 1. Mental Model
 
-> **Every stage maximises some score of the model's outputs while a penalty keeps it close to a
-> reference model. The stages differ in where the score comes from: demonstrations (SFT), a learned
-> reward model (RLHF), preference pairs used directly (DPO), or a program that checks the answer
-> (verifiable rewards).**
+> **SFT is plain maximum likelihood on demonstrations, with no reference-model penalty. Every
+> preference and RL stage after it maximises some score of the model's outputs while a penalty keeps it
+> close to a reference model (usually the SFT model). Those stages differ in where the score comes from:
+> a learned reward model (RLHF), preference pairs used directly (DPO), or a program that checks the
+> answer (verifiable rewards).**
 
 What follows from it:
 
