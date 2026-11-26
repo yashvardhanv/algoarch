@@ -1,6 +1,6 @@
 # Lesson 45 — Caching Patterns and Consistent Hashing
 
-> **Priority:** ★★★★★ — a cache appears in almost every design, and the standard follow-ups are "how does a write reach it?" and "what happens to it when you add or lose a node?".
+> **Priority:** ★★★★★ (proposed; the curriculum data holds the final rating) — a cache appears in almost every design, and the standard follow-ups are "how does a write reach it?" and "what happens to it when you add or lose a node?".
 >
 > **Study time:** 60 minutes. **Do this after:** Redis Internals & Eviction, and Latency Numbers & Capacity Estimation.
 >
@@ -79,27 +79,28 @@ def ideal_hit_rate(n_keys, cache_size, s):
     w = [1.0 / i ** s for i in range(1, n_keys + 1)]
     return sum(w[:cache_size]) / sum(w)
 
-def lru_hit_rate(stream, cache_size):
+def lru_hit_rate(stream, cache_size, skip=0):
+    """Hit rate over stream[skip:]; the first `skip` requests only warm the cache."""
     cache, hits = OrderedDict(), 0
-    for k in stream:
+    for i, k in enumerate(stream):
         if k in cache:
-            hits += 1
+            hits += i >= skip
             cache.move_to_end(k)
         else:
             cache[k] = True
             if len(cache) > cache_size:
                 cache.popitem(last=False)
-    return hits / len(stream)
+    return hits / (len(stream) - skip)
 ```
 
-| Cache size (keys) | Ideal | LRU, cold start |
-|---|---|---|
-| 100 | 42.9% | 29.1% |
-| 1,000 | 61.9% | 50.6% |
-| 10,000 | 81.0% | 73.1% |
-| 50,000 | 94.3% | 84.0% |
+| Cache size (keys) | Ideal | LRU, cold start (300,000 requests) | LRU, warm (second half of 600,000) |
+|---|---|---|---|
+| 100 | 42.9% | 29.1% | 28.9% |
+| 1,000 | 61.9% | 50.6% | 50.7% |
+| 10,000 | 81.0% | 73.1% | 73.8% |
+| 50,000 | 94.3% | 84.0% | 91.8% |
 
-Two lessons. Holding 1% of the keys already gives about 62% hits in the ideal case, and each tenfold increase in memory buys less than the last; at the tail the next point of hit rate costs the most memory. And LRU sits several points below ideal because it spends space on recently seen keys that will not return. The check confirms the same code gives a hit rate of cache size divided by key count on uniform keys, which is why skew is what makes caching work at all.
+Three readings. Holding 1% of the keys already gives about 62% hits in the ideal case, and each tenfold increase in memory buys a roughly constant gain (about 19 points per decade here, because the ideal hit rate under this skew grows with the logarithm of the cache size); what grows is the memory each extra point costs. The cold-start LRU column is not a measure of LRU's policy at the large end: the 300,000-request trace touches only 48,056 distinct keys, so a 50,000-entry cache never evicts anything and the 84.0% is exactly 1 minus 48,056/300,000, the compulsory first-touch misses. The warm column (hits counted only in the second half of a 600,000-request trace) separates the two effects: at 50,000 keys LRU is 2.5 points below ideal (91.8% against 94.3%), and about eight of the ten points in the cold column were cold start. The policy gap is real but shrinks with size (14, 11, 7 and 2.5 points at the four sizes), because LRU spends space on recently seen keys that will not return. The check confirms the same code gives a hit rate of cache size divided by key count on uniform keys, which is why skew is what makes caching work at all.
 
 ---
 
@@ -316,7 +317,7 @@ What the table says:
 
 1. **`mod N` is not unbalanced; it is unstable.** Its balance is as good as any, and it moves 91% of keys when `N` goes from 10 to 11 (the fraction that stays is roughly `1/11`). The Jump Hash paper makes the same point with 10 to 12 shards. For a cache, 91% of keys moving is a hit-rate collapse, shown in the next paragraph.
 2. **A ring with one point per node is badly lumpy:** the busiest node holds 2.8 times the mean. Virtual nodes fix it, with the cost of more points to store and search. The Jump Hash paper reports that Karger et al.'s experiments needed 1,000 points per bucket to reach a 3.2% standard deviation; the 2.0% here at 1,000 virtual nodes is the same order, on a different setup, so do not read the two numbers as a replication.
-3. **Movement is not minimised by balance.** Every consistent scheme moves about the new node's share (the table's spread around 9.1% is sampling noise on a single node's share, and with one vnode it is the luck of one arc). The invariant the check verifies on every ring size is stronger than the average: **keys only ever move to the new node, never between old nodes** (the monotonicity property Karger et al. define). Rendezvous and jump hash satisfy it too.
+3. **Movement is not minimised by balance.** Every consistent scheme moves about the new node's share (the table's spread around 9.1% is sampling noise on a single node's share, and with one vnode it is the luck of one arc). The invariant the check verifies on rings of 1, 7 and 50 virtual nodes is stronger than the average: **keys only ever move to the new node, never between old nodes** (the monotonicity property Karger et al. define). Rendezvous and jump hash satisfy it too.
 4. **Rendezvous and jump hash beat a ring on balance without virtual nodes,** at different costs: rendezvous does one hash per node per lookup; jump hash needs the numbered-bucket restriction.
 
 **What the cache feels.** Assume a 95% hit rate and 100,000 reads per second, and a database that comfortably serves 5,000. Adding a node to a `mod N` cache sends 91% of keys to a node that does not hold them, so the miss rate becomes `1 - 0.95 x (1 - 0.911)`, about 91.5%, or **91,500 reads/s** at the database. With a 1,000-vnode ring only 9.4% of keys move, the miss rate becomes about 14%, and the database sees **14,000 reads/s**: still almost three times its comfortable load, which is why you add cache nodes one at a time and watch the miss rate, as the Distributed Cache lesson advises.

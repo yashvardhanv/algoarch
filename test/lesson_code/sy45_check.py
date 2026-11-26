@@ -198,14 +198,30 @@ assert freq[0] > freq[9] > freq[99] and abs(freq[0] / 20000 - 1 / sum(1 / i for 
 u = zipf_stream(1000, 40000, 0.0, 5)
 assert abs(lru_hit_rate(u, 100) - 0.1) < 0.01                          # uniform keys: hit rate is cache size / keys
 big_stream = zipf_stream(100000, 300000, 1.0, 7)
+warm_stream = zipf_stream(100000, 600000, 1.0, 7)
+distinct = len(set(big_stream))
+assert distinct == 48056 < 50000
+assert lru_hit_rate(big_stream, 50000) == 1 - distinct / len(big_stream)      # a cache that never evicts: only first touches miss
+gaps = []
+prev_gain = None
 for size in (100, 1000, 10000, 50000):
     ideal, lru = ideal_hit_rate(100000, size, 1.0), lru_hit_rate(big_stream, size)
-    assert lru < ideal
-    need('| %s | %.1f%% | %.1f%% |' % (format(size, ','), ideal * 100, lru * 100))
+    warm = lru_hit_rate(warm_stream, size, skip=300000)
+    assert lru < ideal and warm < ideal + 1e-9
+    gaps.append(ideal - warm)
+    need('| %s | %.1f%% | %.1f%% | %.1f%% |' % (format(size, ','), ideal * 100, lru * 100, warm * 100))
+assert gaps[0] > gaps[1] > gaps[2] > gaps[3] and round(gaps[3] * 100, 1) == 2.5            # policy gap shrinks with size
+assert [round(g * 100, 1) for g in gaps] == [14.0, 11.2, 7.2, 2.5]
+ideals = [ideal_hit_rate(100000, c, 1.0) for c in (100, 1000, 10000)]
+assert abs((ideals[1] - ideals[0]) - (ideals[2] - ideals[1])) < 0.01           # roughly constant gain per decade
+need('48,056', '2.5 points below ideal', '91.8% against 94.3%')
 
 # ---------------------------------------------------------------- capacity figures in the prose
 m_mod, m_ring = by['mod N'][2], by['ring, 1000 vnodes'][2]
 miss_mod, miss_ring = 1 - 0.95 * (1 - m_mod), 1 - 0.95 * (1 - m_ring)
+assert round(miss_mod * 100, 1) == 91.5 and round(miss_ring * 100) == 14 and 2.5 < 100000 * miss_ring / 5000 < 3
+assert round(1 / 9 * 100, 1) == 11.1
+need('about 91.5%', 'about 14%', 'almost three times', '1/9 = 11.1%')
 need('1,000 reads/s', '5,000 reads/s', '10,000 reads/s', '100,000 reads/s',
      '0.605 ms', '1.025 ms', '1.550 ms', '11.000 ms',
      '%s reads/s' % format(round(100000 * miss_mod, -2), ',.0f'), '%s reads/s' % format(round(100000 * miss_ring, -2), ',.0f'))
