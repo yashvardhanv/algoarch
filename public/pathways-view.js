@@ -20,13 +20,14 @@
     const cls = 'pw-card' + (o.selected ? ' is-selected' : '') + (o.locked ? ' is-locked' : '');
     const pressed = o.selected ? ' aria-pressed="true"' : ' aria-pressed="false"';
     const pro = o.locked ? '<span class="pw-pro">Pro</span>' : '';
-    const pct = Math.max(0, Math.min(100, p.percent || 0));
+    const pct = Math.max(0, Math.min(100, Math.round(Number(p.percent)) || 0));
+    const fill = pct >= 100 ? 100 : pct <= 0 ? 0 : Math.min(95, Math.max(5, Math.round(pct / 5) * 5));
     return '<button type="button" class="' + cls + '" data-pathway="' + esc(pathway && pathway.id) + '"' + pressed + '>' +
       '<span class="pw-card-head"><span class="pw-card-title">' + esc(pathway && pathway.title) + '</span>' + pro + '</span>' +
       '<span class="pw-card-desc">' + esc(pathway && pathway.description) + '</span>' +
       '<span class="pw-card-meta">' + plural(total, 'lesson', 'lessons') + ' · ' + hoursText(p.minutesTotal) + '</span>' +
       '<span class="pw-bar" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '">' +
-      '<span class="pw-bar-fill pw-w-' + (Math.round(pct / 5) * 5) + '"></span></span>' +
+      '<span class="pw-bar-fill pw-w-' + fill + '"></span></span>' +
       '<span class="pw-card-progress">' + p.done + ' of ' + total + ' done</span>' +
       '</button>';
   }
@@ -65,7 +66,13 @@
     return '<div class="pw-error" role="alert"><p>' + esc(message) + '</p><button type="button" class="pw-retry" data-action="retry">Retry</button></div>';
   }
 
-  const api = { esc, cardHtml, scheduleHtml, errorHtml };
+  function statusHtml(title, lessonId, withUndo) {
+    const t = esc(title);
+    if (!withUndo) return 'Marked not done: ' + t + '.';
+    return 'Marked done: ' + t + '. <button type="button" class="pw-undo" data-action="undo" data-lesson="' + esc(lessonId) + '">Undo</button>';
+  }
+
+  const api = { esc, cardHtml, scheduleHtml, errorHtml, statusHtml };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.PathwaysView = api;
 })();

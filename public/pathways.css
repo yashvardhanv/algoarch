@@ -22,6 +22,7 @@
 
 .pw-bar { display: block; height: 6px; border-radius: 3px; background: var(--well-2); overflow: hidden; }
 .pw-bar-fill { display: block; height: 100%; width: 0; background: var(--ok); transition: width var(--dur-short) var(--ease-out); }
+.pw-bar-fill.pw-w-0 { width: 0; }
 .pw-bar-fill.pw-w-5 { width: 5%; }
 .pw-bar-fill.pw-w-10 { width: 10%; }
 .pw-bar-fill.pw-w-15 { width: 15%; }

@@ -79,3 +79,22 @@ test('no output contains compensation figures', () => {
     V.scheduleHtml({ ...sched, fits: false, hoursNeeded: 9 }, { completed: [], target: 1 }), V.errorHtml('Could not load')];
   for (const o of outs) assert.deepStrictEqual(findCompClaims(o), []);
 });
+
+test('cardHtml bar never shows 98% as full or 1% as empty', () => {
+  const at = (percent) => V.cardHtml(pw, { ...prog, percent }, {});
+  assert.ok(at(98).includes('pw-w-95') && at(98).includes('aria-valuenow="98"'));
+  assert.ok(at(1).includes('pw-w-5') && at(1).includes('aria-valuenow="1"'));
+  assert.ok(at(100).includes('pw-w-100'));
+  assert.ok(at(0).includes('pw-w-0"'));
+  assert.ok(at(NaN).includes('aria-valuenow="0"'));
+  assert.ok(at(33.4).includes('aria-valuenow="33"'));
+});
+
+test('statusHtml escapes the title and offers undo only when asked', () => {
+  const h = V.statusHtml('<b>x</b>', 'l"1', true);
+  assert.ok(h.includes('Marked done: &lt;b&gt;x&lt;/b&gt;.'));
+  assert.ok(h.includes('data-action="undo"') && h.includes('data-lesson="l&quot;1"'));
+  assert.ok(!h.includes('<b>') && !/\bon\w+=/.test(h) && !h.includes('style='));
+  const u = V.statusHtml('T', 'l1', false);
+  assert.ok(u.includes('Marked not done: T.') && !u.includes('data-action'));
+});
