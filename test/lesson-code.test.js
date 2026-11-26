@@ -299,3 +299,12 @@ test('sy46 lesson code matches an independent happened-before, the published Dyn
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.match(r.stdout, /sy46 code checks passed/);
 });
+
+test('sy48 lesson code reproduces the SRE Workbook burn-rate figures and a brute-force alert-window reference', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'sy48_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'sy48-slos-error-budgets.md'),
+  ], { encoding: 'utf8', timeout: 180000 });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /sy48 code checks passed/);
+});
