@@ -117,6 +117,14 @@ na, da = optimal_split(1e21); nb, db = optimal_split(4e21)
 assert abs(nb / na - 2) < 1e-9 and abs(db / da - 2) < 1e-9 and abs(na - da) / na < 1e-9
 ns.update(old)
 
+# ---- rounding of the published exponents explains the 32B vs 40B gap (numbers the paper prints: 40B text, 67B Table A3) ----
+n_lo, _ = optimal_split(5.76e23); n_hi, _ = optimal_split(1.71e24)
+m_lo, _ = optimal_split(5.76e23, beta=0.285); m_hi, _ = optimal_split(1.71e24, beta=0.285)
+assert abs(n_lo / 40e9 - 1) > 0.15 and abs(n_hi / 67e9 - 1) > 0.15       # printed exponents: both paper numbers missed by over 15%
+assert abs(m_lo / 40e9 - 1) < 0.05 and abs(m_hi / 67e9 - 1) < 0.05       # beta 0.285: both within 5%
+assert m_lo / n_lo > 1.2                                                  # a 0.005 change moves the optimum by over 20%
+assert abs(0.285 / (0.34 + 0.285) - 0.46) < 0.005 and abs(0.28 / 0.62 - 0.46) > 0.005   # Table 2's 0.46 vs the printed constants
+
 # ---- the lesson's printed numbers ----
 for line in g('demo')():
     assert line in src, "lesson's printed output out of date: " + line
@@ -124,4 +132,5 @@ R = g('RESULTS')
 assert R['wrong'] == 0 and R['caught'] >= R['planted'] - 2
 assert abs(R['opt'][0][0] / R['opt'][1][0] - 1) < 0.01
 assert R['gc'][1] < R['gc'][0]
+assert R['miss'][1] > 0.99 and abs(R['miss'][0] - 0.857) < 0.001       # the one miss is an unlucky draw, not a low-probability pair
 print("ai31 code checks passed")

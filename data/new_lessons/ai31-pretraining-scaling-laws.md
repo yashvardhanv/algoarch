@@ -33,7 +33,7 @@ What follows from it:
 | "what is a scaling law?" | a fitted relation, usually a power law, between loss and `N`, `D` or compute, valid in the range it was fitted |
 | "can we extrapolate it?" | cautiously: it is an empirical fit, sensitive to the constants (section 6) |
 | "why not train the biggest model?" | at fixed compute it may be undertrained; also inference cost scales with `N` |
-| "multiple epochs over the same data?" | not covered by the fits read here; both papers' analyses assume less than one epoch |
+| "multiple epochs over the same data?" | not covered by the Chinchilla fits, whose runs were all under one epoch; Kaplan et al.'s small-dataset runs did repeat data with early stopping, which is a different question from planned multi-epoch training |
 
 ---
 
@@ -117,7 +117,7 @@ def dedup(docs, k=3, threshold=0.7, bands=16, rows=8, seed=0, verify=True):
 
 The check script holds this code to four standards: shingles match a brute-force window scan; the MinHash estimate averages to the true Jaccard over many seeds for pairs built with known similarity; the measured candidate rate at similarity 0.5, 0.7 and 0.8 matches the S-curve formula; and, on a planted corpus, the kept set always contains the kept set of the exact all-pairs clustering (LSH can miss a pair, never invent one). A mutation that removes the verification step is caught by a permissive-LSH test where false candidate pairs merge unrelated documents.
 
-Choosing `(b, r)`: the steep part of the S-curve sits near `(1/b)^(1/r)`. With `b = 16`, `r = 8` that is about 0.71, which is why a 0.7 threshold is a reasonable pairing. Trade-off: more bands and fewer rows raise recall and the number of candidates to verify.
+Choosing `(b, r)`: the steep part of the S-curve sits near `(1/b)^(1/r)`. That is a standard approximation, not taken from the papers read: it is the similarity at which `s^r` equals `1/b`, so each band matches with probability about `1/b`. With `b = 16`, `r = 8` that is about 0.71, which is why a 0.7 threshold is a reasonable pairing. Trade-off: more bands and fewer rows raise recall and the number of candidates to verify.
 
 ---
 
@@ -187,10 +187,12 @@ E, A, B, ALPHA, BETA = 1.69, 406.4, 410.7, 0.34, 0.28
 def loss(N, D):
     return E + A / N ** ALPHA + B / D ** BETA
 
-def optimal_split(C):
+def optimal_split(C, alpha=None, beta=None):
     """Minimise loss(N, D) subject to 6*N*D = C. Closed form from the paper: N = G (C/6)^a, D = (C/6)^b / G."""
-    G = (ALPHA * A / (BETA * B)) ** (1 / (ALPHA + BETA))
-    a, b = BETA / (ALPHA + BETA), ALPHA / (ALPHA + BETA)
+    alpha = ALPHA if alpha is None else alpha
+    beta = BETA if beta is None else beta
+    G = (alpha * A / (beta * B)) ** (1 / (alpha + beta))
+    a, b = beta / (alpha + beta), alpha / (alpha + beta)
     return G * (C / 6) ** a, (C / 6) ** b / G
 
 def grid_optimum(C, points=20000):
@@ -236,6 +238,10 @@ def demo():
     wrongly = len(dropped - truly_dup)
     L.append(f"{len(docs)} documents: 150 distinct + 30 exact copies + 40 light edits")
     L.append(f"MinHash-LSH (128 hashes, 16 bands x 8 rows) kept {len(keep)}; dropped {caught} of {len(truly_dup)} planted duplicates, {wrongly} wrongly")
+    for j in sorted(truly_dup & set(keep)):
+        s = jaccard(shs[j], shs[truth[j]])
+        RESULTS["miss"] = (s, 1 - (1 - s ** 8) ** 16)
+        L.append(f"  the miss: a light edit with exact Jaccard {s:.3f}, proposal probability {1 - (1 - s ** 8) ** 16:.3f}")
     RESULTS["caught"], RESULTS["planted"], RESULTS["wrong"] = caught, len(truly_dup), wrongly
     # the S-curve: how likely is a pair to be proposed, as a function of its true similarity
     for s in (0.3, 0.5, 0.7, 0.8, 0.9):
@@ -255,6 +261,12 @@ def demo():
     RESULTS["gc"] = (gopher, chin)
     L.append(f"fitted loss: 280B params on 300B tokens {gopher:.3f}; 70B params on 1.4T tokens {chin:.3f}")
     L.append(f"exponents: N grows as C^{BETA / (ALPHA + BETA):.3f}, D as C^{ALPHA / (ALPHA + BETA):.3f}")
+    # sensitivity: the published exponents are rounded to two digits; nudge beta by 0.005
+    rows = {}
+    for beta in (0.28, 0.285):
+        rows[beta] = [optimal_split(c, beta=beta)[0] / 1e9 for c in (5.76e23, 1.71e24)]
+        L.append(f"beta={beta}: N_opt at 5.76e23 = {rows[beta][0]:.1f}B, at 1.71e24 = {rows[beta][1]:.1f}B, exponent {beta / (ALPHA + beta):.3f}")
+    RESULTS["sens"] = rows
     return L
 
 if __name__ == "__main__":
@@ -266,6 +278,7 @@ Output (produced by the check script, which fails if this block drifts from the 
 ```text
 220 documents: 150 distinct + 30 exact copies + 40 light edits
 MinHash-LSH (128 hashes, 16 bands x 8 rows) kept 151; dropped 69 of 70 planted duplicates, 0 wrongly
+  the miss: a light edit with exact Jaccard 0.857, proposal probability 0.996
   similarity 0.3: probability a pair is proposed = 0.0010
   similarity 0.5: probability a pair is proposed = 0.0607
   similarity 0.7: probability a pair is proposed = 0.6133
@@ -275,18 +288,20 @@ synthetic loss = 1.7 + 400/N^0.34: plain log-log slope 0.108; with a fitted floo
 budget 5.76e23 FLOPs: closed form N=32.2B params, D=2.98T tokens; grid search N=32.2B
 fitted loss: 280B params on 300B tokens 1.993; 70B params on 1.4T tokens 1.937
 exponents: N grows as C^0.452, D as C^0.548
+beta=0.28: N_opt at 5.76e23 = 32.2B, at 1.71e24 = 52.6B, exponent 0.452
+beta=0.285: N_opt at 5.76e23 = 39.4B, at 1.71e24 = 64.7B, exponent 0.456
 ```
 
 Reading it:
 
-1. **Dedup.** The planted corpus has 70 duplicates; the pipeline drops 69 and none of the 150 distinct documents. The miss is a near-duplicate pair that the S-curve did not propose: recall below 100% is the price of LSH, and is why the table of S-curve probabilities is part of the answer to "how confident are you the corpus is deduplicated?".
+1. **Dedup.** The planted corpus has 70 duplicates; the pipeline drops 69 and none of the 150 distinct documents. The one miss is a light edit whose exact Jaccard similarity is `0.857`, a pair the S-curve proposes with probability `0.996`: an unlucky draw for this seed, not a prediction of the formula. It shows why recall has to be measured on planted duplicates rather than assumed, and why the S-curve table is part of the answer to "how confident are you the corpus is deduplicated?".
 2. **The S-curve.** At similarity 0.5 a pair is proposed about 6% of the time; at 0.8, 94.7%; at 0.9 essentially always.
 3. **The floor.** The synthetic loss is `1.7 + 400 / N^0.34`. Plain log-log fitting reports a slope of `0.108`, a third of the true exponent; fitting the floor recovers `E = 1.70` and `alpha = 0.340`. (This is the lesson's own synthetic experiment, not a finding about real models.)
-4. **The allocation.** For a budget of `5.76e23` FLOPs, the figure the paper gives for Gopher's training, the closed form with equation-10 constants gives about 32B parameters and 3T tokens, and the grid search lands on the same size. The paper's text projects about 40B parameters for this budget under its parametric approach. The difference is a reminder that extrapolations from fitted constants are sensitive: this lesson did not trace which exact fit produced the paper's 40B, so treat both numbers as showing the method, not as a recommendation.
-5. **Exponents.** From the equation-10 constants, `N` grows as `C^0.452` and `D` as `C^0.548`: close to equal scaling, as the paper's headline says.
+4. **The allocation.** For a budget of `5.76e23` FLOPs, the figure the paper gives for Gopher's training, the closed form with equation-10 constants gives about 32B parameters and 3T tokens, and the grid search lands on the same size. The paper's text projects about 40B parameters for this budget under its parametric approach. The gap is most likely rounding: the paper prints the exponents to two digits. Nudging `beta` from `0.28` to `0.285` moves the answer to `39.4B` at that budget (the paper's text says about 40B) and to `64.7B` at `1.71e24` FLOPs, against the 67B the paper's Table A3 lists for Approach 3 at that budget (the table has no model between 67B and 175B for Approach 3, so this is the nearest published point). With the printed `0.28` the same budget gives `52.6B`. This is an inference from reproducing three published numbers with one adjustment, not something the paper states, and it shows how sensitive extrapolation is: a change of 0.005 in one exponent moves the optimum by about 22%. Treat the numbers as showing the method, not as a recommendation.
+5. **Exponents.** From the printed equation-10 constants, `N` grows as `C^0.452` and `D` as `C^0.548`. The paper's Table 2 gives `0.46` and `0.54` for this approach, so the printed constants fall slightly outside the table; `beta = 0.285` gives `0.456`, which rounds to the table's `0.46`. Either way the result is close to equal scaling, as the paper's headline says.
 6. **Loss.** Under the fitted formula, the 70B/1.4T model's loss (`1.937`) is below the 280B/300B model's (`1.993`) at about the same compute. That is the formula's prediction, which is not the same as the measured downstream results the paper reports.
 
-What this does not tell you: the fits assume less than one epoch of data (Hoffmann et al. say their runs are all under one epoch and leave multi-epoch training for future work); they say nothing about data quality; and they optimise training loss per unit of training compute, not total cost. The Chinchilla paper itself notes that a smaller model reduces inference cost considerably and eases downstream use on smaller hardware; if a model will serve a great deal of traffic, the right size under a training-only budget is not the right size under a lifetime-cost view. That last step is reasoning from the quoted statement, not a sourced rule.
+What this does not tell you: the Chinchilla fits come from runs under one epoch of data (Hoffmann et al. say so and leave multi-epoch training for future work), and Kaplan et al. report that their own fits were poor for the smallest datasets, where an epoch is only about 40 updates; they say nothing about data quality; and they optimise training loss per unit of training compute, not total cost. The Chinchilla paper itself notes that a smaller model reduces inference cost considerably and eases downstream use on smaller hardware; if a model will serve a great deal of traffic, the right size under a training-only budget is not the right size under a lifetime-cost view. That last step is reasoning from the quoted statement, not a sourced rule.
 
 ---
 
@@ -298,7 +313,7 @@ What this does not tell you: the fits assume less than one epoch of data (Hoffma
 4. **Using exact-match contamination checks as proof of a clean benchmark.** Paraphrases pass.
 5. **Fitting a power law to a loss that has a floor** and reporting the exponent.
 6. **Extrapolating beyond the fitted range** as if it were a law of nature.
-7. **Quoting the "20 tokens per parameter" rule** or any single ratio without saying which paper, which constants and which compute range. Neither paper read here is cited for that figure.
+7. **Quoting the "20 tokens per parameter" rule** or any single ratio without saying which paper, which constants and which compute range. Chinchilla's own model, 70B parameters on 1.4T tokens, is 20 tokens per parameter, but that is one point on a fitted curve, not a constant: with exponents near `C^0.45` and `C^0.55` the optimal ratio drifts with the budget.
 8. **Forgetting inference cost.** Training-compute-optimal is not lifetime-cost-optimal.
 9. **Assuming repeated data behaves like fresh data.** The fits here do not cover it.
 
@@ -332,8 +347,8 @@ What this does not tell you: the fits assume less than one epoch of data (Hoffma
 
 Read on 26 November 2026:
 
-- Hoffmann et al., "Training Compute-Optimal Large Language Models", arXiv:2203.15556, full text (ar5iv rendering). Used for the abstract claims, the model and token counts of Gopher and Chinchilla, the `6ND` approximation, the exponent summary, the parametric form and its reported constants, the 40B projection for the Gopher budget, the single-epoch caveat and the remark on inference cost.
-- Kaplan et al., "Scaling Laws for Neural Language Models", arXiv:2001.08361, full text (ar5iv rendering). Used for the power-law forms and exponents quoted, the statement about architectural details, the fixed-budget conclusion and `N ~ C_min^0.73`, `D ~ N^0.74`.
+- Hoffmann et al., "Training Compute-Optimal Large Language Models", arXiv:2203.15556, full text (ar5iv rendering). Used for the abstract claims, the model and token counts of Gopher and Chinchilla, the `6ND` approximation, the exponent summary, the parametric form and its reported constants, the 40B projection for the Gopher budget, Table A3 (the Approach 3 row for 67B: `1.71e24` FLOPs, 4.1T tokens), the single-epoch caveat and the remark on inference cost.
+- Kaplan et al., "Scaling Laws for Neural Language Models", arXiv:2001.08361, full text (ar5iv rendering). Used for the power-law forms and exponents quoted, the statement about architectural details, the fixed-budget conclusion and `N ~ C_min^0.73`, `D ~ N^0.74`, and the remarks that the smallest-dataset runs (an epoch of about 40 updates) fit poorly.
 - Lee et al., "Deduplicating Training Data Makes Language Models Better", arXiv:2107.06499, full text (ar5iv rendering). Used for the memorisation and duplicate-count statistics, the 4% train-test overlap, the two deduplication tools, the 50-token minimum, and the description of GPT-3's 13-gram overlap filter (as described by these authors, not read in the GPT-3 paper).
 
 Not consulted, and nothing above relies on them: later work that refits or questions the compute-optimal constants, the GPT-3, Gopher, C4 and other corpus papers themselves, quality-filtering and data-mixture studies, and any data about proprietary training sets. Quality filtering and mixture design are named only; this lesson says nothing about how they are done.
