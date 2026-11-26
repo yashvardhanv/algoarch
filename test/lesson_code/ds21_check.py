@@ -69,6 +69,7 @@ for _ in range(400):
     assert can_partition_k(list(nums), k) == brute_k(nums, k), (nums, k)
 assert can_partition_k([4, 3, 2, 3, 5, 2, 1], 4) is True
 assert can_partition_k([1, 2, 3, 4], 3) is False
+assert can_partition_k([5], 1) is True and can_partition_k([5], 2) is False
 
 # submasks: exactly the non-empty submasks, each once, descending; total over all masks is 3^n - 2^n
 for mask in range(0, 64):

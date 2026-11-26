@@ -8,8 +8,7 @@
 Some problems ask you to choose among, order, or partition a small set of items, and the answer
 depends on *which* items are already used. The set of used items is the DP state. When there are at
 most about 20 items, that set fits in one integer, one bit per item, and `2^n` states is affordable.
-This lesson gives you the template, four worked problems, and the one counting argument interviewers
-like to hear.
+This lesson gives you the template, four worked problems, and the counting argument for why submask enumeration costs `3^n`; say it out loud.
 
 ---
 
@@ -134,6 +133,7 @@ via `% t`.
 
 ```python
 def can_partition_k_subsets(nums, k):
+    """Can nums (positive integers, non-empty) split into k subsets of equal sum?"""
     total = sum(nums)
     if total % k:
         return False
