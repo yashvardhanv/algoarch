@@ -236,3 +236,12 @@ test('ds27 lesson code matches reference checks', { skip: py ? false : 'python n
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.match(r.stdout, /ds27 code checks passed/);
 });
+
+test('ds28 lesson code matches reference checks', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'ds28_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'ds28-recursion-fundamentals.md'),
+  ], { encoding: 'utf8', timeout: 120000 });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /ds28 code checks passed/);
+});
