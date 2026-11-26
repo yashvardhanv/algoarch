@@ -291,7 +291,7 @@ implementations use arbitrary-precision strings or re-space positions; say which
 
 ## 8. What Real Companies Did (Dated)
 
-- **Google Docs (Google Drive Blog, 22 September 2010):** operational transformation over a revision log of three
+- **Google Docs (Google Drive Blog, 22 September 2010):** described as consistent with operational transformation (protocol details were not read), over a revision log of three
   change types (insert text, delete text, apply style); each change goes from an editor to the server and then to
   the other editors, which transform it against their local version. Details and examples are in Deep Dive 1.
 - **Figma (Figma Blog, 16 October 2019):** a server-authoritative, CRDT-inspired design rather than OT or true CRDTs:

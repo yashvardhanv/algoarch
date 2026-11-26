@@ -282,7 +282,7 @@ All read 2026-11-26.
   Source for the banking example and the comparisons with linearizability, serializability and strong consistency.
 - Google Cloud, *Regional, dual-region, and multi-region configurations*, cloud.google.com/spanner/docs/instance-configurations
   (regional, dual-region and the start of the multi-region sections). Source for replica layouts, quorum rules, failover
-  times, availability figures and zero RPO.
+  times, availability figures and zero RPO for dual-region only.
 - Google Cloud, *Disaster recovery overview*, cloud.google.com/spanner/docs/backup/disaster-recovery-overview. Source for
   PITR (7 days), backup retention (one year), cross-region backup copies, deletion protection and 99.999% for multi-region.
 

@@ -98,7 +98,7 @@ POST /products/_pit?keep_alive=1m returns a point-in-time id for stable deep pag
 
 A document is routed to a shard by `shard_num = hash(_routing) % num_primary_shards`, where `_routing`
 defaults to the document id. Because the shard count is in the formula, **the number of primaries is
-effectively fixed for an index**; changing it means copying into a new index (the split and shrink APIs do this for you). Choose it from the
+effectively fixed for an index**; changing it means copying into a new index (the split and shrink APIs can change it in constrained ways). Choose it from the
 capacity estimate, not by habit.
 
 Inside a shard the index is an **inverted index**: for each term, the documents that contain it and how
@@ -116,7 +116,7 @@ with `IDF(q) = ln(1 + (N - n(q) + 0.5) / (n(q) + 0.5))`. `f` is the term's count
 document's length, `avgdl` the average length, `N` the number of documents and `n(q)` how many contain
 the term. Lucene's defaults are `k1 = 1.2` and `b = 0.75`. This is the textbook form of BM25; Lucene's
 scorer does not use exactly this expression, so absolute scores in Elasticsearch's `_explain` output differ
-from it by constant factors, but the ranking is the same.
+from it (Lucene omits the k1 + 1 factor and stores document length in a lossy one-byte norm).
 
 Read the formula as two ideas: **rare terms count more** (IDF), and **repeating a term helps less and
 less, more so in long documents** (the saturating fraction, normalised by length).
