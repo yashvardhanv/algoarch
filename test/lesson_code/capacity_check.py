@@ -73,7 +73,23 @@ def sy39(src):
          '7,776,000 seconds', '2^23 = 8,388,608', 'points < 1,048,576')
     return 'sy39'
 
-SECTIONS = {'sy37': sy37, 'sy38': sy38, 'sy39': sy39}
+def sy40(src):
+    poll_s, drift_us_per_s, comm_ms, eps_avg_ms = 30, 200, 1, 4        # from the Spanner paper, Section 3
+    drift_ms = poll_s * drift_us_per_s / 1000
+    assert drift_ms == 6 and drift_ms + comm_ms == 7
+    assert 2 * eps_avg_ms == 8
+    assert round(14.4 - 9.4, 1) == 5.0                                   # Table 3: 1 replica vs commit wait off
+    writes, lag_s = 5000, 2                                              # assumptions
+    assert writes * lag_s == 10000
+    minutes = 365 * 24 * 60
+    assert minutes == 525600
+    assert round(minutes * 1e-4, 2) == 52.56 and round(minutes * 1e-5, 3) == 5.256
+    need(src, '30 s x 200 us/s = 6 ms', '= 7 ms peak', 'at least 2 x average ε = 8 ms', '9.4 ms vs 14.4 ms: about 5 ms',
+         '2 s x 5,000 = 10,000 committed transactions', '52.56 vs 5.256 minutes', '525,600 minutes per year',
+         '10,000 transactions in the assumed scenario')
+    return 'sy40'
+
+SECTIONS = {'sy37': sy37, 'sy38': sy38, 'sy39': sy39, 'sy40': sy40}
 
 done = []
 for path in sys.argv[1:]:
