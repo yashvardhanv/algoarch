@@ -344,3 +344,26 @@ test('sy50 lesson code matches datetime arithmetic, a minute-by-minute budget co
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.match(r.stdout, /sy50 code checks passed/);
 });
+
+test('sy54 lesson code matches an RFC 3986 oracle, a regex robots matcher, a fetch-log audit and a breadth-first reference crawl', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'sy54_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'sy54-web-crawler.md'),
+  ], { encoding: 'utf8', timeout: 180000 });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /sy54 code checks passed/);
+});
+
+const CAPACITY_LESSONS_C = [
+  'sy54-web-crawler.md',
+];
+
+test('sy54-sy56 capacity estimates are reproduced by script', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'capacity_check_c.py'),
+    ...CAPACITY_LESSONS_C.map((f) => path.join(__dirname, '..', 'data', 'new_lessons', f)),
+  ], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /capacity checks passed/);
+  for (const f of CAPACITY_LESSONS_C) assert.match(r.stdout, new RegExp(f.slice(0, 4)));
+});
