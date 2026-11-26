@@ -290,3 +290,12 @@ test('sy45 lesson code matches brute-force ring lookups, exhaustive cache-aside 
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.match(r.stdout, /sy45 code checks passed/);
 });
+
+test('sy46 lesson code matches an independent happened-before, the published Dynamo example and brute-force linearizability', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'sy46_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'sy46-time-clocks-ordering.md'),
+  ], { encoding: 'utf8', timeout: 180000 });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /sy46 code checks passed/);
+});
