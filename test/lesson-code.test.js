@@ -317,3 +317,12 @@ test('sy49 lesson code matches an independent retry-loop simulator and the metas
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.match(r.stdout, /sy49 code checks passed/);
 });
+
+test('sy51 lesson code matches a per-read replica brute force, a batching event simulation and full enumeration of contention', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'sy51_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'sy51-scaling-patterns-reads-writes.md'),
+  ], { encoding: 'utf8', timeout: 180000 });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /sy51 code checks passed/);
+});
