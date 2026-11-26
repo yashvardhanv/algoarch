@@ -38,10 +38,12 @@ Company ladders usually define one Staff expectation. In practice the job takes 
 
 | Archetype | One-line job | Typical scope | Shape of a good story | Characteristic risk |
 |---|---|---|---|---|
-| **Tech Lead** | Guides approach and execution for one team, or a small cluster, in close partnership with its manager | A team's roadmap and its hardest technical calls | You scoped something complex, delegated the pieces, unblocked people, and the team's output grew while your own code shrank | Doing the Tech Lead job at Senior impact: coordinating without changing what the team can do |
-| **Architect** | Owns direction, quality and approach for a critical technical domain (storage, APIs, a frontend stack) | One domain, across many teams, for years | You held a long-lived technical direction, earned authority through repeated good judgement, and kept close to real users and real code | Designing in isolation; judgement decays the further you drift from real work |
+| **Tech Lead** | Guides approach and execution for one team, or a small cluster, in close partnership with its manager | A team's roadmap and its hardest technical calls | You scoped something complex, delegated the pieces, unblocked people, and the team's impact grew as your own coding shrank | Performing the role without the impact expected of Staff; Larson says you will find non-Staff engineers acting out every archetype |
+| **Architect** | Owns direction, quality and approach for a critical technical domain (storage, APIs, a frontend stack) | One domain that is complex and enduringly central, across many teams, for years | You held a long-lived technical direction and earned authority through consistently good judgement, with a working grasp of business needs, user goals and technical constraints | The stereotype of designing in isolation and handing designs over; Larson says the Architects he interviewed avoid it. Companies differ on whether Architects write code, and he says both models work |
 | **Solver** | Goes deep on a knotty problem leadership has marked critical, until it is contained | One problem at a time, wherever it is | A hard, risky, unclear problem; you found a path, the problem became ordinary, and you moved on | Leaving the "solved" problem behind with teams that now must maintain it |
-| **Right Hand** | Extends a senior leader's attention, borrowing their authority across a large organisation | A whole organisation, mostly non-purely-technical problems | You walked into a fire, edited the approach, handed execution to the right team, and went to the next fire | Always moving on before you see the result; authority is borrowed, so it requires staying aligned with that leader |
+| **Right Hand** | Extends a senior leader's attention, borrowing their authority across a large organisation | A whole organisation, with problems that are never purely technical | You walked into a fire, edited the approach, handed execution to the right team, and went to the next fire | Always moving on before you see the result; authority is borrowed, so it requires staying aligned with that leader |
+
+Visual (planned): a four-column strip, one column per archetype, showing the scope each covers (one team, one domain, one problem, one organisation) against the organisation size at which it tends to appear.
 
 Larson also reports that the archetypes appear at different organisation sizes. Tech Leads exist almost everywhere, and he says an organisation needs roughly one per eight engineers. Architects tend to appear as organisations grow large or carry heavy technical debt. Solvers are common where individuals rather than teams are the unit of planning. Right Hands appear only in organisations of many hundreds or thousands of engineers. Treat these as his observations from his interviews, not as measurements.
 
@@ -61,7 +63,7 @@ Larson's overview names a small shared foundation under all four archetypes. Thi
 | **Exploration** | Being one of a few trusted people given an ambiguous, important problem and a few months | What you tried, what you ruled out, what you reported, and how you handled the real possibility of failure |
 | **Being glue** | The needed but often invisible work that keeps the team shipping (see Tanya Reilly's talk in Sources) | The cost of the work if it had not been done, stated in outcomes. Lesson 12 covers how to frame it |
 
-On writing code: Larson's interview answers, taken together, say most Staff engineers write some, a few write none, none write as much as before, and an occasional all-coding week is normal while frequent ones can signal comfortable rather than important work. He also reports a reason several keep some hands-on work: it keeps their decisions informed by what the rest of the team experiences. Have a one-sentence answer ready for "do you still code?" that names what you wrote recently and why (Lesson 03 already drills the manager version of this question).
+On writing code: Larson's interview answers, taken together, say most Staff engineers write some, a few write none, none write as much as before, and an occasional all-coding week is normal while frequent ones can signal comfortable rather than important work. One interviewee he quotes gives a reason to keep some hands-on work: it keeps strategy and other large decisions informed by what the rest of the team experiences. Have a one-sentence answer ready for "do you still code?" that names what you wrote recently and why (Lesson 03 already drills the manager version of this question).
 
 **Slow feedback is part of the job.** Larson notes that the timeframes lengthen from days to weeks, months and years, and that ending some days feeling you accomplished nothing is normal. In a story, this shows up as a measure with a long horizon. If every result in your story landed within a sprint, the interviewer may reasonably conclude your scope was a sprint.
 
@@ -91,7 +93,7 @@ Two details in that framework are worth carrying into an interview.
 
 ## 5. Choosing What to Work On
 
-If the job is choosing problems, then what you decline is part of your story. Larson's "work on what matters" guide gives a vocabulary that works in an interview as well as in a week.
+If the job is choosing problems, then what you decline is part of your story. Larson's "work on what matters" guide gives a vocabulary that works in an interview as well as in a week. "Snacking" is a term he takes from Hunter Walk; "preening" and "chasing ghosts" are his own.
 
 | Trap | What it is | How to recognise it in your own stories |
 |---|---|---|
@@ -115,17 +117,17 @@ The last one is the best Staff-story question. "What would not have happened if 
 
 These are invented. They show how the same facts read differently under different archetypes, and what a missing piece sounds like.
 
-### 6.1 A Tech Lead story, told weakly and then well
+### 6.1 Lifting a team-lead story to Staff altitude
 
-*Illustrative scenario: a payments team of eight, one manager.*
+If you wrote your Lesson 02 inventory, one of your stories is probably a hands-on lead who became the bottleneck on every decision, then split decisions into "mine" and "the owner's" and made code review a teaching surface (Lesson 02, Story 3). That is a good Tech Lead story: it has a real failure and a result inside the team. By this lesson's own tests it is still a team-scope story, because nothing in it reaches another team, nobody loses, and the result lands within the team's own horizon. The lift is not a new project; it is finding the part of the true story that already reaches further and telling that part. The example below is **illustrative**: invented facts showing what the lifted version contains. If your true facts do not reach this far, keep the Senior-scope version and do not stretch it.
 
-**Weak.** "I was the tech lead for the checkout rewrite. I broke it into tasks, assigned them, reviewed all the pull requests, and we shipped on time."
+*Illustrative scenario: three teams that share one service interface; you lead one of them.*
 
-Nothing is wrong, but the interviewer cannot tell what would have happened without you, and your review of every pull request suggests the team could not decide without you.
+**Team scope (what the interview already knows).** "Cross-service changes waited on me for review, so I split which decisions were mine and which were the owner's, and the team stopped waiting."
 
-**Better.** "The team kept missing estimates because every cross-service change waited on one reviewer: me. I wrote down the three decisions that were actually blocking people, made two of them with the team in a single meeting, and wrote a short guide for the third. I stopped reviewing most pull requests after that and moved to reviewing only interface changes. The measure I watched was how many changes waited more than a day for review, which fell over the next quarter. What I would change: I should have asked the engineers what they were blocked on before assuming it was approvals."
+**Lifted.** "The same wait showed up on the two neighbouring teams, because all three of us changed one shared interface and none of us owned it. I proposed that the three teams rotate an interface owner and that the owner, not a central reviewer, decide breaking changes, with a written compatibility rule. The lead of one neighbouring team wanted a single central reviewer instead; I lost that argument, so I offered to run the rotation as a pilot for one quarter and agreed that we would switch if the pilot failed on the measure we had agreed beforehand, the time a change waits for a decision. It held for the first quarter, so we kept it. I kept tracking it for the next three quarters through two reorganisations, and the rotation survived because the rule was written down and the owner list lived in the repository. What I would change: I should have asked the neighbour's lead for their failure case before the pilot, not after."
 
-What improved: the problem was found rather than assigned; there is a decision and its reason; the team gets stronger while the lead's own throughput on one task falls; there is a measure with a horizon; there is an unprompted mistake. (Labelled as illustrative: use a real number from your own work if it exists, and say so if it does not.)
+Check it against the lesson's own tests. It reaches two teams you did not manage. It has a decision and a named loser, and a written way to be proved wrong. The measure has a horizon longer than one release. It says what lasted without you, and has an unprompted mistake. (Use a real number from your own work if one exists; if you did not measure it, say so.)
 
 ### 6.2 A Solver story
 
@@ -162,7 +164,7 @@ The skeleton: leadership flagged it as a risk to a launch; no team could reprodu
 1. In two sentences, explain why "a Staff engineer is a faster Senior engineer" is a misleading description. Name two things that move from the centre of the week to the edge.
 2. Name Larson's four archetypes and give the typical ending of a good story for each.
 3. Why does the Dropbox framework say its archetype tables are not a checklist, and how should that change the way you present yourself?
-4. Rewrite this at Staff altitude, keeping the facts invented but plausible and labelled as illustrative: "I was tech lead for the search migration and we finished on time."
+4. Rewrite this at Staff altitude, keeping the facts invented but plausible and labelled as illustrative: "I was tech lead for the search migration and we finished on time." Your rewrite must name a team beyond your own, a loser, and a measure with a horizon longer than one release.
 5. What is the difference between snacking and preening? Give one example of each from your own week.
 6. Name the five shared activities in §3. Pick the one you have least evidence for and say what story you would need to find.
 7. An interviewer says: "Your result all landed in one quarter." What does the interviewer suspect about your scope, and what could you add if it is true?
@@ -186,7 +188,7 @@ The skeleton: leadership flagged it as a risk to a launch; no team could reprodu
 
 All pages below were read in full or in the stated part on 2026-11-26. Statements about what an organisation's internal rubric says are limited to the public Dropbox framework.
 
-- Will Larson, *Staff Engineer* guides, staffeng.com/guides: "Staff archetypes", "What do Staff engineers actually do?", "Work on what matters", read in full. Used for: the four archetypes and where they tend to appear; the shared foundation of activities; the observations about writing code and slow feedback; snacking, preening and chasing ghosts. The interview-derived statements (one Tech Lead per eight engineers, the stages at which archetypes appear) are Larson's reports from his own interviews, not measured data.
+- Will Larson, *Staff Engineer* guides, staffeng.com/guides: "Staff archetypes", "What do Staff engineers actually do?", "Work on what matters", read in full. Used for: the four archetypes and where they tend to appear; the shared foundation of activities; the observations about writing code and slow feedback; snacking (Larson credits the word to Hunter Walk), preening and chasing ghosts (both Larson's). The interview-derived statements (one Tech Lead per eight engineers, the stages at which archetypes appear) are Larson's reports from his own interviews, not measured data.
 - Dropbox Engineering Career Framework, dropbox.github.io/dbx-career-framework: IC5 Staff Software Engineer page, "What is Impact?", "Archetypes Behaviors", "Clarifications and Myths", and "Promotion Principles", read in full; the IC4 Software Engineer page was read as well. No page shows a date. The Staff expectations paraphrased in §4 come from these pages.
 - Tanya Reilly, "Being Glue" (talk text), noidea.dog/glue, read in part (the opening abstract and the first half of the story). Used only to define glue work.
 
