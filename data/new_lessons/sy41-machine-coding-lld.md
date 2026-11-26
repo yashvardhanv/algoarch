@@ -123,10 +123,12 @@ class ParkingLot:
 
     def leave(self, tid, now):
         with self.lock:
-            spot, vehicle_type, entered, plate = self.tickets.pop(tid)   # KeyError: unknown or reused ticket
+            spot, vehicle_type, entered, plate = self.tickets[tid]       # KeyError: unknown or reused ticket
+            fee = self.fee_policy.fee(vehicle_type, entered, now)        # validate (raises) before changing state
+            del self.tickets[tid]
             del self.parked[plate]
             heapq.heappush(self.free[self.size_of[spot]], spot)
-        return self.fee_policy.fee(vehicle_type, entered, now)
+        return fee
 ```
 
 The fee rule is a separate object, so "weekend rates" or "per-minute billing" is a new class and the lot does not
@@ -250,7 +252,8 @@ minimal: take balances Asha -40, Ben -30, Chen +20, Dev +20, Esha +30. Greedy ha
 **four** payments. The minimum is **three**: Ben pays Esha 30, Asha pays Chen 20 and Dev 20, because {Ben, Esha} is a
 group whose balances already sum to zero. In general a group of `k` people summing to zero settles in `k - 1`
 payments, so the minimum is `n` minus the largest number of disjoint zero-sum groups. Finding that is a subset
-problem; for a trip-sized group this DP is exact:
+problem, and in general an NP-hard one (it contains subset sum: deciding whether some of the debts sum exactly to a
+given creditor's balance); for a trip-sized group this DP is exact:
 
 ```python
 def min_payments(net):

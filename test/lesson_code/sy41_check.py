@@ -87,7 +87,19 @@ try:
 except ValueError:
     pass
 
-# concurrency: 50 threads, 20 spots, exactly 20 tickets and no spot twice
+# leaving "before" entering is rejected without touching state: the ticket stays valid and the spot stays taken
+lot = ParkingLot({(0, 0): Size.COMPACT}, f)
+tid, spot = lot.park('EARLY', 'car', 100)
+try:
+    lot.leave(tid, 50)
+    raise AssertionError('negative stay accepted')
+except ValueError:
+    pass
+assert tid in lot.tickets and 'EARLY' in lot.parked and not lot.free[Size.COMPACT]
+assert lot.leave(tid, 200) == 400 and lot.free[Size.COMPACT] == [(0, 0)]
+
+# concurrency. Threaded tests find races probabilistically: a pass means no race showed up in these interleavings.
+# 50 threads, 20 spots, exactly 20 tickets and no spot twice
 for _ in range(5):
     layout = {(0, i): Size.COMPACT for i in range(20)}
     lot = ParkingLot(layout, f)
