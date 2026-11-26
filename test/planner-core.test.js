@@ -106,3 +106,20 @@ test('isPathwayLocked', () => {
   assert.equal(isPathwayLocked({ id: 'deep' }, false), true);
   assert.equal(isPathwayLocked({ id: 'deep' }, true), false);
 });
+
+test('hoursNeeded accounts for packing when the target is missed', () => {
+  const p = pathway(...Array.from({ length: 13 }, (_, i) => lesson('l' + i, 45)));
+  const a = buildSchedule(p, [], { hoursPerWeek: 5, weeks: 2 });
+  assert.equal(a.fits, false);
+  assert.ok(a.hoursNeeded > 5);
+  const re = buildSchedule(p, [], { hoursPerWeek: a.hoursNeeded, weeks: 2 });
+  assert.ok(re.weeks.length <= 2);
+  assert.ok(a.hoursNeeded > Math.ceil(a.remainingMinutes / 60 / 2));
+});
+
+test('hoursNeeded caps at 40 when nothing fits', () => {
+  const p = pathway(...Array.from({ length: 200 }, (_, i) => lesson('l' + i, 60)));
+  const a = buildSchedule(p, [], { hoursPerWeek: 10, weeks: 1 });
+  assert.equal(a.fits, false);
+  assert.equal(a.hoursNeeded, 40);
+});

@@ -38,17 +38,11 @@
     return { done, total, percent: total ? Math.round((done / total) * 100) : 0, minutesTotal, minutesLeft, next };
   }
 
-  function buildSchedule(pathway, completed, opts) {
-    const o = opts || {};
-    const budget = clampHours(o.hoursPerWeek) * 60;
-    const doneSet = new Set(completed || []);
-    const remaining = lessonsOf(pathway).filter((l) => !doneSet.has(l.id));
+  function packWeeks(lessons, budget) {
     const weeks = [];
     let cur = null;
-    let remainingMinutes = 0;
-    for (const l of remaining) {
+    for (const l of lessons) {
       const m = minutesOf(l.duration);
-      remainingMinutes += m;
       if (!cur || (cur.lessons.length > 0 && cur.minutes + m > budget)) {
         cur = { n: weeks.length + 1, minutes: 0, lessons: [] };
         weeks.push(cur);
@@ -56,14 +50,34 @@
       cur.lessons.push(l);
       cur.minutes += m;
     }
+    return weeks;
+  }
+
+  function buildSchedule(pathway, completed, opts) {
+    const o = opts || {};
+    const doneSet = new Set(completed || []);
+    const remaining = lessonsOf(pathway).filter((l) => !doneSet.has(l.id));
+    const weeks = packWeeks(remaining, clampHours(o.hoursPerWeek) * 60);
+    const remainingMinutes = remaining.reduce((sum, l) => sum + minutesOf(l.duration), 0);
     const target = typeof o.weeks === 'number' && o.weeks > 0 ? o.weeks : null;
+    const fits = target === null ? true : weeks.length <= target;
+    let hoursNeeded = null;
+    if (target !== null) {
+      hoursNeeded = Math.ceil(remainingMinutes / 60 / target);
+      if (!fits) {
+        // Lessons do not split across weeks, so step up until the packing really fits.
+        let h = Math.min(40, Math.max(1, hoursNeeded));
+        while (h < 40 && packWeeks(remaining, h * 60).length > target) h++;
+        hoursNeeded = h;
+      }
+    }
     return {
       weeks,
       remainingLessons: remaining.length,
       remainingMinutes,
       weeksNeeded: weeks.length,
-      fits: target === null ? true : weeks.length <= target,
-      hoursNeeded: target === null ? null : Math.ceil(remainingMinutes / 60 / target),
+      fits,
+      hoursNeeded,
     };
   }
 
