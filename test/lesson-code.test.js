@@ -95,3 +95,12 @@ test('ai24 lesson code matches reference checks', { skip: py ? false : 'python n
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.match(r.stdout, /ai24 code checks passed/);
 });
+
+test('ai25 lesson code matches reference checks', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'ai25_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'ai25-constrained-generation.md'),
+  ], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /ai25 code checks passed/);
+});
