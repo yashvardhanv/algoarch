@@ -18,7 +18,7 @@ A language model has to let each token's representation depend on the tokens aro
 
 What follows from it:
 
-- **Everything is a weighted average.** The weights are non-negative and sum to one per query, so the output lies in the span of the values. Nothing in that formula knows the order of the tokens.
+- **Everything is a weighted average.** The weights are non-negative and sum to one per query, so each output is a convex combination of the value rows: it lies in their convex hull and cannot leave the range the values span. Nothing in that formula knows the order of the tokens.
 - **Order has to be added.** Without a positional signal, shuffling the input shuffles the output and nothing else (section 5 shows it).
 - **A mask is a rule about who may look at whom.** For next-token prediction a token must not see later tokens, or training would just copy the answer. The mask is applied before the softmax, as minus infinity, so those weights are exactly zero.
 - **Only attention mixes tokens.** The feed-forward network, the normalisation and the residual additions all act on each token separately. That is why the leak test in section 6 can be so strong: if attention is masked, nothing else can carry information backwards.
@@ -131,7 +131,7 @@ For a language model, position `i` may attend to positions `0..i` only. The mask
 
 The test that matters is behavioural, not structural: change one token, run the whole layer, and compare the outputs at *earlier* positions. With the mask they must be identical, bit for bit, because the changed token can influence earlier positions through no path; without the mask they must differ. The check does this for random sequences and positions, through the full layer defined in the next section.
 
-A common bug is to apply the mask after the softmax (zeroing weights but not renormalising, so rows no longer sum to one) or to forget it at inference. Another is to mask with a large negative finite number such as `-1e9` in low precision, which can underflow to a value that is not negative enough, or to overflow when added; `-inf` with a max-subtracted softmax is the safe form in this code.
+A common bug is to apply the mask after the softmax (zeroing weights but not renormalising, so rows no longer sum to one) or to forget it at inference. Another is a row where every position is masked: `softmax` of all `-inf` is `nan`, so padding masks need a guard. This code masks with `-inf` and a max-subtracted softmax, which makes masked weights exactly zero; if you mask with a large finite negative number instead, check that it is negative enough for the score scale and numeric precision you use, because nothing in the sources read here covers that case.
 
 ---
 
