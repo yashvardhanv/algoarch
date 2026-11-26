@@ -104,3 +104,12 @@ test('ai25 lesson code matches reference checks', { skip: py ? false : 'python n
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.match(r.stdout, /ai25 code checks passed/);
 });
+
+test('ai26 lesson code matches reference checks', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'ai26_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'ai26-dpo-alignment.md'),
+  ], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /ai26 code checks passed/);
+});
