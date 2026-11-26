@@ -326,3 +326,12 @@ test('sy51 lesson code matches a per-read replica brute force, a batching event 
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.match(r.stdout, /sy51 code checks passed/);
 });
+
+test('sy52 lesson code matches fault-injected upload, task-store and event-stream references and the standard\'s own examples', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'sy52_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'sy52-scaling-patterns-blobs-tasks-realtime.md'),
+  ], { encoding: 'utf8', timeout: 180000 });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /sy52 code checks passed/);
+});
