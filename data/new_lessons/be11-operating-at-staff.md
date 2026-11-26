@@ -46,6 +46,8 @@ Larson's opening claim is that low technical quality is usually not a crisis cau
 
 ### 3.2 The staircase
 
+Visual (planned): a staircase of seven steps from hot spots up to a quality program, with a marker showing that real organisations step up and down rather than climb once.
+
 He lists seven approaches in the order to try them: fix hot spots; adopt best practices; prioritise leverage points; align technical vectors; measure quality; create a quality team; run a quality program. He also says real organisations do not climb linearly: you may hot-spot, roll out a practice, set up a review, abolish it and return to hot-spotting. Pick the cheapest tool likely to work.
 
 | Step | Idea | A test for "am I at the right step?" |
@@ -95,7 +97,7 @@ He is explicit that "managing up" done well is about increasing bandwidth and re
 
 ### 4.2 Illustrative scenario
 
-*You disagree with a reorganisation that will split a platform team.* A weak response: argue in a leadership meeting, lose, then complain. A better sequence: first ask your manager what problem the reorganisation is solving; send them, privately, the two pieces of data that bear on the risk; state your concern once, in writing, with the alternative; and if the decision stands, agree and commit, then watch the specific risk you named and report on it later. The point is to stay in the room, and the answer you would give in a behavioral round is the one that shows both a clear opinion and the discipline to commit.
+*You disagree with a reorganisation that will split a platform team.* A weak response: argue in a leadership meeting, lose, then complain. A better sequence: first ask your manager what problem the reorganisation is solving; send them, privately, the two pieces of data that bear on the risk; state your concern once, in writing, with the alternative; and if the decision stands, agree and commit, then watch the specific risk you named and report on it later. The point is to stay in the room, and the answer you would give in a behavioral round is the one that shows both a clear opinion and the discipline to commit. Lesson 04 already covers the "disagree and commit" half of this for the Amazon loop; what this lesson adds is the private data to your sponsor first, and naming the specific risk so you can watch it and report back afterwards.
 
 ---
 
@@ -155,6 +157,12 @@ The paragraph is complete on its own. If the meeting only reaches this opening, 
 | "Tell me about a disagreement with a senior leader." | Their goal, your data, your single clear statement, the commitment after the decision, and what you watched afterwards |
 | "How do you present to executives?" | The purpose of the meeting, the SCQA opening, the pre-alignment, and how you handled feedback live |
 
+**A worked answer: influencing without authority (illustrative).** *Illustrative scenario: you want three teams to stop sharing one overloaded database.*
+
+> "Three teams read and wrote one database, and a slow query from any of them hurt the others. I did not own any of those teams. My manager's priority that quarter was fewer incidents, so I framed it that way: I wrote a one-page SCQA opening and sent it to my manager first, with the incident list as the data. I told her the two things I did not know: whether the teams would accept ownership boundaries, and what it would cost them. I then met each team lead separately before any group meeting, and one of them pointed out that their batch job could not tolerate the proposed schedule, so I changed the plan to move that job last. At the review the proposal was a recommendation with a changed shape, not a surprise. One lead still disagreed; I asked them to name the single risk they most feared, we wrote it into the plan with an owner, and I reported on that risk monthly. What I would change: I should have talked to the batch job's owner before drafting, not after."
+
+Why this works: it starts from the sponsor's priority, it shows the context you fed upward, it uses pre-alignment, it lets feedback change the plan, it names the dissenter's risk instead of arguing it down, and it ends with an unprompted mistake. Every fact in it must come from your own work if you tell it; if a step did not happen, leave it out.
+
 Keep your own stories honest: if your quality work was a hot-spot fix, tell it as that. A modest, measured fix is a better story than an inflated program.
 
 ---
@@ -181,7 +189,7 @@ Keep your own stories honest: if your quality work was a hot-spot fix, tell it a
 3. Why limit yourself to one best-practice rollout at a time? What goes wrong if you run several?
 4. What are the three leverage points and why does each deserve extra care?
 5. Explain "authority is loaned" and what it implies you should do daily.
-6. List the three reasons an executive meeting happens and what your goal is in each.
+6. List the three reasons an executive meeting happens. What single goal does Larson give you for all three, and why does going in to change their mind backfire?
 7. Write an SCQA opening paragraph, with invented, labelled-illustrative facts, proposing to delay a feature to fix an operational problem.
 8. A senior leader rejects your proposal in a meeting. Describe, step by step, what you do in the meeting, after it, and two weeks later.
 
@@ -206,7 +214,6 @@ All read on 2026-11-26. This lesson rests on one author's guides, which are prac
 - Will Larson, "Manage technical quality", staffeng.com/guides/manage-technical-quality, read through the quality-program section and the first paragraphs of the closing section; the final paragraphs were not read.
 - Will Larson, "Staying aligned with authority", staffeng.com/guides/staying-aligned-with-authority, read in full.
 - Will Larson, "Present to executives", staffeng.com/guides/present-to-executives, read in full.
-- Dropbox Engineering Career Framework, IC5 Staff Software Engineer page, dropbox.github.io/dbx-career-framework, read 2026-11-26 (communication, decision-making and strategy expectations, used only to show that a published ladder asks for them).
 
 **Not consulted:** *Accelerate*, *The Pyramid Principle*, *A Philosophy of Software Design*, and *Building Evolutionary Architectures*, all cited by Larson. This lesson relays his description of them and does not vouch for them. The staffeng.com guides on creating space for others and building a network of peers were not read.
 
