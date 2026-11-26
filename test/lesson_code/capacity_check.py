@@ -55,7 +55,25 @@ def sy38(src):
          '54 bytes per visible character', '| 36 bytes |')
     return 'sy38'
 
-SECTIONS = {'sy37': sy37, 'sy38': sy38}
+def sy39(src):
+    players, entry_bytes, writes, rank_reads, shard_limit, shards, replicas = 50e6, 100, 5000, 50000, 50000, 4, 2
+    mem_gb = players * entry_bytes / 1e9
+    primary_ops = writes + rank_reads
+    assert mem_gb == 5 and primary_ops == 55000 and primary_ops > shard_limit
+    assert mem_gb / shards == 1.25 and writes / shards == 1250
+    assert rank_reads * shards == 200000                       # every rank asks every shard
+    per_node = rank_reads / (1 + replicas)
+    assert round(per_node) == 16667
+    # packing budget
+    season = 90 * 86400
+    assert season == 7776000 and season < 2**23 == 8388608 and 2**20 == 1048576
+    assert (2**20 - 1) * 2**23 + (2**23 - 1) < 2**43 <= 2**53
+    need(src, '| 5 GB |', '55,000 per second: above the assumed 50,000', '1.25 GB and 1,250 writes/s per shard',
+         '200,000 shard operations/s, 50,000 on every shard', 'about 16,667 rank reads/s per node',
+         '7,776,000 seconds', '2^23 = 8,388,608', 'points < 1,048,576')
+    return 'sy39'
+
+SECTIONS = {'sy37': sy37, 'sy38': sy38, 'sy39': sy39}
 
 done = []
 for path in sys.argv[1:]:

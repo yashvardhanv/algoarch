@@ -132,9 +132,19 @@ test('sy38 lesson code matches reference checks', { skip: py ? false : 'python n
   assert.match(r.stdout, /sy38 code checks passed/);
 });
 
+test('sy39 lesson code matches brute-force checks', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'sy39_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'sy39-realtime-leaderboard.md'),
+  ], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /sy39 code checks passed/);
+});
+
 const CAPACITY_LESSONS = [
   'sy37-distributed-search.md',
   'sy38-collaborative-docs-crdt.md',
+  'sy39-realtime-leaderboard.md',
 ];
 
 test('sy37-sy40 capacity estimates are reproduced by script', { skip: py ? false : 'python not installed' }, () => {
