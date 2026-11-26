@@ -20,11 +20,11 @@ assert kv_cache_bytes(2048, 40, 5120) == 1_677_721_600
 assert 12 * 10**9 // kv_cache_bytes(1, 40, 5120) == 14_648
 assert kv_cache_bytes(1, 32, 8 * 128) == 131_072            # drill 1
 for _ in range(200):
-    t, L, w, bpv = random.randint(0, 5000), random.randint(1, 96), random.randint(1, 16384), random.choice([1, 2, 4])
-    count = 0
-    for kind in ('k', 'v'):
-        count += L * w * t                                 # one value per layer, channel, token
-    assert kv_cache_bytes(t, L, w, bpv) == count * bpv
+    # independent count: build the cache as explicit nested lists of K and V entries and count the bytes
+    t, L, heads, hd, bpv = random.randint(0, 6), random.randint(1, 4), random.randint(1, 4), random.randint(1, 8), random.choice([1, 2, 4])
+    cache = [{kind: [[[0] * hd for _ in range(heads)] for _ in range(t)] for kind in ('k', 'v')} for _ in range(L)]
+    n_values = sum(len(vec) for layer in cache for kind in layer.values() for tok in kind for vec in tok)
+    assert kv_cache_bytes(t, L, heads * hd, bpv) == n_values * bpv
 
 # --- waste comparison: the lesson's illustrative run, and paged waste < one block per sequence
 assert reserved_vs_used([120, 900, 300, 2048], 2048, 16) == (3368, 8192, 3392)

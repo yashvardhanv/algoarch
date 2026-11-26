@@ -214,8 +214,9 @@ suffers at small block sizes because of many small transfers.
 Request-level batching runs a batch until its longest member finishes, so a new arrival waits for the
 slowest request, and finished slots sit idle. Iteration-level scheduling (introduced by Orca, used by
 vLLM) re-forms the batch after every decode step: finished sequences leave, waiting ones join, and a
-new request waits at most one iteration. Paged KV memory is what makes this cheap, because a joining
-sequence needs only one free block, not a contiguous max-length buffer.
+new request waits at most one iteration, if there is memory for it (otherwise it queues, and §5's
+preemption decides who gives way). Paged KV memory is what makes this cheap, because a joining sequence
+needs only the blocks its prompt fills, not a contiguous max-length buffer.
 
 ---
 
