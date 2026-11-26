@@ -40,7 +40,41 @@ def sy54(src):
          '781,250,000 URLs', 'about 19.7%', '1,157 robots.txt fetches per second', 'about 386 per second')
     return 'sy54'
 
-SECTIONS = {'sy54': sy54}
+def sy55(src):
+    dau, per_user, peak, mb, row_b, devices, conn_per_server = 100e6, 20, 3, 2, 300, 2, 100000
+    block_mb, blocklist_mb, hash_b, eb, entry_b, others = 4, 100, 32, 1e18, 64, 1.5
+    new_gb, link_mbit = 50, 100
+    up_mb_s, down_mb_s = 1.2, 5
+    events = dau * per_user / 86400
+    whole_file = events * mb / 1e3
+    rows_day = dau * per_user
+    journal_gb_day = rows_day * row_b / 1e9
+    journal_tb_year = rows_day * row_b * 365 / 1e12
+    blocks_in_list = blocklist_mb / block_mb
+    blocks = eb / (block_mb * 1e6)
+    index_tb = blocks * entry_b / 1e12
+    conns = dau * devices
+    notif = events * others
+    first_sync_s = new_gb * 1e9 * 8 / (link_mbit * 1e6)
+    seq = 1 / up_mb_s + 1 / down_mb_s                       # seconds per MB, upload then download
+    overlap = 1 / up_mb_s                                   # download hidden behind the slower upload
+    saving = 1 - overlap / seq
+    assert round(events) == 23148 and round(events * peak) == 69444
+    assert round(whole_file, 1) == 46.3 and round(whole_file * 8) == 370
+    assert rows_day == 2e9 and journal_gb_day == 600 and journal_tb_year == 219
+    assert blocks_in_list == 25 and blocks_in_list * hash_b == 800
+    assert blocks == 2.5e11 and index_tb == 16
+    assert conns == 2e8 and conns / conn_per_server == 2000 and round(notif) == 34722
+    assert first_sync_s == 4000 and round(first_sync_s / 60) == 67 and round(saving * 100) == 19
+    # a 100 MB file with a few bytes inserted at the front: fixed 4 MB blocks all change
+    assert 100 / 4 == 25
+    need(src, '23,148 file changes per second', '69,444 per second', '46.3 GB/s', '370 Gbit/s',
+         '2 billion journal rows per day', '600 GB per day', '219 TB per year', '25 hashes x 32 bytes = 800 bytes',
+         '250 billion blocks', '| 16 TB |', '200 million long-poll connections', '2,000 servers',
+         '34,722 notifications per second', '4,000 seconds, about 67 minutes', 'about 19%')
+    return 'sy55'
+
+SECTIONS = {'sy54': sy54, 'sy55': sy55}
 
 if __name__ == '__main__':
     done = []

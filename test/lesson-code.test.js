@@ -354,8 +354,18 @@ test('sy54 lesson code matches an RFC 3986 oracle, a regex robots matcher, a fet
   assert.match(r.stdout, /sy54 code checks passed/);
 });
 
+test('sy55 lesson code matches a from-scratch window hash, journal replay, every two-client interleaving, crash injection and a brute-force cycle check', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'sy55_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'sy55-file-sync-storage.md'),
+  ], { encoding: 'utf8', timeout: 180000 });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /sy55 code checks passed/);
+});
+
 const CAPACITY_LESSONS_C = [
   'sy54-web-crawler.md',
+  'sy55-file-sync-storage.md',
 ];
 
 test('sy54-sy56 capacity estimates are reproduced by script', { skip: py ? false : 'python not installed' }, () => {
