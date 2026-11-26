@@ -73,6 +73,8 @@ for trial in range(200):
         pts = unpack(-neg, 50)[0]
         b = pts // hist.bucket
         assert lo == sum(1 for q in best.values() if unpack(q, 50)[0] // hist.bucket > b)
+        same = sum(1 for q in best.values() if unpack(q, 50)[0] // hist.bucket == b)
+        assert hi == lo + same - 1, (lo, hi, same)
     boards += 1
 
 # --- capacity statements that depend on the packing

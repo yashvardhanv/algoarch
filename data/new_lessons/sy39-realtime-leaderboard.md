@@ -38,7 +38,7 @@ What follows from it:
 | "top 100 and my rank, live" | a sorted set per leaderboard (Redis `ZADD`, `ZREVRANGE`, `ZREVRANK`) |
 | "keep each player's best score" | `ZADD ... GT` (update only if greater) |
 | "equal scores: earlier wins" | pack points and time into one integer score below 2^53 |
-| "players near me" | rank, then a range around it (`ZREVRANGE rank-r rank+r`) |
+| "players near me" | rank, then a range around it (`ZRANGE key max(0, rank-r) rank+r REV`) |
 | "global board, hundreds of millions of players" | exact top tier plus histogram percentiles for everyone else |
 | "daily / weekly / per-region boards" | one sorted set per board key; expire or archive old ones |
 | "scores must never be lost" | the sorted set is a cache; the durable score log lives in a database |
@@ -73,12 +73,18 @@ the command mix.
 | operations on one primary | 5,000 + 50,000 | 55,000 per second: above the assumed 50,000 |
 | hash-shard into 4: memory and writes per shard | 5 GB / 4; 5,000 / 4 | 1.25 GB and 1,250 writes/s per shard |
 | hash-shard into 4: rank reads | each rank asks all 4 shards | 200,000 shard operations/s, 50,000 on every shard |
-| instead, 1 primary + 2 read replicas | 50,000 / 3 | about 16,667 rank reads/s per node |
+| instead, 1 primary + 2 read replicas | 50,000 / 3 + 5,000 replicated writes | about 21,667 operations/s per node (16,667 rank reads + 5,000 writes) |
+| ten times the writes (50,000/s), 4 hash shards | 50,000 / 4 + 50,000 | 62,500 per shard: above the assumed 50,000 |
+| ten times the writes, 1 primary + 2 replicas | 50,000 / 3 + 50,000 | about 66,667 per node: above the assumed 50,000 |
+| ten times the writes, 4 hash shards each with 2 replicas | 50,000 / 3 + 12,500 | about 29,167 per node |
 
 The punchline is in rows three to five: **hash sharding divides memory and writes but not rank reads**, because a
-rank needs a count from every shard. Replicas divide reads, at the cost of slightly stale ranks (Redis replication
-is asynchronous). For this mix, one primary with read replicas beats hash sharding; with ten times the writes, the
-answer flips.
+rank needs a count from every shard, so every shard still sees all 50,000 rank reads. Replicas divide reads, but every
+replica applies every write, and ranks are slightly stale (Redis replication is asynchronous). For this mix, one
+primary with read replicas fits. With ten times the writes, **neither option fits alone** (rows six and seven):
+combine them, hash shards to divide the writes and replicas on each shard to divide the fan-out rank reads (row
+eight), or shard by score range, which makes a rank read touch one shard plus cached counts of the shards above it
+(cutting the fan-out) but concentrates writes on the busiest score ranges.
 
 Visual (planned): a game server writing to a durable score log and to the sorted set, with read replicas serving rank and a cache serving the top 100.
 
@@ -297,7 +303,7 @@ write-up was read for this revision, so none is described.
 3. How many bits does a 120-day season need for `remaining`, and does the packed score still fit below `2^53` with 20 point bits?
 4. Prove that `ShardedLeaderboard.top(k)` only needs `k` entries per shard.
 5. Why does `rank` call `better_than` on every shard, and what does that cost with 8 shards at 50,000 rank reads/s?
-6. In the capacity table, when would hash sharding beat read replicas?
+6. In the capacity table, why does neither hash sharding nor read replicas alone fit at ten times the writes, and what does each of the two fixes reduce?
 7. Given `rank_bounds` returns `(1200, 1450)`, what can you tell the player, and what made the interval wide?
 8. The sorted-set primary failed. How do you rebuild the board, and why is that safe to repeat?
 

@@ -65,12 +65,19 @@ def sy39(src):
     assert rank_reads * shards == 200000                       # every rank asks every shard
     per_node = rank_reads / (1 + replicas)
     assert round(per_node) == 16667
+    assert round(per_node + writes) == 21667 and per_node + writes < shard_limit   # replicas apply every write
+    w10 = writes * 10
+    assert w10 / shards + rank_reads == 62500 > shard_limit                         # hash shards alone
+    assert round(rank_reads / (1 + replicas) + w10) == 66667 > shard_limit          # replicas alone
+    combo = rank_reads / (1 + replicas) + w10 / shards                               # both
+    assert round(combo) == 29167 and combo < shard_limit
     # packing budget
     season = 90 * 86400
     assert season == 7776000 and season < 2**23 == 8388608 and 2**20 == 1048576
     assert (2**20 - 1) * 2**23 + (2**23 - 1) < 2**43 <= 2**53
     need(src, '| 5 GB |', '55,000 per second: above the assumed 50,000', '1.25 GB and 1,250 writes/s per shard',
-         '200,000 shard operations/s, 50,000 on every shard', 'about 16,667 rank reads/s per node',
+         '200,000 shard operations/s, 50,000 on every shard', 'about 21,667 operations/s per node (16,667 rank reads + 5,000 writes)', '62,500 per shard: above the assumed 50,000',
+         'about 66,667 per node: above the assumed 50,000', 'about 29,167 per node',
          '7,776,000 seconds', '2^23 = 8,388,608', 'points < 1,048,576')
     return 'sy39'
 
