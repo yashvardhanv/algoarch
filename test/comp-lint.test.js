@@ -18,3 +18,15 @@ test('does not flag qualitative compensation talk, code or unrelated numbers', (
 test('returns the matched text so a reviewer can find it', () => {
   assert.deepEqual(findCompClaims('target ₹35L base'), ['₹35L']);
 });
+
+test('rubric verdicts carry no compensation figures', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const lines = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').split(/\r?\n/);
+  const start = lines.findIndex((l) => l.includes('const updateRubric'));
+  assert.notEqual(start, -1);
+  let end = start + 1;
+  while (end < lines.length && lines[end] !== '  };') end++;
+  const text = lines.slice(start, end).join('\n');
+  assert.deepEqual(findCompClaims(text), []);
+});

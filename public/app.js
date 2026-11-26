@@ -1247,16 +1247,16 @@ function setupPlannerAndRubric() {
 
     if (verdictEl) {
       if (total >= 18) {
-        verdictEl.textContent = 'STRONG HIRE (L6 Staff SWE · ₹80LPA–₹1.2Cr+)';
+        verdictEl.textContent = 'STRONG HIRE (L6 Staff SWE)';
         verdictEl.style.color = '#10b981';
       } else if (total >= 15) {
-        verdictEl.textContent = 'STRONG HIRE (L5 Senior SWE · ₹50LPA–₹75LPA)';
+        verdictEl.textContent = 'STRONG HIRE (L5 Senior SWE)';
         verdictEl.style.color = '#10b981';
       } else if (total >= 12) {
-        verdictEl.textContent = 'LEAN HIRE (L4 Mid-Level SWE · ₹28LPA–₹45LPA)';
+        verdictEl.textContent = 'LEAN HIRE (L4 Mid-Level SWE)';
         verdictEl.style.color = '#f59e0b';
       } else {
-        verdictEl.textContent = 'NO HIRE (Needs deeper invariant & constraint proofs)';
+        verdictEl.textContent = 'NO HIRE (needs deeper invariant and constraint proofs)';
         verdictEl.style.color = '#ef4444';
       }
     }
