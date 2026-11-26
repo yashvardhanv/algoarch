@@ -1,0 +1,95 @@
+/* Pathways view: cards, plan controls, weekly schedule. Tokens come from style.css. */
+.pw-grid { display: grid; grid-template-columns: 1fr; gap: var(--s-md); }
+@media (min-width: 720px) { .pw-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1100px) { .pw-grid { grid-template-columns: repeat(3, 1fr); } }
+
+.pw-card {
+  display: flex; flex-direction: column; gap: var(--s-xs); min-height: 44px; width: 100%;
+  padding: var(--s-md); background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-outer);
+  text-align: left; transition: border-color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out);
+}
+.pw-card:hover { border-color: var(--line-strong); background: var(--well); }
+.pw-card.is-selected { border-color: var(--accent); background: var(--accent-wash); }
+.pw-card.is-locked .pw-card-title, .pw-card.is-locked .pw-card-desc { color: var(--ink-3); }
+.pw-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-xs); }
+.pw-card-title { font-size: var(--text-h3); font-weight: 600; color: var(--ink); line-height: 1.25; }
+.pw-pro {
+  flex: none; padding: var(--s-3xs) var(--s-xs); border-radius: var(--r-inner);
+  background: var(--well-2); color: var(--ink-2); font-size: var(--text-tiny); font-weight: 600;
+}
+.pw-card-desc { color: var(--ink-2); font-size: var(--text-small); }
+.pw-card-meta, .pw-card-progress { color: var(--ink-3); font-size: var(--text-tiny); }
+
+.pw-bar { display: block; height: 6px; border-radius: 3px; background: var(--well-2); overflow: hidden; }
+.pw-bar-fill { display: block; height: 100%; width: 0; background: var(--ok); transition: width var(--dur-short) var(--ease-out); }
+.pw-bar-fill.pw-w-5 { width: 5%; }
+.pw-bar-fill.pw-w-10 { width: 10%; }
+.pw-bar-fill.pw-w-15 { width: 15%; }
+.pw-bar-fill.pw-w-20 { width: 20%; }
+.pw-bar-fill.pw-w-25 { width: 25%; }
+.pw-bar-fill.pw-w-30 { width: 30%; }
+.pw-bar-fill.pw-w-35 { width: 35%; }
+.pw-bar-fill.pw-w-40 { width: 40%; }
+.pw-bar-fill.pw-w-45 { width: 45%; }
+.pw-bar-fill.pw-w-50 { width: 50%; }
+.pw-bar-fill.pw-w-55 { width: 55%; }
+.pw-bar-fill.pw-w-60 { width: 60%; }
+.pw-bar-fill.pw-w-65 { width: 65%; }
+.pw-bar-fill.pw-w-70 { width: 70%; }
+.pw-bar-fill.pw-w-75 { width: 75%; }
+.pw-bar-fill.pw-w-80 { width: 80%; }
+.pw-bar-fill.pw-w-85 { width: 85%; }
+.pw-bar-fill.pw-w-90 { width: 90%; }
+.pw-bar-fill.pw-w-95 { width: 95%; }
+.pw-bar-fill.pw-w-100 { width: 100%; }
+
+.pw-controls { display: flex; flex-wrap: wrap; gap: var(--s-md); align-items: end; margin: var(--s-lg) 0 var(--s-md); }
+.pw-controls label { display: flex; flex-direction: column; gap: var(--s-2xs); font-size: var(--text-small); color: var(--ink-2); }
+.pw-controls select {
+  min-height: 44px; padding: 0 var(--s-sm); background: var(--paper); border: 1px solid var(--line-strong);
+  border-radius: var(--r-inner); color: var(--ink);
+}
+
+.pw-summary { margin: 0 0 var(--s-md); color: var(--ink-2); }
+.pw-week { margin-bottom: var(--s-lg); }
+.pw-week-title {
+  display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 var(--s-xs);
+  padding-bottom: var(--s-xs); border-bottom: 1px solid var(--line); font-size: var(--text-h3);
+}
+.pw-week-hours { color: var(--ink-3); font-size: var(--text-small); font-weight: 400; }
+.pw-lessons { list-style: none; margin: 0; padding: 0; }
+.pw-lesson { display: flex; align-items: stretch; gap: var(--s-xs); border-bottom: 1px solid var(--line); }
+.pw-open {
+  flex: 1; min-width: 0; min-height: 44px; display: flex; justify-content: space-between; align-items: center;
+  gap: var(--s-sm); padding: var(--s-xs) var(--s-xs); border-radius: var(--r-inner);
+  transition: background-color var(--dur-short) var(--ease-out);
+}
+.pw-open:hover { background: var(--well); }
+.pw-lesson-title { overflow-wrap: anywhere; }
+.pw-lesson-dur { flex: none; color: var(--ink-3); font-size: var(--text-tiny); }
+.pw-lesson.is-done .pw-lesson-title { color: var(--ink-3); text-decoration: line-through; }
+.pw-check {
+  flex: none; width: 44px; min-height: 44px; display: grid; place-items: center;
+}
+.pw-check::before {
+  content: ""; width: 20px; height: 20px; border: 2px solid var(--line-strong); border-radius: var(--r-inner);
+  background: var(--paper); transition: background-color var(--dur-short) var(--ease-out), border-color var(--dur-short) var(--ease-out);
+}
+.pw-check:hover::before { border-color: var(--ok); }
+.pw-check[aria-pressed="true"]::before {
+  background: var(--ok); border-color: var(--ok);
+  box-shadow: inset 0 0 0 3px var(--paper);
+}
+
+.pw-empty { padding: var(--s-lg); background: var(--well); border-radius: var(--r-outer); color: var(--ink-2); }
+.pw-empty p { margin: var(--s-2xs) 0 0; }
+.pw-error { padding: var(--s-lg); border: 1px solid var(--danger); border-radius: var(--r-outer); }
+.pw-error p { margin: 0 0 var(--s-sm); }
+.pw-retry {
+  min-height: 44px; padding: 0 var(--s-md); background: var(--accent); color: var(--accent-ink);
+  border-radius: var(--r-inner); font-weight: 600; text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pw-card, .pw-bar-fill, .pw-open, .pw-check::before { transition: none; }
+}
