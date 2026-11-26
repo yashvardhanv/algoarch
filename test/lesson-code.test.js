@@ -308,3 +308,12 @@ test('sy48 lesson code reproduces the SRE Workbook burn-rate figures and a brute
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.match(r.stdout, /sy48 code checks passed/);
 });
+
+test('sy49 lesson code matches an independent retry-loop simulator and the metastable-failure arithmetic', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'sy49_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'sy49-overload-load-shedding.md'),
+  ], { encoding: 'utf8', timeout: 180000 });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /sy49 code checks passed/);
+});
