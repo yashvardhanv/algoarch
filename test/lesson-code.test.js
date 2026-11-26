@@ -113,3 +113,26 @@ test('ai26 lesson code matches reference checks', { skip: py ? false : 'python n
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.match(r.stdout, /ai26 code checks passed/);
 });
+
+test('sy37 lesson code matches brute-force checks', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'sy37_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'sy37-distributed-search.md'),
+  ], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /sy37 code checks passed/);
+});
+
+const CAPACITY_LESSONS = [
+  'sy37-distributed-search.md',
+];
+
+test('sy37-sy40 capacity estimates are reproduced by script', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'capacity_check.py'),
+    ...CAPACITY_LESSONS.map((f) => path.join(__dirname, '..', 'data', 'new_lessons', f)),
+  ], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /capacity checks passed/);
+  for (const f of CAPACITY_LESSONS) assert.match(r.stdout, new RegExp(f.slice(0, 4)));
+});
