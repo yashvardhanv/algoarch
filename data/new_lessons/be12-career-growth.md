@@ -6,7 +6,7 @@
 >
 > **Level:** advanced. Optional for a crash plan.
 
-Past Senior, most companies stop running a promotion pipeline for you. Larson's survey of Staff engineers found about two-thirds were promoted at the company they were already at and the rest changed companies to reach the title. In both cases the person took deliberate control of the process. This lesson covers the tools the published guides describe for that: a promotion packet you keep as a map, a sponsor who speaks for your work, visibility that does not hog the room, and the honest limits of all three. It is mostly about work you do before and between interviews.
+Past Senior, most companies stop running a promotion pipeline for you. Larson's survey of Staff engineers found about two-thirds were promoted at the company they were already at and the rest changed companies to reach the title. Larson's advice for both paths is the same: past the career level, take more deliberate control of your own progression. This lesson covers the tools the published guides describe for that: a promotion packet you keep as a map, a sponsor who speaks for your work, visibility that does not hog the room, and the honest limits of all three. It is mostly about work you do before and between interviews.
 
 > **What this lesson will not do.** It does not promise a promotion, tell you how any company's process works, or say anything about pay. It states no compensation figures, and the packet template below carries placeholders instead of numbers. The scenarios are **illustrative**. The sources are practitioner essays and one public career framework, not studies, and the lesson says where a claim is one author's survey.
 
@@ -58,6 +58,8 @@ Larson recommends starting a packet long before you expect to be promoted, the w
 
 ### 3.2 How to iterate on it
 
+Visual (planned): a timeline of the packet loop, from first one-hour draft through peer edit, manager edit and periodic review, with a marker where a manager change resets progress unless the packet is reviewed with the new manager.
+
 His sequence, in short: decide why you want this (many people choose not to; you need a reason or you may land in a job you dislike); temper expectations, because promotions at this level are built over quarters and years; bring your manager in and say that Staff is your goal; write a first version in an hour; reread it two days later; share it with trusted peers, preferably already Staff-plus; share it with your manager and ask specifically for gaps; then review it periodically with your manager, especially after a manager change, which otherwise tends to reset progress.
 
 ### 3.3 A packet entry, illustrative
@@ -81,7 +83,7 @@ Two things this does: it names the complexity (not only the outcome), and it end
 
 ### 4.1 Sponsor versus mentor
 
-Lara Hogan's essay on sponsorship draws the line: to sponsor someone is to feel on the hook to help get them promoted, to raise their name for more visible, valuable work. A mentor gives advice; a sponsor spends their own standing. She notes that you can be sponsored without knowing it, and argues that people from under-represented groups often need opportunity and visibility more than advice. She also notes that the people whose names we raise tend to be those closest to us, which is a bias to counter deliberately.
+Lara Hogan's essay on sponsorship draws the line this way: a sponsor takes responsibility for someone's advancement and puts their name forward when visible, valuable work is handed out, where a mentor mainly gives advice. (Larson makes the related point that a sponsor in a room is spending social capital and being judged on how you perform there; that cost is his observation, not Hogan's.) She notes that you can be sponsored without knowing it, and argues that people from under-represented groups often need opportunity and visibility more than advice. She also notes that the people whose names we raise tend to be those closest to us, which is a bias to counter deliberately.
 
 Larson's reading for promotion: the person speaking up for your work in forums of influence and when advocating for scarce resources. For a Staff promotion that is almost always your direct manager, who turns your packet into the company format and argues for it in the room where others test your qualifications.
 
@@ -164,7 +166,7 @@ Practical consequences:
 ## Drills
 
 1. What is the difference between a mentor and a sponsor? Why does Larson say that for a Staff promotion the sponsor is almost always your direct manager?
-2. List the seven questions of the packet template. Which one do most people leave blank, and why is it the most credible when filled in?
+2. List the seven questions of the packet template. Which one makes the packet credible to a reader, and why does the lesson say a packet without it is not believed?
 3. Why start a packet long before you expect a promotion? Name two benefits from the lesson.
 4. Your manager changes. What does the lesson say usually happens to your progress, and what do you do in the first month?
 5. Rewrite this question to get a useful answer: "What do I need to do to get promoted?"
