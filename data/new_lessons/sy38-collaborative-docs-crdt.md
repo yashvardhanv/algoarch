@@ -289,7 +289,20 @@ implementations use arbitrary-precision strings or re-space positions; say which
 
 ---
 
-## 8. Failure Modes
+## 8. What Real Companies Did (Dated)
+
+- **Google Docs (Google Drive Blog, 22 September 2010):** operational transformation over a revision log of three
+  change types (insert text, delete text, apply style); each change goes from an editor to the server and then to
+  the other editors, which transform it against their local version. Details and examples are in Deep Dive 1.
+- **Figma (Figma Blog, 16 October 2019):** a server-authoritative, CRDT-inspired design rather than OT or true CRDTs:
+  per-property last-writer-wins ordered by the server, client-generated unique ids, parent links as properties with
+  cycle rejection, fractional indexing for order, and a process per multiplayer document. Details are in Deep Dive 3.
+
+Both write-ups describe the systems as of their dates; neither was checked against the products today.
+
+---
+
+## 9. Failure Modes
 
 | Failure | Effect | Mitigation |
 |---|---|---|
@@ -302,7 +315,7 @@ implementations use arbitrary-precision strings or re-space positions; say which
 
 ---
 
-## 9. Pitfalls Checklist
+## 10. Pitfalls Checklist
 
 1. **Sending the whole document per keystroke**, or locking the document while one person types.
 2. **Claiming OT needs no server.** Pairwise transforms are enough only against one agreed order; say where it comes from.
