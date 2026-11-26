@@ -7,6 +7,7 @@
   }
 
   function hoursText(minutes) {
+    if (minutes > 0 && minutes < 30) return 'under an hour';
     const h = Math.round((minutes || 0) / 60);
     return h + (h === 1 ? ' hour' : ' hours');
   }
@@ -47,13 +48,18 @@
     const o = opts || {};
     const s = schedule || { weeks: [] };
     if (!s.weeks || s.weeks.length === 0) {
+      if (o.totalLessons === 0) {
+        return '<div class="pw-empty"><strong>This pathway has no lessons yet.</strong><p>Check back soon.</p></div>';
+      }
       return '<div class="pw-empty"><strong>Pathway complete</strong><p>Every lesson in this pathway is marked done.</p></div>';
     }
     const doneSet = new Set(o.completed || []);
     let summary = plural(s.remainingLessons, 'lesson', 'lessons') + ' left, about ' + hoursText(s.remainingMinutes) +
       ', ' + plural(s.weeksNeeded, 'week', 'weeks') + ' at this pace.';
     if (o.target && s.fits === false && s.hoursNeeded) {
-      summary += ' To finish in ' + plural(o.target, 'week', 'weeks') + ', plan ' + s.hoursNeeded + ' hours a week.';
+      summary += s.hoursNeeded >= 40
+        ? ' The ' + plural(o.target, 'week', 'weeks') + ' target cannot be met at 40 hours a week.'
+        : ' To finish in ' + plural(o.target, 'week', 'weeks') + ', plan ' + s.hoursNeeded + ' hours a week.';
     }
     const weeks = s.weeks.map((w) =>
       '<section class="pw-week"><h3 class="pw-week-title">Week ' + esc(w.n) + '<span class="pw-week-hours">' + hoursText(w.minutes) + '</span></h3>' +
@@ -66,13 +72,17 @@
     return '<div class="pw-error" role="alert"><p>' + esc(message) + '</p><button type="button" class="pw-retry" data-action="retry">Retry</button></div>';
   }
 
+  function emptyHtml(message) {
+    return '<div class="pw-empty"><p>' + esc(message) + '</p></div>';
+  }
+
   function statusHtml(title, lessonId, withUndo) {
     const t = esc(title);
     if (!withUndo) return 'Marked not done: ' + t + '.';
     return 'Marked done: ' + t + '. <button type="button" class="pw-undo" data-action="undo" data-lesson="' + esc(lessonId) + '">Undo</button>';
   }
 
-  const api = { esc, cardHtml, scheduleHtml, errorHtml, statusHtml };
+  const api = { esc, cardHtml, scheduleHtml, errorHtml, emptyHtml, statusHtml };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.PathwaysView = api;
 })();

@@ -98,3 +98,36 @@ test('statusHtml escapes the title and offers undo only when asked', () => {
   const u = V.statusHtml('T', 'l1', false);
   assert.ok(u.includes('Marked not done: T.') && !u.includes('data-action'));
 });
+
+test('emptyHtml shows an escaped message with no retry button', () => {
+  const h = V.emptyHtml('No pathways available yet.');
+  assert.ok(h.includes('No pathways available yet.'));
+  assert.ok(!h.includes('data-action') && !h.includes('Retry'));
+  const x = V.emptyHtml('<b>x</b>');
+  assert.ok(x.includes('&lt;b&gt;') && !x.includes('<b>x'));
+});
+
+test('scheduleHtml distinguishes a pathway with no lessons from a finished one', () => {
+  const none = { weeks: [], remainingLessons: 0, remainingMinutes: 0, weeksNeeded: 0, fits: true, hoursNeeded: null };
+  const empty = V.scheduleHtml(none, { completed: [], target: null, totalLessons: 0 });
+  assert.ok(empty.includes('This pathway has no lessons yet.'));
+  assert.ok(!empty.includes('Pathway complete'));
+  const done = V.scheduleHtml(none, { completed: ['a'], target: null, totalLessons: 3 });
+  assert.ok(done.includes('Pathway complete'));
+});
+
+test('scheduleHtml does not advise more than 40 hours a week', () => {
+  const h = V.scheduleHtml({ ...sched, fits: false, hoursNeeded: 40 }, { completed: [], target: 1 });
+  assert.ok(!h.includes('plan 40 hours'));
+  assert.ok(h.includes('cannot be met at 40 hours a week'));
+  const ok = V.scheduleHtml({ ...sched, fits: false, hoursNeeded: 39 }, { completed: [], target: 1 });
+  assert.ok(ok.includes('plan 39 hours a week'));
+});
+
+test('hoursText says under an hour for 1 to 29 minutes', () => {
+  const h = (m) => V.cardHtml(pw, { ...prog, minutesTotal: m }, {});
+  assert.ok(h(20).includes('under an hour') && !h(20).includes('about 0'));
+  assert.ok(h(29).includes('under an hour'));
+  assert.ok(h(30).includes('1 hour') && !h(30).includes('under'));
+  assert.ok(h(0).includes('0 hours'));
+});
