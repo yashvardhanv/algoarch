@@ -272,3 +272,12 @@ test('ai30 lesson code matches a naive attention reference and leaks nothing thr
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.match(r.stdout, /ai30 code checks passed/);
 });
+
+test('ai31 lesson code matches brute-force dedup, contamination and compute-optimal references', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'ai31_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'ai31-pretraining-scaling-laws.md'),
+  ], { encoding: 'utf8', timeout: 180000 });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /ai31 code checks passed/);
+});
