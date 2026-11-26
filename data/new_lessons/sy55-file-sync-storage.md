@@ -175,7 +175,7 @@ The check compares `cdc_chunks` with a version that recomputes the 64-byte windo
 rolling state cannot hide a bug), on 60 random inputs and parameter sets, and verifies the size limits and that the
 chunks concatenate to the input. Then the experiment: 60 random 30,000-byte files, each with 7 bytes inserted near
 the front. With 64-byte fixed blocks, more than 80% of blocks changed in every trial. With content-defined chunks
-(average about 64 bytes, minimum 16, maximum 512) at most 8 chunks changed in any trial and under 4 on average. An
+(about 80 bytes on average: the 16-byte minimum plus a mean of 64 beyond it; maximum 512) at most 8 chunks changed in any trial and under 4 on average. An
 overwrite of the same length, on the other hand, changes exactly one fixed block, so fixed blocks are not wasteful when
 edits are in place (typical for databases and virtual-disk images, less so for documents that are rewritten).
 
@@ -255,11 +255,13 @@ class Client:
     def _blocklist(self, data):
         return None if data is None else [sha(c) for c in self.chunker(data)]
 
-    def _conflict(self, path):
+    def _conflict(self, path, lost_to):
         data = self.files.pop(path, None)
         self.dirty.discard(path)
         if data is not None:                             # keep our version under a new name; a lost delete is just dropped
-            copy = '%s (conflicted copy %s)' % (path, self.name)
+            copy = '%s (conflicted copy %s, v%d)' % (path, self.name, lost_to)   # client and journal id keep names unique
+            while copy in self.files:
+                copy += ' again'
             self.files[copy] = data
             self.dirty.add(copy)
 
@@ -270,13 +272,16 @@ class Client:
             bl, sent = self._blocklist(data), 0
             while True:
                 status, arg = self.meta.commit(self.ns, path, bl, self.base.get(path, 0))
-                if status != 'need_blocks':
+                if status == 'need_blocks':
+                    for h in arg:
+                        if crash_after_blocks is not None and sent >= crash_after_blocks:
+                            raise Crash()
+                        self.store.put(chunks[h])
+                        sent += 1
+                elif status == 'conflict' and data is not None and self.meta.head(self.ns, path)[1] is None:
+                    self.base[path] = arg                # deleted under our edit: the edit wins, commit it on top of the delete
+                else:
                     break
-                for h in arg:
-                    if crash_after_blocks is not None and sent >= crash_after_blocks:
-                        raise Crash()
-                    self.store.put(chunks[h])
-                    sent += 1
             if status == 'ok':
                 if crash_after_commit:
                     raise Crash()
@@ -288,7 +293,7 @@ class Client:
                 self.base[path] = head_jid
                 self.dirty.discard(path)
             else:
-                self._conflict(path)
+                self._conflict(path, head_jid)
 
     def pull(self):
         for jid, path, bl in self.meta.list(self.ns, self.cursor):
@@ -300,7 +305,10 @@ class Client:
                     self.base[path] = jid
                     self.dirty.discard(path)
                     continue                             # both sides made the same change
-                self._conflict(path)
+                if bl is None and self.files.get(path) is not None:
+                    self.base[path] = jid                # remote delete under our pending edit: the edit wins
+                    continue
+                self._conflict(path, jid)
             self.base[path] = jid
             if bl is None:
                 self.files.pop(path, None)
@@ -308,17 +316,28 @@ class Client:
                 self.files[path] = b''.join(self.store.blocks[h] for h in bl)
 ```
 
-**Conflicts.** Offline editing makes them certain, so the protocol must decide. The rule here is optimistic: an edit is
-made on top of a base version, the server accepts a commit only if that base is still the file's head, and a refused
-or surprised client keeps its version under a new name instead of overwriting anyone. Nothing is lost, and the two
-versions are visible for a human to merge. The check enumerates **all 24 orderings of the four actions** (A pushes, B
-pushes, A pulls, B pulls) after both edited the same file from the same base; in every one both devices converge to the
-same tree, equal to a replay of the journal, with both edits present (one at the original path, the other as a conflicted
-copy). It also checks an edit on top of a pulled change (no conflict), edit against delete (the edit survives), a
-crash after uploading 4 of 10 blocks (the retry sends only the other 6, total bytes received equal the file's size, no
-journal row ever points at a missing block), and a crash after the commit but before the client noted it (re-pushing
-is a no-op, not a conflict). Finally 300 seeded random runs of three clients with edits, deletes, pushes, pulls and
-crashes must end with every client equal to the journal replay, and a further quiet round must append nothing.
+**Conflicts.** Offline editing makes them certain, so the protocol must decide. Two rules. **Edit against edit:** an edit
+is made on top of a base version, the server accepts a commit only if that base is still the file's head, and a refused
+or surprised client keeps its version under a new name instead of overwriting anyone. The name carries the client and
+the journal id it lost to (`f (conflicted copy B, v7)`). Without the client, two devices losing to the same version
+choose the same name; without the id, one device's second conflict reuses its first copy's name. The `again` suffix in
+the code is only a last resort, and the check asserts the exact names. **Edit against delete:** the edit wins in
+every arrival order. If the delete was pushed first, the editor's commit is refused, sees that the head is a delete and
+re-commits on top of it, so the file comes back at its original path; if the edit was pushed first, the deleter's commit
+is refused and dropped. (A deliberate product choice: losing a delete costs a stray file, losing an edit costs work.)
+Nothing is lost, and the versions are visible for a human to merge.
+
+The check enumerates **all 24 orderings of the four actions** (A pushes, B pushes, A pulls, B pulls) for edit against
+edit and, separately, for edit against delete; in every one both devices converge to the same tree, equal to a replay of
+the journal, with the right contents present. It runs three clients editing one file in every push order (all three
+edits must survive), and two rounds of the same conflict (the first copy must survive the second). It also checks an
+edit on top of a pulled change (no conflict), pulling your own earlier commit while a newer edit is pending, a crash
+after uploading 4 of 10 blocks (the retry sends only the other 6, total bytes received equal the file's size, no journal
+row ever points at a missing block), and a crash after the commit but before the client noted it. For that last case
+the immediate retry is a no-op. If someone else builds on the commit before the retry, **pull before you push**: a client
+that pushes first gets a conflicted copy of its own, already committed version. That is clutter, not loss, and the check
+asserts both outcomes. Finally 300 seeded random runs of three clients with edits, deletes, pushes, pulls and crashes
+must end with every client equal to the journal replay, and a further quiet round must append nothing.
 
 The seeded random runs are not decoration. Dropbox's Nucleus post says the engine's control thread is deterministic
 for fixed inputs and scheduling, so a random seed generates a filesystem, a schedule and perturbations that can be
@@ -396,8 +415,8 @@ The loser's client must then rebase: drop the refused move from its pending list
 |---|---|---|
 | crash between block upload and commit | orphan blocks | harmless: nothing references them; a background job collects blocks no row uses (sy35) |
 | crash after commit, before the client records it | client re-pushes | detect "head already has this blocklist" and treat as done |
-| two devices edit offline | divergent versions | base-version check, conflicted copy, never overwrite |
-| delete versus edit | surprising loss | edit wins; the delete is dropped |
+| two devices edit offline | divergent versions | base-version check, conflicted copy named by client and journal id, never overwrite |
+| delete versus edit | surprising loss | the edit wins in either arrival order (re-commit on top of the delete, or drop the delete) |
 | cycle from concurrent moves | corrupt tree | reject the later move; client rebases |
 | notification lost | device stale until it next polls | cursor-based `list` makes catch-up idempotent; also poll slowly as a backstop |
 | local filesystem quirks | file differs between platforms | Dropbox's engineers describe separate behaviour on each OS and file system; test per platform and treat "durability everywhere" as hard |

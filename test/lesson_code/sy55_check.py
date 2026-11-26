@@ -162,15 +162,61 @@ assert a.files == {'f': b'version 2'} and a.dirty == {'f'} and a.cursor == 1 and
 a.push(); b.pull()
 assert a.files == b.files == {'f': b'version 2'} and b.cursor == 2
 
-# delete versus edit: the edit survives, the delete is dropped
-store, meta, (a, b) = mk()
-a.write('f', b'keep me'); quiesce([a, b])
-a.remove('f'); b.write('f', b'edited!!')
-b.push(); quiesce([a, b])
-assert a.files == b.files == {'f': b'edited!!'}
+# delete versus edit: the edit beats the delete in every arrival order (not only when the edit is pushed first)
+for order in itertools.permutations(['A.push', 'B.push', 'A.pull', 'B.pull']):
+    store, meta, (a, b) = mk()
+    a.write('f', b'keep me'); quiesce([a, b])
+    a.remove('f'); b.write('f', b'edited!!')
+    cl = {'A': a, 'B': b}
+    for step in order:
+        who, what = step.split('.'); getattr(cl[who], what)()
+    quiesce([a, b])
+    assert a.files == b.files == {'f': b'edited!!'} == replay(meta, store), (order, a.files, b.files)
+    no_dangling(meta, store)
 # a plain delete propagates
-a.remove('f'); quiesce([a, b])
+store, meta, (a, b) = mk()
+a.write('f', b'x'); quiesce([a, b]); a.remove('f'); quiesce([a, b])
 assert a.files == b.files == {}
+
+# three clients edit one file from the same base, in every push order: no two conflicted copies may share a name
+for order in itertools.permutations('ABC'):
+    store, meta, cs = mk(3)
+    cl = dict(zip('ABC', cs))
+    cs[0].write('f', b'base'); quiesce(cs)
+    for n, c in cl.items(): c.write('f', ('edit by ' + n).encode())
+    for n in order: cl[n].push()
+    quiesce(cs)
+    assert cs[0].files == cs[1].files == cs[2].files == replay(meta, store)
+    assert sorted(cs[0].files.values()) == [b'edit by A', b'edit by B', b'edit by C'], (order, cs[0].files)
+    losers = [n for n in 'ABC' if n != order[0]]                    # both losers lose to the winner's row (journal id 2)
+    assert set(cs[0].files) == {'f'} | {'f (conflicted copy %s, v2)' % n for n in losers}, (order, sorted(cs[0].files))
+
+# two rounds of the same conflict: the second copy must not overwrite the first
+store, meta, (a, b) = mk()
+a.write('f', b'base'); quiesce([a, b])
+for rnd in ('one', 'two'):
+    a.write('f', ('A ' + rnd).encode()); b.write('f', ('B ' + rnd).encode())
+    b.push(); quiesce([a, b])
+assert a.files == b.files == replay(meta, store)
+assert sorted(a.files.values()) == [b'A one', b'A two', b'B two'], a.files       # B's second edit replaces its first, on top
+assert len(a.files) == 3
+assert set(a.files) == {'f', 'f (conflicted copy A, v2)', 'f (conflicted copy A, v4)'}, sorted(a.files)   # one name per conflict
+
+# crash after commit, then someone builds on it before the retry: pulling first leaves no clutter; pushing first
+# leaves a conflicted copy (clutter, but nothing is lost)
+for pull_first in (True, False):
+    store, meta, (a, b) = mk()
+    a.write('f', b'v1 v1 v1!')
+    try:
+        a.push(crash_after_commit=True); assert False
+    except Crash:
+        pass
+    b.pull(); b.write('f', b'v2 v2 v2!'); b.push()
+    if pull_first: a.pull()
+    quiesce([a, b])
+    assert a.files == b.files == replay(meta, store)
+    assert b'v2 v2 v2!' in a.files.values() and (pull_first or b'v1 v1 v1!' in a.files.values())
+    assert (len(a.files) == 1) == pull_first, (pull_first, a.files)
 
 # random runs against the journal replay: three clients, edits, deletes, pushes, pulls and crashes
 pool = [b'', b'x', b'same content!', rbytes(40, random.Random(1)), rbytes(40, random.Random(2)), rbytes(100, random.Random(3))]
