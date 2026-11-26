@@ -194,9 +194,9 @@ def alpha_for_budget(scores, strong_fraction):
 quality)`. `CPT(x%)` is the smallest call percentage that recovers `x%` of the gap. On MT Bench, with
 routers trained on Arena data plus judge-labelled data, the matrix-factorisation router reached half the gap
 with 13.4% of calls to GPT-4 against 49.0% for random routing; the paper reports this as a cost saving of
-about 3.66 times at 95% of GPT-4's MT Bench score. Two caveats from the same paper: on MMLU and GSM8K,
-routers trained only on Arena data were close to random until in-domain labelled data was added, and the
-routers did transfer to other model pairs without retraining.
+about 3.66 times at 95% of GPT-4's MT Bench score. The same paper gives a caveat and a positive result:
+on MMLU and GSM8K, routers trained only on Arena data were close to random until in-domain labelled data was
+added; and the routers did transfer to other model pairs without retraining.
 
 **Cascades** are the other shape. FrugalGPT names three strategies for cutting LLM cost (prompt
 adaptation, LLM approximation and the LLM cascade) and studies the cascade: query models in order of cost
