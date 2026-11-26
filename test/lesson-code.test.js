@@ -263,3 +263,12 @@ test('ai29 lesson code matches reference counts, finite-difference gradients and
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.match(r.stdout, /ai29 code checks passed/);
 });
+
+test('ai30 lesson code matches a naive attention reference and leaks nothing through the causal mask', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'ai30_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'ai30-attention-transformer-block.md'),
+  ], { encoding: 'utf8', timeout: 180000 });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /ai30 code checks passed/);
+});
