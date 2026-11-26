@@ -31,9 +31,19 @@ test('rubric verdicts carry no compensation figures', () => {
   assert.deepEqual(findCompClaims(text), []);
 });
 
-// Stricter than findCompClaims: also rejects currency symbols followed by a number and
-// percentages tied to pay (e.g. "15% of base", "10-20% of salary"), which read as market norms.
-const STRICT_COMP_RE = /[$€£₹]\s?\d|\b\d+(?:\.\d+)?\s?(?:[-–]\s?\d+(?:\.\d+)?\s?)?%\s*(?:of\s+)?(?:(?:your|the|annual|base|target)\s+)*(?:base|salary|pay|CTC|compensation|bonus|equity|grant)\b/gi;
+// Stricter than findCompClaims: also rejects currency symbols and ISO codes next to a number,
+// k-suffix amounts, multiples of pay ("2x base") and percentages tied to pay ("15% of base",
+// "a bonus of 15%", "25% of the initial grant"), which read as market norms.
+const PAY = String.raw`(?:base|salary|pay|CTC|compensation|bonus|equity|grant|RSUs?|options?)`;
+const STRICT_COMP_RE = new RegExp([
+  String.raw`[$€£₹]\s?\d`, // $40, ₹10
+  String.raw`\b(?:USD|EUR|GBP|INR|Rs\.?)\s?\d`, // USD 150k, Rs. 20 lakh, INR 30,00,000
+  String.raw`\d[\d,.]*\s?(?:USD|EUR|GBP|INR)\b`, // 150,000 USD
+  String.raw`\b\d+(?:\.\d+)?\s?[kK]\b`, // base 180k
+  String.raw`\b\d+(?:\.\d+)?\s?[x×]\s*(?:(?:the|your|annual|target)\s+)*${PAY}\b`, // 2x base
+  String.raw`\b\d+(?:\.\d+)?\s?(?:[-–]\s?\d+(?:\.\d+)?\s?)?%\s*(?:of\s+)?(?:[\w-]+\s+){0,3}?${PAY}\b`, // 15% of base, 25% of the initial grant
+  String.raw`\b${PAY}\s+(?:of|at|is|was|=|:)\s*(?:about\s+|around\s+|~)?\d+(?:\.\d+)?\s?%`, // bonus of 15%
+].join('|'), 'gi');
 
 function findStrictCompClaims(text) {
   return String(text || '').match(STRICT_COMP_RE) || [];
@@ -54,4 +64,19 @@ test('be08 lesson carries no compensation figures', () => {
   assert.match(md.split(/\r?\n/)[0], /^# Lesson 08 — Offer Structure and Equity Playbook$/);
   assert.match(md, /^## Sources$/m);
   assert.match(md, /not tax advice/i);
+});
+
+test('the strict pattern catches codes, k-suffixes, multiples and grant percentages', () => {
+  const planted = [
+    'a bonus of 15%',
+    'USD 150k',
+    '150,000 USD',
+    'Rs. 20 lakh',
+    'INR 30,00,000',
+    'base 180k',
+    'equity worth 2x base',
+    '25% of the initial grant',
+  ];
+  for (const s of planted) assert.notDeepEqual(findStrictCompClaims(s), [], `should flag: ${s}`);
+  assert.deepEqual(findStrictCompClaims('Vest G/4 units after a one-year cliff; read your plan'), []);
 });

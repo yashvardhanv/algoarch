@@ -14,8 +14,8 @@ rather than on a single figure.
 
 > **What this lesson will not do.** It states no salary, equity or tax figures and no "typical"
 > ranges. Pay, vesting and tax practices differ by company, by level, by country and by year, and
-> they change. Every example uses symbols (A, B, G shares, a price P) or plain index numbers that
-> are illustrative and are not money. **Nothing here is tax or legal advice.** For any number you
+> they change. Every example uses symbols (A, B, G shares, a price P) that are illustrative and
+> are not money. **Nothing here is tax or legal advice.** For any number you
 > act on, use your own offer letter, the company's plan documents, and a qualified tax adviser in
 > your country.
 
@@ -133,11 +133,16 @@ share is P.
 
 - If P is above K, the spread per share is P − K and the total spread is X × (P − K). To capture it
   you must pay X × K to exercise.
-- If P is at or below K, the options have no exercise value today. Exercising would mean paying more
-  than the share is worth.
+- If P equals K, the options have no exercise value today: exercising gains you nothing. If P is
+  below K, exercising would mean paying more than the share is worth.
 - If the company is private and there is no market for its shares, you may have to pay X × K, and in
   some tax systems owe tax on the spread, while holding shares you cannot sell. That combination is
   the trap.
+
+**Leaving with vested options.** Vested options do not wait for you forever. After you leave,
+they typically must be exercised within a window set by the plan, or they expire, and the length
+of that window varies by company. Read yours before you resign: a short window can force you to
+decide quickly whether to pay the strike (and any tax due) or walk away from the options.
 
 In the United States, for example, the IRS distinguishes **statutory** options (incentive stock
 options and employee stock purchase plans) from **non-statutory** ones. For most non-statutory
@@ -172,7 +177,10 @@ exercised), and there is a way to sell them.
 | Unvested anything | Not yours yet. It depends on you staying and the price holding |
 
 The price used in an offer is a choice the company made. Ask which price (today's market price, an
-average, the latest private valuation) and when it was set.
+average, the latest private valuation) and when it was set. For a private company, also ask whether
+a quoted per-share price is a funding-round price or the company's valuation of its common shares,
+and treat them as different numbers: a funding-round price is not the value used for common shares
+or options.
 
 ### 4.6 Taxes: timing matters, rules vary
 
@@ -196,34 +204,36 @@ not tax advice.**
 Do not compare headlines. Build a table per year for each offer, in your own numbers, with the three
 columns from §3.
 
-**Worked example in index numbers (not money).** Set offer A's base to 100 as an index. Everything
-else is stated relative to it, and the ratios between lines are invented to make the arithmetic
-clear. They are not typical of any company or market.
+**Worked example in symbols (not money).** Every quantity is a symbol so that nothing here can be
+read as a market figure or a typical ratio. Offer A is from a listed company, offer B from a private
+one.
 
 | Year 1 | Offer A (listed company) | Offer B (private company) |
 |---|---|---|
-| Base (guaranteed) | 100 | 90 |
-| Sign-on (guaranteed, clawback if you leave early) | 10 | 0 |
-| Target bonus (variable) | 15 | 0 |
-| Equity vesting this year, at the quoted price | 25 (RSUs, sellable) | 60 (options, private, spread at latest valuation) |
-| **Headline** | **150** | **150** |
+| Base (guaranteed) | B_A | B_B, smaller than B_A |
+| Sign-on (guaranteed, clawback if you leave early) | S | none |
+| Target bonus (variable) | T | none |
+| Equity vesting this year, at the quoted price | E_A (RSUs, sellable) | E_B (options, private, spread at the latest valuation) |
+| **Headline** | **H = B_A + S + T + E_A** | **H = B_B + E_B** |
 
-The headlines are equal. Now apply the lenses:
+The headlines are equal by construction, so E_B is larger than E_A by exactly the cash B does not
+pay: E_B − E_A = (B_A − B_B) + S + T. Now apply the lenses:
 
-- **Guaranteed cash:** A gives 110, B gives 90. If your fixed costs need more than 90, B is a
+- **Guaranteed cash:** A gives B_A + S, B gives B_B. If your fixed costs need more than B_B, B is a
   problem whatever else it offers.
-- **Variable cash:** A's 15 is a target. Discount it by your honest estimate of the payout; you
-  choose the discount and write down why.
-- **Equity:** A's 25 can be sold as it vests (subject to trading rules), and it moves with the market.
-  B's 60 is a spread on paper: you would pay the strike to exercise, may owe tax on exercise
-  depending on where you live, and cannot sell until there is a market. Ask yourself what B's 60 is
-  worth to you if it takes years to sell, or never sells.
+- **Variable cash:** A's T is a target. Multiply it by your honest estimate of the payout, a
+  fraction you choose and write down with your reason.
+- **Equity:** A's E_A can be sold as it vests (subject to trading rules), and it moves with the
+  market. B's E_B is a spread on paper: you would pay the strike to exercise, may owe tax on exercise
+  depending on where you live, and cannot sell until there is a market. Ask yourself what E_B is
+  worth to you if it takes years to sell, or never sells. If your honest answer is a fraction f of
+  E_B, offer B is worth B_B + f × E_B to you, and the headline no longer decides anything.
 - **Later years:** if A's initial grant vests over four years with refreshers you cannot count on,
   and B's options are all granted up front, both offers can look very different in year five.
 
 The decision is not "which number is bigger"; it is **which risk you are being paid to take, and
 whether you can afford it**. A candidate with savings and a belief in company B may rationally
-choose B. A candidate who needs predictable cash should value B's equity close to zero until it is
+choose B. A candidate who needs predictable cash may reasonably value B's equity close to zero until it is
 sellable.
 
 Visual (planned): two stacked bars per offer per year, split into guaranteed, variable and equity,
@@ -232,6 +242,8 @@ with equity shaded by liquidity, showing the year-five drop when only the initia
 ---
 
 ## 6. Negotiation Structure and Trade-offs
+
+*This section is reasoning about negotiation, not a sourced account of what companies do.*
 
 ### 6.1 What can move
 
@@ -295,7 +307,8 @@ Ask them in writing if you can, and keep the answers.
 5. Does the sign-on bonus have a clawback, and on what terms?
 6. For options: what is the strike price, the latest valuation and its date, the expiry, and how long
    do I have to exercise vested options if I leave?
-7. For a private company: have employees been able to sell shares, and how?
+7. For a private company: is the quoted per-share price a funding-round price or your valuation of
+   common shares? Have employees been able to sell shares, and how?
 8. Which benefits are counted in the headline, and do any need a minimum service period?
 9. What is the level, and what does the next level up require?
 10. What is the deadline, and can it move?
@@ -311,11 +324,13 @@ Ask them in writing if you can, and keep the answers.
    an RSU is worth something while the share is.
 5. **Believing the paper price.** A private valuation is not a sale price, and a listed price moves.
 6. **Forgetting the year-five drop.** When the initial grant ends, only refreshers remain.
-7. **Exercising without a tax plan.** In some systems you owe tax on the spread at exercise, before
+7. **Missing the exercise window.** Vested options typically expire if you do not exercise them
+   within the window the plan sets after you leave. Read its length before you resign.
+8. **Exercising without a tax plan.** In some systems you owe tax on the spread at exercise, before
    you can sell.
-8. **Missing the clawback.** A sign-on you must repay if you leave early is a loan with conditions.
-9. **Bluffing.** An invented competing offer that gets checked can cost you the real one.
-10. **Using someone else's country's rules.** Tax and vesting conventions differ; check yours.
+9. **Missing the clawback.** A sign-on you must repay if you leave early is a loan with conditions.
+10. **Bluffing.** An invented competing offer that gets checked can cost you the real one.
+11. **Using someone else's country's rules.** Tax and vesting conventions differ; check yours.
 
 ---
 
@@ -330,6 +345,8 @@ Ask them in writing if you can, and keep the answers.
 5. You have X vested options with strike K; the latest valuation is P, below K. What is their
    exercise value today, and why should you not exercise?
 6. Why can exercising options in a private company leave you worse off in cash in the short term?
+   And what happens to your vested options if you leave and do not exercise them within the window
+   the plan sets?
 7. In the §5 example, which offer is better for a candidate with no savings, and why? What would
    have to be true for the other offer to be the better choice?
 8. Give the four negotiation steps in §6.2 in order, and say why level comes first.
@@ -346,6 +363,8 @@ with values you expect to ask about, and leave blanks where you would need the r
 your own currency, for each of two offers. Do one table per year for at least years one, two and
 five. State the share price you used and where it came from.
 
+**State whether every figure is gross or after tax, and use the same basis for both offers.**
+
 | Line | Offer A | Offer B | Notes (source, date, assumptions) |
 |---|---|---|---|
 | Base salary (guaranteed) | | | |
@@ -357,6 +376,7 @@ five. State the share price you used and where it came from.
 | Cost to exercise (options only) | | | |
 | Tax timing for the equity (ask an adviser) | | | |
 | Benefits counted in the headline but not spendable | | | |
+| Kept if you leave at the end of this year | | | |
 | **Guaranteed cash total** | | | |
 | **Guaranteed + discounted variable** | | | |
 | **Sellable equity** | | | |
@@ -392,7 +412,9 @@ HTML-to-text extractor (full text, not a summary).
 - Investopedia, *Restricted Stock Unit (RSU): How It Works and Pros and Cons*,
   investopedia.com/terms/r/restricted-stock-unit.asp. Used for: RSUs have no value before vesting,
   no voting rights or dividends before vesting, forfeiture on leaving, US taxation as income at
-  vesting, and share withholding for tax.
+  vesting, and share withholding for tax. The RSU tax sentence in §4.2 rests on this secondary
+  source, not on the IRS text: the Publication 525 restricted-property section read here does not
+  name RSUs.
 - Investopedia, *Understanding Employee Stock Options*, investopedia.com/terms/e/eso.asp. Used for:
   options as a right to buy at a strike price for a limited term; employee options usually not
   sellable; cancellation if you leave before vesting; strike usually but not always set at the
@@ -405,7 +427,8 @@ no source above is cited for them.
 
 - Carta's equity education pages on vesting, options and RSUs (carta.com/learn): the pages refused
   automated download on 2026-11-26 and were not read.
-- Tech Interview Handbook, the compensation and negotiation pages: exist, not read.
+- Tech Interview Handbook, compensation and negotiation pages: not checked (whether they exist was
+  not confirmed), not read.
 - India-specific guidance on employee stock option taxation from the Income Tax Department: not
   read. If you work in India, read the current official rules before exercising.
 
