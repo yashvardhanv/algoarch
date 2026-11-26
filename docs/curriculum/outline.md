@@ -24,7 +24,7 @@ Every status below is judged from lesson titles and audit flags, not from lesson
 | **Total** | **106** | **156** | **50** |
 
 **Conflict to resolve:** decision 2 caps the curriculum at 110 to 140 lessons. The owner's answer for System Design (real-life case studies "as many as we can", in detail) cannot fit under 140. Dropping everything marked `NEW?` and the `extended` tier 3 case studies gives about 143, still over 140; there is no honest way to reach 140 without cutting what the owner asked for.
-**Recommendation:** raise the cap to about 155 and ship in waves (see "Build order"), so the cap is never a reason to write a thin case study. Pathways keep learners from being overwhelmed: Crash stays near 60 lessons whatever the library size.
+**Resolved (owner, 2026-11-26): cap raised to about 155.** Original recommendation: raise the cap to about 155 and ship in waves (see "Build order"), so the cap is never a reason to write a thin case study. Pathways keep learners from being overwhelmed: Crash stays near 60 lessons whatever the library size.
 
 ## AI Engineering (28 to 34)
 
