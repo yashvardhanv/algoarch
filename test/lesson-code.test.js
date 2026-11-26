@@ -157,6 +157,15 @@ test('sy40 lesson code matches reference checks', { skip: py ? false : 'python n
   assert.match(r.stdout, /sy40 code checks passed/);
 });
 
+test('sy41 lesson code matches reference models and threaded checks', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'sy41_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'sy41-machine-coding-lld.md'),
+  ], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /sy41 code checks passed/);
+});
+
 test('sy37-sy40 capacity estimates are reproduced by script', { skip: py ? false : 'python not installed' }, () => {
   const r = spawnSync(py, [
     path.join(__dirname, 'lesson_code', 'capacity_check.py'),
