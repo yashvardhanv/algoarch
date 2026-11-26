@@ -76,7 +76,7 @@ assert pm({'user_visible_min': 14}) == [] and pm({'user_visible_min': 15}) == ['
 assert pm({'data_loss': True}) == ['data loss'] and pm({'intervention': True}) == ['on-call intervention']
 assert pm({'resolve_min': 59}) == [] and pm({'resolve_min': 60}) == ['resolution took 60 min or more']
 assert pm({'found_by_humans': True}) == ['monitoring did not catch it'] and pm({'requested': True}) == ['a stakeholder asked for one']
-assert pm({'user_visible_min': 49, 'intervention': True, 'resolve_min': 80}) == [
+assert pm({'user_visible_min': 49, 'intervention': True, 'resolve_min': 79}) == [
     'user-visible for 15 min or more', 'on-call intervention', 'resolution took 60 min or more']
 assert len(pm({'user_visible_min': 99, 'data_loss': True, 'intervention': True, 'resolve_min': 999, 'found_by_humans': True,
                'requested': True})) == 6
@@ -88,18 +88,27 @@ ITEMS, lint, blame = ns['ITEMS'], ns['lint_action_items'], ns['blame_flags']
 assert lint(ITEMS) == [] and [i['id'] for i in ITEMS] == [1, 2, 3, 4, 5]
 
 def ref_lint(items, user_affecting=True):
-    """Second implementation: one table of per-item predicates, one of per-set predicates."""
+    """Second implementation, token based instead of regex based: the text becomes a list of words, a keyword
+    counts only as a whole word (with the listed inflections), and a number counts only when the next word is a unit."""
     vague_starts = ('improve', 'make better', 'look into', 'consider', 'review', 'investigate', 'enhance')
-    human_bits = ('train', 'remind', 'be more careful', 'pay attention', 'educate', 'tell people', 'learn to')
-    verifiable_words = ('reject', 'block', 'refuse', 'fail', 'alert', 'limit', 'cap', 'require', 'disallow', 'test', 'exercise', 'canary')
+    human_words = {'train', 'trains', 'training', 'remind', 'reminds', 'reminder', 'educate'}
+    human_phrases = ('be more careful', 'pay attention', 'pays attention', 'tell people', 'learn to', 'learns to')
+    verifiable = {'reject', 'block', 'refuse', 'fail', 'alert', 'limit', 'cap', 'require', 'disallow', 'test', 'exercise', 'canary'}
+    suffixes = ('', 's', 'es', 'ed', 'd', 'ing')
+    units = {'%', 'x', 'ms', 's', 'second', 'seconds', 'minute', 'minutes', 'min', 'hour', 'hours', 'day', 'days'}
     if len(items) == 0:
         return [(None, 'no action items')]
     out = []
     for it in items:
         t = it['text'].lower()
-        has_digit = any(c.isdigit() for c in t)
+        words = re.findall(r"[a-z]+|[0-9.]+|%", t)
+        has_number = any(re.fullmatch(r'[0-9]+(\.[0-9]+)?', w) and i + 1 < len(words) and words[i + 1] in units
+                         or re.fullmatch(r'[0-9]+(\.[0-9]+)?(x|ms|s|%)', w) is not None
+                         for i, w in enumerate(words))
+        # tokens such as '3x', '10%' and '200ms' arrive split by the regex above, so test the raw text as well
+        has_number = has_number or re.search(r'[0-9](%|x\b|ms\b)', t) is not None
         o = it.get('owner', '')
-        multi = (',' in o) or (';' in o) or ('/' in o) or ('&' in o) or (' and ' in (' ' + o + ' '))
+        multi = (',' in o) or (';' in o) or ('/' in o) or ('&' in o) or ('and' in re.findall(r'[a-z]+', o.lower()))
         if o.strip() == '' or multi:
             out.append((it['id'], 'owner'))
         if it.get('tracking', '').strip() == '':
@@ -107,12 +116,13 @@ def ref_lint(items, user_affecting=True):
         if it.get('priority') not in ['P0', 'P1', 'P2', 'P3', 'P4']:
             out.append((it['id'], 'priority'))
         starts_vague = any(t.startswith(v) for v in vague_starts)
-        verifiable = has_digit or any(re.search(r'\b' + w, t) for w in verifiable_words)
-        if starts_vague and not has_digit:
+        has_verb = any(w[:len(v)] == v and w[len(v):] in suffixes[0:] for w in words for v in verifiable)
+        if starts_vague and not has_number:
             out.append((it['id'], 'vague'))
-        elif not verifiable:
+        elif not (has_number or has_verb):
             out.append((it['id'], 'unverifiable'))
-        if any(h in t for h in human_bits):
+        joined = ' '.join(words)
+        if any(w in human_words for w in words) or any(ph in joined for ph in human_phrases):
             out.append((it['id'], 'fixes people'))
     if all(i['kind'] != 'prevent' for i in items):
         out.append((None, 'nothing preventive'))
@@ -122,7 +132,7 @@ def ref_lint(items, user_affecting=True):
         out.append((None, 'no P0 or P1'))
     return out
 
-texts = ['Improve alerting', 'Improve alerting for 3 of the services', 'Cap retries at 10% of requests', 'Train engineers to be careful',
+texts = ['Improve alerting', 'Improve alerting to page within 5 minutes', 'Capture more context in the dashboards', 'Ensure the team pays attention to latency', 'Improve alerting by Q3 2027', 'Testify to the runbook', 'Cap retries at 10% of requests', 'Train engineers to be careful',
          'Remind people to read the runbook', 'Add a test that fails when the timeout is under 1000 ms', 'Look into the retry behaviour',
          'Review the dashboards', 'Rewrite the config loader', 'Alert when more than 5% of hosts are drained', 'Educate the team on retries',
          'Block pushes that lower a timeout']
@@ -141,9 +151,9 @@ assert lint(one()) == []
 assert lint(one(owner='a, b')) == [(1, 'owner')] and lint(one(owner='a and b')) == [(1, 'owner')] and lint(one(owner='')) == [(1, 'owner')]
 assert lint(one(owner='brand lead')) == []                                                      # 'and' inside a word is not a list
 assert lint(one(tracking='')) == [(1, 'tracking')] and lint(one(priority='high'), user_affecting=False) == [(1, 'priority')] and lint(one(priority='high')) == [(1, 'priority'), (None, 'no P0 or P1')]
-assert lint(one(text='Improve alerting')) == [(1, 'vague')] and lint(one(text='Improve alerting for 3 services')) == []
+assert lint(one(text='Improve alerting')) == [(1, 'vague')] and lint(one(text='Improve alerting to page within 5 minutes')) == []
 assert lint(one(text='Rewrite the loader')) == [(1, 'unverifiable')]
-assert lint(one(text='Train engineers to be careful with 3 checks')) == [(1, 'fixes people')]
+assert lint(one(text='Train engineers to be careful within 2 days')) == [(1, 'fixes people')]
 assert lint(one(kind='mitigate')) == [(None, 'nothing preventive')]
 assert lint(one(priority='P2')) == [(None, 'no P0 or P1')]
 assert lint(one(priority='P2'), user_affecting=False) == []
@@ -169,5 +179,27 @@ assert blame('The checklist step was skipped because it was not in the runbook.'
 assert blame('RIDICULOUS') == ['ridiculous'] and blame('') == [] and blame('Fine!') == ['!']
 assert blame('Nobody could have known') == []                                                 # not every sentence about knowing is a flag
 need('careless', 'ridiculous')
+
+# word-boundary behaviour, and a hand-labelled table that does not depend on either implementation
+assert blame('This is a blameless postmortem.') == [] and blame('Nobody should be blamed.') == ['blamed'] and blame('Do not blame anyone.') == ['blame']
+assert blame('We use lazy loading here.') == []
+labelled = [
+    ('Capture more context in the dashboards', ['unverifiable']),
+    ('Testify to the runbook', ['unverifiable']),
+    ('Improve alerting by Q3 2027', ['vague']),
+    ('Rewrite the loader by Q3 2027', ['unverifiable']),
+    ('Unblock the team', ['unverifiable']),
+    ('Ensure the team pays attention to latency', ['unverifiable', 'fixes people']),
+    ('Improve alerting to page within 5 minutes', []),
+    ('CI rejects timeouts below 3x the provider p99', []),
+    ('Train engineers on the runbook', ['unverifiable', 'fixes people']),
+    ('Training for all new on-call engineers within 30 days', ['fixes people']),
+    ('Alert when more than 5% of hosts are drained', []),
+    ('Add a test that fails on a retry loop', []),
+]
+for text, want in labelled:
+    got = [f for i, f in lint([dict(one()[0], text=text)], user_affecting=False)]
+    assert got == want, (text, got, want)
+need('seven minutes later', '79 minutes from the start of impact to close', 'about 35% of checkout requests failed', 'P0 or P1 bug', 'VP for 24/7 Operations')
 
 print('sy50 code checks passed')

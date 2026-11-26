@@ -1,6 +1,6 @@
 # Lesson 50 — Incident Response and Blameless Postmortems
 
-> **Priority:** ★★★☆☆ — "tell me about an outage you handled" and "how do you stop it happening again?" are standard senior questions, and the strong answer is a process, not a story about heroics.
+> **Priority:** ★★★☆☆ (proposed; the curriculum data holds the final rating) — "tell me about an outage you handled" and "how do you stop it happening again?" are standard senior questions, and the strong answer is a process, not a story about heroics.
 >
 > **Study time:** 55 minutes. **Do this after:** SLOs, SLIs and Error Budgets, and Overload, Load Shedding and Cascading Failures.
 >
@@ -134,7 +134,7 @@ Computed from that timeline (minutes from the start of user impact at 14:03):
 What the numbers say, with the information the responders had at each point:
 
 - **Detection was fast and declaration was slow.** The page came 6 minutes after impact, and the incident was declared 13 minutes after impact, 7 minutes after the page, though the SRE book's customer-visibility question was already answered by the alert itself. A page template carrying the declare checklist is the cheap fix, and it appears as an action item below.
-- **The rollback was a reasonable first move that did not work.** Reverting the push at 14:24 was the generic mitigation and the right call on the available evidence. It did not help because the trigger was not the sustaining effect: retries kept the service overloaded. The effective action came at 14:38, 35 minutes after impact, and was the load-shedding and retry cap that the overload lesson describes. The postmortem's job is to turn that discovery into a runbook step so that shedding follows a failed rollback at once instead of fourteen minutes later.
+- **The rollback was a reasonable first move that did not work.** Reverting the push at 14:24 was the generic mitigation and the right call on the available evidence. It did not help because the trigger was not the sustaining effect: retries kept the service overloaded. The effective action came at 14:38, 35 minutes after impact, and was the load-shedding and retry cap that the overload lesson describes. The postmortem's job is to turn that discovery into a runbook step so that shedding follows a failed rollback at once instead of seven minutes later.
 - **The close came after an exit criterion.** The incident was closed at 15:22 because the service held nominal behaviour for 30 minutes after mitigation. The SRE book's example postmortem closes its incident with the same kind of exit criterion, 30 minutes of nominal performance.
 
 ### What it cost
@@ -182,7 +182,7 @@ def needs_postmortem(incident, user_visible_min=15, resolve_min=60):
     return why
 ```
 
-For this incident (49 minutes of impact, a rollback and shedding, 80 minutes to resolve) it returns three reasons. The code is a checklist, not judgement; its value is that the criteria are written down in advance, not decided in the middle of an argument.
+For this incident (49 minutes of impact, a rollback and shedding, 79 minutes from the start of impact to close) it returns three reasons. The code is a checklist, not judgement; its value is that the criteria are written down in advance, not decided in the middle of an argument.
 
 ---
 
@@ -195,7 +195,7 @@ For the invented incident, the filled-in postmortem, abbreviated:
 | Field | Content (illustrative) |
 |---|---|
 | Summary | A configuration push cut the payment-provider timeout to 200 ms; checkout failed for 49 minutes |
-| Impact | 1,412,400 failed requests (27.2% of the 30-day budget); checkout unavailable for most users between 14:09 and 14:38; no data loss |
+| Impact | 1,412,400 failed requests (27.2% of the 30-day budget); about 35% of checkout requests failed between 14:09 and 14:38 (20% before that, 3% until 14:52); no data loss |
 | Trigger | The 14:02 push, which set a timeout lower than the provider's normal latency |
 | Contributing factors | Nothing checked the value against the provider's latency; the change took a full rollout rather than a canary; retries to the provider were uncapped, so the overload outlived the rollback; the runbook had no "rollback did not recover" branch |
 | Detection | A burn-rate alert paged in 6 minutes |
@@ -208,7 +208,7 @@ Trigger and contributing factors are different things. The Workbook's good examp
 
 ### Action items that survive review
 
-The Workbook's critique of a weak postmortem is a list: items mostly about mitigation with nothing preventive, all the same priority, vague wording such as "improve" or "make better", a postmortem owned by four people, action items with no owner, no tracking bug, and one item to "train humans" which it calls less reliable than changing the system. It also says the postmortems after a user-affecting outage should have at least one top-priority bug, attributing that rule to Google's head of 24/7 operations. Here are the five items for the invented incident:
+The Workbook's critique of a weak postmortem is a list: items mostly about mitigation with nothing preventive, all the same priority, vague wording such as "improve" or "make better", a postmortem owned by four people, action items with no owner, no tracking bug, and one item to "train humans" which it calls less reliable than changing the system. It also says the postmortems after a user-affecting outage must have at least one P0 or P1 bug, attributing that rule to Google's VP for 24/7 Operations. Here are the five items for the invented incident:
 
 ```python
 ITEMS = [
@@ -232,9 +232,10 @@ import re
 
 VAGUE = ('improve', 'make better', 'look into', 'consider', 'review', 'investigate', 'enhance')
 
-HUMAN = ('train', 'remind', 'be more careful', 'pay attention', 'educate', 'tell people', 'learn to')
+HUMAN = (r'train(s|ing)?', r'remind(s|er)?', r'be more careful', r'pays? attention', r'educate', r'tell people', r'learns? to')
 
-VERIFIABLE = re.compile(r"\d|\b(reject|block|refuse|fail|alert|limit|cap|require|disallow|test|exercise|canary)", re.I)
+NUMBER = re.compile(r"\d+(\.\d+)?\s?(%|x\b|ms\b|s\b|seconds?\b|minutes?\b|min\b|hours?\b|days?\b)", re.I)
+VERIFIABLE = re.compile(r"\b(reject|block|refuse|fail|alert|limit|cap|require|disallow|test|exercise|canary)(s|es|ed|d|ing)?\b", re.I)
 
 PRIORITIES = ('P0', 'P1', 'P2', 'P3', 'P4')
 
@@ -255,11 +256,11 @@ def lint_action_items(items, user_affecting=True):
             flags.append((it['id'], 'tracking'))
         if it.get('priority') not in PRIORITIES:
             flags.append((it['id'], 'priority'))
-        if any(text.startswith(v) for v in VAGUE) and not re.search(r'\d', text):
+        if any(text.startswith(v) for v in VAGUE) and not NUMBER.search(text):
             flags.append((it['id'], 'vague'))
-        elif not VERIFIABLE.search(text):
+        elif not (NUMBER.search(text) or VERIFIABLE.search(text)):
             flags.append((it['id'], 'unverifiable'))
-        if any(h in text for h in HUMAN):
+        if any(re.search(r'\b' + h + r'\b', text) for h in HUMAN):
             flags.append((it['id'], 'fixes people'))
     if not any(i['kind'] == 'prevent' for i in items):
         flags.append((None, 'nothing preventive'))
@@ -269,13 +270,13 @@ def lint_action_items(items, user_affecting=True):
         flags.append((None, 'no P0 or P1'))
     return flags
 
-LOUD = ('careless', 'ridiculous', 'stupid', 'idiot', 'lazy', 'negligent', 'incompetent', 'sloppy', 'blame',
+LOUD = ('careless', 'ridiculous', 'stupid', 'idiot', 'negligent', 'incompetent', 'sloppy', 'blame', 'blamed',
         'should have known', 'ignored', 'unbelievable')
 
 def blame_flags(text):
     """The loud cases only: judgemental words and exclamation marks. Review has to catch the quiet ones."""
     low = text.lower()
-    out = [w for w in LOUD if w in low]
+    out = [w for w in LOUD if re.search(r'\b' + re.escape(w) + r'\b', low)]      # whole words: 'blameless' is fine
     if '!' in text:
         out.append('!')
     return out
