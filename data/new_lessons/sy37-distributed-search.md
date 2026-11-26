@@ -98,7 +98,7 @@ POST /products/_pit?keep_alive=1m returns a point-in-time id for stable deep pag
 
 A document is routed to a shard by `shard_num = hash(_routing) % num_primary_shards`, where `_routing`
 defaults to the document id. Because the shard count is in the formula, **the number of primaries is
-effectively fixed for an index**; changing it means copying into a new index. Choose it from the
+effectively fixed for an index**; changing it means copying into a new index (the split and shrink APIs do this for you). Choose it from the
 capacity estimate, not by habit.
 
 Inside a shard the index is an **inverted index**: for each term, the documents that contain it and how
@@ -114,7 +114,9 @@ BM25 scores document `D` for query terms `q` as the sum over terms of
 `IDF(q) * f(q, D) * (k1 + 1) / (f(q, D) + k1 * (1 - b + b * |D| / avgdl))`,
 with `IDF(q) = ln(1 + (N - n(q) + 0.5) / (n(q) + 0.5))`. `f` is the term's count in the document, `|D|` the
 document's length, `avgdl` the average length, `N` the number of documents and `n(q)` how many contain
-the term. Lucene's defaults are `k1 = 1.2` and `b = 0.75`.
+the term. Lucene's defaults are `k1 = 1.2` and `b = 0.75`. This is the textbook form of BM25; Lucene's
+scorer does not use exactly this expression, so absolute scores in Elasticsearch's `_explain` output differ
+from it by constant factors, but the ranking is the same.
 
 Read the formula as two ideas: **rare terms count more** (IDF), and **repeating a term helps less and
 less, more so in long documents** (the saturating fraction, normalised by length).
@@ -222,7 +224,7 @@ by default.
 | Request on 15 shards | Hits each shard returns | Hits the coordinator merges |
 |---|---|---|
 | page 1 (`from=0, size=10`) | 10 | 150 |
-| page 1,001 (`from=10000, size=10`) | 10,010 | 150,150 |
+| page 1,000 (`from=9990, size=10`, the deepest the default window allows) | 10,000 | 150,000 |
 
 The fix is a cursor. `search_after` passes the sort values of the last hit; each shard returns only the
 next `size` hits after it, so every page costs the same. A unique tiebreaker in the sort keeps pages from
@@ -362,9 +364,10 @@ All read 2026-11-26.
   for the routing formula and the default routing value.
 - Elastic, *Search API* reference, elastic.co/docs/api/doc/elasticsearch/operation/operation-search (the
   `search_type` parameter only). Source for `query_then_fetch` and `dfs_query_then_fetch`.
-- Apache Lucene 9.9 Javadoc, *BM25Similarity*, lucene.apache.org/core/9_9_0/core/org/apache/lucene/search/similarities/BM25Similarity.html.
-  Source for the defaults `k1 = 1.2`, `b = 0.75` and the IDF form.
-- Wikipedia, *Okapi BM25*, en.wikipedia.org/wiki/Okapi_BM25. Source for the full scoring formula.
+- Apache Lucene 9.9 Javadoc, *BM25Similarity*, lucene.apache.org/core/9_9_0/core/org/apache/lucene/search/similarities/BM25Similarity.html
+  (read through a summarising fetch). Source for the defaults `k1 = 1.2`, `b = 0.75` and the IDF form.
+- Wikipedia, *Okapi BM25*, en.wikipedia.org/wiki/Okapi_BM25 (read through a summarising fetch).
+  Source for the full scoring formula.
 
 ## Further reading (not consulted)
 

@@ -26,12 +26,13 @@ def sy37(src):
     assert writes * copies == 4000
     # deep pagination on 15 shards
     assert (0 + 10, shards * (0 + 10)) == (10, 150)
-    assert (10000 + 10, shards * (10000 + 10)) == (10010, 150150)
+    assert 9990 + 10 <= 10000                                              # inside max_result_window
+    assert (9990 + 10, shards * (9990 + 10)) == (10000, 150000)
     # async translog: 5 s window at 2,000 writes/s
     assert writes * 5 == 10000
     need(src, '400 GB', '600 GB', '| 15 |', 'about 13.3 million', '30 copies, 1.2 TB', '300,000 per second',
          '600 cores busy; 1,000 cores at 60%', '40 cores busy', '4,000 document writes/s',
-         '| 10,010 | 150,150 |', '| 10 | 150 |', 'up to 10,000 lost')
+         '| 10,000 | 150,000 |', '| 10 | 150 |', 'up to 10,000 lost')
     return 'sy37'
 
 def sy38(src):
