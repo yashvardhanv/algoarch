@@ -10,6 +10,105 @@ ns = {}
 for b in re.findall(r"```python\n(.*?)```", src, re.S):
     exec(b, ns)
 
+# Code that used to be printed in the lesson and now lives only here: the lossy network and upload client loops,
+# and the event-stream parser the lesson's Subscriber calls.
+PRELUDE = r'''
+import random
+
+class Flaky:
+    """Network between client and server: each block fails with probability p (the request dies there and later
+    blocks do not arrive); an acknowledgement is lost with probability ack_loss. Counts the blocks put on the wire."""
+    def __init__(self, p, ack_loss=0.0, seed=0):
+        self.p, self.ack_loss, self.rng = p, ack_loss, random.Random(seed)
+        self.blocks_sent = self.requests = self.heads = 0
+
+    def transmit(self, blocks):
+        """Returns how many leading blocks arrive, and whether the request got through whole."""
+        self.requests += 1
+        for i in range(len(blocks)):
+            self.blocks_sent += 1
+            if self.rng.random() < self.p:
+                return i, False
+        return len(blocks), True
+
+    def ack_lost(self):
+        return self.rng.random() < self.ack_loss
+
+def upload_parts(source, chunk, store, net, seed=1):
+    """Send numbered parts in a random order, retrying each until acknowledged, then complete with the list of
+    parts the client itself recorded (the S3 page says to keep your own list rather than trust a listing)."""
+    chunks = [source[i:i + chunk] for i in range(0, len(source), chunk)]
+    order = list(range(1, len(chunks) + 1))
+    random.Random(seed).shuffle(order)
+    acked = set()
+    for n in order:
+        while n not in acked:
+            got, whole = net.transmit(chunks[n - 1])
+            if not whole:
+                continue                                  # a half-sent part is not stored; send it again
+            store.put_part(n, chunks[n - 1])
+            if not net.ack_lost():
+                acked.add(n)
+    return store.complete(sorted(acked))
+
+def upload_offset(source, chunk, store, net):
+    """Resume from the server's offset. After a request whose answer arrived the client trusts the new offset;
+    after a failure or a lost answer it asks (a HEAD) where the server is, and sends the rest from there."""
+    off = store.head()
+    while off < len(source):
+        blocks = source[off:off + chunk]
+        got, whole = net.transmit(blocks)
+        new = store.patch(off, blocks, None if whole else got)
+        if whole and not net.ack_lost():
+            off = new
+        else:
+            net.heads += 1
+            off = store.head()
+    return store.data
+
+import re
+
+def parse_event_stream(text, last_id=''):
+    """Parse a text/event-stream the way the WHATWG HTML standard (section 9.2) describes. Lines end in CRLF, LF or
+    CR; a blank line dispatches; `:` starts a comment; fields are event, data, id, retry. An event cut off before its
+    blank line is dropped. Returns (events, last event id string, reconnection time in ms or None); each event is
+    (type, data, lastEventId)."""
+    if text.startswith('\ufeff'):
+        text = text[1:]                                   # one leading byte order mark is stripped
+    events, retry = [], None
+    data, etype, id_buf = [], '', last_id
+    lines = re.split(r'\r\n|\n|\r', text)
+    if lines and lines[-1] == '':
+        lines.pop()                                       # the text ended with a line terminator
+    complete = text.endswith(('\n', '\r'))                # a last line with no terminator is never dispatched
+    for i, line in enumerate(lines):
+        if i == len(lines) - 1 and not complete:
+            break                                         # an unterminated final line is incomplete
+        if line == '':
+            last_id = id_buf                              # the id buffer is not reset: it stays until the server changes it
+            if data:                                      # an event with no data lines is not dispatched
+                events.append((etype or 'message', '\n'.join(data), last_id))
+            data, etype = [], ''
+            continue
+        if line.startswith(':'):
+            continue
+        name, sep, value = line.partition(':')
+        if sep and value.startswith(' '):
+            value = value[1:]
+        if name == 'event':
+            etype = value
+        elif name == 'data':
+            data.append(value)
+        elif name == 'id':
+            if '\0' not in value:
+                id_buf = value
+        elif name == 'retry':
+            if value.isascii() and value.isdigit():
+                retry = int(value)
+    return events, last_id, retry
+'''
+exec(PRELUDE, ns)
+
 def need(*phrases):
     for p in phrases:
         assert p in src, 'lesson text is missing the computed figure: %r' % p
@@ -402,6 +501,21 @@ log.append(7)
 assert sub.receive(log.serve(sub.last_id)) == 1 and (sub.total, sub.last_id) == (157, 6)
 try:
     sub.receive('id: 9\ndata: 1\n\n'); raise AssertionError('a gap was applied')
+except ValueError:
+    pass
+sub2 = Subscriber()
+sub2.receive('id: 1\ndata: 5\n\nid: 2\ndata: 5\n\n')
+assert (sub2.total, sub2.last_id) == (10, 2)
+for dup in ('id: 2\ndata: 5\n\n', 'id: 1\ndata: 5\n\n'):                                    # at or below the last id: ignored
+    assert sub2.receive(dup) == 0 and (sub2.total, sub2.last_id) == (10, 2)
+try:
+    sub2.receive('id: 4\ndata: 5\n\n'); raise AssertionError('a gap of exactly one event was applied or ignored')
+except ValueError:
+    pass
+assert (sub2.total, sub2.last_id) == (10, 2)
+assert sub2.receive('id: 3\ndata: 5\n\n') == 1 and (sub2.total, sub2.last_id) == (15, 3)
+try:
+    EventLog(0); raise AssertionError('keep=0 accepted')
 except ValueError:
     pass
 

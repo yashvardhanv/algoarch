@@ -1,6 +1,6 @@
 # Lesson 52 — Scaling Patterns II: Large Blobs, Long-Running Tasks and Real-Time Updates
 
-> **Priority:** ★★★★★ — video upload, report export and live notifications show up in half the case studies, and the follow-up is always "what happens when the connection drops halfway?".
+> **Priority:** ★★★★★ (proposed; the curriculum data holds the final rating) — video upload, report export and live notifications show up in half the case studies, and the follow-up is always "what happens when the connection drops halfway?".
 >
 > **Study time:** 75 minutes. **Do this after:** Scaling Patterns I: Reads, Writes and Contention, and Idempotency, Outbox & Sagas.
 >
@@ -59,12 +59,12 @@ Because a URL is a bearer token, issue **one URL per part with a short expiry** 
 | Unit of progress | a part number and its checksum | a byte offset |
 | Order | any order, in parallel | one contiguous stream |
 | Who knows what is stored | the client keeps its own list of part numbers and checksums | the server; the client asks (a `HEAD` in tus, a status query in Google's) |
-| Repeating a request | the same part number replaces the part | a request at a stale offset is refused (tus: 409 Conflict) and changes nothing |
+| Repeating a request | the same part number replaces the part | tus: a request at a stale offset is refused (409 Conflict) and changes nothing; Google: bytes resent below the persisted offset are ignored |
 | A request that fails midway | the part is not stored; resend the whole part | tus: the server should keep what arrived; resume from the new offset |
 | Completion | a request listing every part number and checksum | when the offset reaches the length |
 | Cleanup | parts are billed until completed or aborted; no expiry unless you add a lifecycle rule | tus: optional `Upload-Expires`; Google: the session lasts a week |
 
-This table comes from three documents read on 2026-11-26. S3's multipart page: parts uploaded independently and in any order, part numbers 1 to 10,000 (they need not be consecutive, unless checksums are used, when they must start at 1 and be consecutive), a retransmitted part with the same number overwrites the old one, the complete call needs the part numbers and ETags, the page says to keep your own list rather than use the listing, and parts are billed until you complete or stop the upload (with a lifecycle rule recommended to delete incomplete uploads). The tus 1.0.0 protocol: `HEAD` returns `Upload-Offset`; `PATCH` must carry the current offset or the server answers 409 and leaves the upload alone; the server should store as much of a request as it received; optional checksum (460 on mismatch), expiry and concatenation extensions. Google's resumable-upload page: a session URI valid for a week that works as an authentication token; bytes once persisted cannot be overwritten, so resending from an earlier offset is ignored up to the persisted point; chunks are multiples of 256 KiB; and the page's advice is to avoid chunking unless you need it.
+The table comes from three documents read on 2026-11-26. Details it does not carry: S3 part numbers run 1 to 10,000, and when checksums are used they must start at 1 and be consecutive. tus defines optional checksum (460 on mismatch), expiry and concatenation extensions. Google's session URI works as an authentication token, chunks are multiples of 256 KiB, and the page advises avoiding chunking unless you need it.
 
 The S3 limits decide the part size for large objects:
 
@@ -147,11 +147,9 @@ A 10 GiB object is 10,000 blocks; take `p = 0.001` (one block in a thousand fail
 
 ### Deep dive 2: the bookkeeping that survives retries
 
-Both protocols come down to a small ledger on the storage side and a loop on the client side. The code below models both with a simulated network: each block fails with probability `p` and kills the request, and an acknowledgement can be lost (the server did the work; the client does not know).
+Both protocols come down to a small ledger on the storage side and a loop on the client side. The code below is the storage-side ledger for both. The check drives it with a client loop and a simulated network (each block fails with probability `p` and kills the request, and an acknowledgement can be lost: the server did the work and the client does not know).
 
 ```python
-import random
-
 class Conflict(Exception):
     """The upload's offset is not the one the client sent (HTTP 409 in tus)."""
 
@@ -189,60 +187,9 @@ class OffsetStore:
         if len(self.data) > self.length:
             raise ValueError('past the declared length')
         return len(self.data)
-
-class Flaky:
-    """Network between client and server: each block fails with probability p (the request dies there and later
-    blocks do not arrive); an acknowledgement is lost with probability ack_loss. Counts the blocks put on the wire."""
-    def __init__(self, p, ack_loss=0.0, seed=0):
-        self.p, self.ack_loss, self.rng = p, ack_loss, random.Random(seed)
-        self.blocks_sent = self.requests = self.heads = 0
-
-    def transmit(self, blocks):
-        """Returns how many leading blocks arrive, and whether the request got through whole."""
-        self.requests += 1
-        for i in range(len(blocks)):
-            self.blocks_sent += 1
-            if self.rng.random() < self.p:
-                return i, False
-        return len(blocks), True
-
-    def ack_lost(self):
-        return self.rng.random() < self.ack_loss
-
-def upload_parts(source, chunk, store, net, seed=1):
-    """Send numbered parts in a random order, retrying each until acknowledged, then complete with the list of
-    parts the client itself recorded (the S3 page says to keep your own list rather than trust a listing)."""
-    chunks = [source[i:i + chunk] for i in range(0, len(source), chunk)]
-    order = list(range(1, len(chunks) + 1))
-    random.Random(seed).shuffle(order)
-    acked = set()
-    for n in order:
-        while n not in acked:
-            got, whole = net.transmit(chunks[n - 1])
-            if not whole:
-                continue                                  # a half-sent part is not stored; send it again
-            store.put_part(n, chunks[n - 1])
-            if not net.ack_lost():
-                acked.add(n)
-    return store.complete(sorted(acked))
-
-def upload_offset(source, chunk, store, net):
-    """Resume from the server's offset. After a request whose answer arrived the client trusts the new offset;
-    after a failure or a lost answer it asks (a HEAD) where the server is, and sends the rest from there."""
-    off = store.head()
-    while off < len(source):
-        blocks = source[off:off + chunk]
-        got, whole = net.transmit(blocks)
-        new = store.patch(off, blocks, None if whole else got)
-        if whole and not net.ack_lost():
-            off = new
-        else:
-            net.heads += 1
-            off = store.head()
-    return store.data
 ```
 
-What the tests establish, with injected failures at three severities and chunk sizes from 1 to 200:
+What the check establishes with its client loops and injected failures at three severities and chunk sizes from 1 to 200:
 
 - **Both uploads rebuild the source exactly,** including with lost acknowledgements, random part order, and a lost answer after a part was stored (the part is simply stored again, as the same number replaces it).
 - **The part ledger refuses to complete without every part,** with a duplicate, or with a part never uploaded, and rejects part numbers outside the range. Completion takes the client's own list, as the S3 page recommends.
@@ -268,7 +215,7 @@ A worker can die at any moment, and a slow one is indistinguishable from a dead 
 | State | Meaning | Leaves by |
 |---|---|---|
 | `QUEUED` | waiting for a worker | `claim` |
-| `RUNNING` | a worker holds a lease | `complete`, `fail`, `cancel`, or the lease running out |
+| `RUNNING` | a worker holds a lease | `complete`, `fail`, `cancel`, or the reaper finding the lease expired |
 | `SUCCEEDED`, `FAILED`, `CANCELLED` | terminal | nothing: they never change |
 
 A worker **claims** a task and gets the attempt number as a **fencing token**. Every later call (`heartbeat`, `complete`, `fail`) must carry it. A heartbeat extends the lease. A reaper returns tasks whose lease has expired to `QUEUED`, or marks them `FAILED` when attempts are used up.
@@ -412,12 +359,13 @@ The scenario the check walks through:
 | 11 | B completes with token 2 | `SUCCEEDED` |
 
 - **The token stops a late worker from overwriting a newer result,** and no lock service is involved because the store itself compares the number. This is the same idea as the fencing token in the flash-sale lesson, applied to tasks.
+- **Expiry takes effect only when the reaper runs.** A worker whose lease lapsed but who has not been reaped can still heartbeat and complete; that is safe because the token, not the clock, decides who may finish.
 - **Execution is at least once, not exactly once.** Task `t` ran, at least partly, twice: A may have finished its side effects before it was fenced out. The effects therefore have to be idempotent (write results under a key derived from the task id, charge with an idempotency key). The store protects its own record, not the world outside it.
 - **A task that keeps killing workers must stop.** After `max_attempts` the task becomes `FAILED` with an error instead of cycling forever. A poison task that crashes every worker is the usual reason.
 - **Cancellation is cooperative.** `cancel` marks the record; a running worker learns at its next heartbeat (`cancelled`) and must stop, and its `complete` is refused.
 - **Submitting twice is harmless.** `submit` with an existing id changes nothing.
 
-The fleet simulation puts 1,000 tasks on 20 workers. Each task takes 8 seconds, leases are 5 seconds, tasks get 3 attempts, and a claiming worker dies silently at a random second with probability `c`. Closed forms say each task makes `(1 - c^3) / (1 - c)` claims on average and fails with probability `c^3`:
+The fleet simulation (`run_fleet(1000, 20, c, seed=5)`) puts 1,000 tasks on 20 workers. Each task takes 8 seconds, leases are 5 seconds, tasks get 3 attempts, and a claiming worker dies silently at a random second with probability `c`. Closed forms say each task makes `(1 - c^3) / (1 - c)` claims on average and fails with probability `c^3`:
 
 | Crash rate | Seconds to finish | Succeeded | Failed | Claims | Expected claims |
 |---|---|---|---|---|---|
@@ -428,7 +376,7 @@ The fleet simulation puts 1,000 tasks on 20 workers. Each task takes 8 seconds, 
 
 At a 40% crash rate, 61 of 1,000 tasks fail permanently (the formula says 64), 553 extra claims are made, and the batch takes a third longer. The lease length shows up as the wait before a dead worker's task is retried, so a short lease finds failures sooner and fences out slow workers more often. The check compares the store with a second implementation that replays an event log, on 300 random operation sequences with random times, and asserts every return value agrees.
 
-What to add around it: a visibility-style retry delay so a failing task does not spin, a dead-letter list for `FAILED` tasks that someone looks at, polling with backoff on the client (or a notification when `done`), and, for jobs with many dependent steps, a workflow engine instead of hand-built state (see the Idempotency, Outbox & Sagas lesson). Retention matters here too: AIP-151's 30-day suggestion is a policy about how long finished records are kept.
+What to add around it: a visibility-style retry delay so a failing task does not spin, a dead-letter list for `FAILED` tasks that someone looks at, polling with backoff on the client (or a notification when `done`), and, for jobs with many dependent steps, a workflow engine instead of hand-built state (see the Workflow Orchestration lesson). The Distributed Task Scheduler and Message Queue case studies cover leases, visibility timeouts and dead-lettering from the scheduler's and the broker's side; this lesson adds the fencing token and the failure model. Multipart upload also appears in the Object Storage case study and WebSockets in the Chat case study; here they are costed and tested. Retention matters here too: AIP-151's 30-day suggestion is a policy about how long finished records are kept.
 
 Visual (planned): the task lifecycle as a state diagram, with the scenario above as a swimlane of worker A, the reaper and worker B.
 
@@ -482,50 +430,7 @@ Push wins on requests, loses on connections held open, and adds a cost people fo
 
 ### Deep dive 4: resuming a stream
 
-The failure that decides the design is not "the connection dropped", it is "which events did I miss?". The WHATWG HTML standard (section 9.2, read 2026-11-26) gives server-sent events the pieces for the answer. The stream is `text/event-stream`, UTF-8, made of fields separated by line breaks and events ended by a blank line. The `id` field sets the client's *last event id*, and when the client reconnects it sends that value in the `Last-Event-ID` header. The `retry` field sets the reconnect delay. A comment line starts with a colon. An event cut off before its blank line is never dispatched. The parser below implements those rules, and the check runs the standard's own examples through it (the four-block `first event` example, the `YHOO` example, the empty-data example, and the two equal events), plus carriage-return line endings, a byte-order mark, an `id` with a NUL, and 3,000 random strings against a second, character-at-a-time parser.
-
-```python
-import re
-
-def parse_event_stream(text, last_id=''):
-    """Parse a text/event-stream the way the WHATWG HTML standard (section 9.2) describes. Lines end in CRLF, LF or
-    CR; a blank line dispatches; `:` starts a comment; fields are event, data, id, retry. An event cut off before its
-    blank line is dropped. Returns (events, last event id string, reconnection time in ms or None); each event is
-    (type, data, lastEventId)."""
-    if text.startswith('\ufeff'):
-        text = text[1:]                                   # one leading byte order mark is stripped
-    events, retry = [], None
-    data, etype, id_buf = [], '', last_id
-    lines = re.split(r'\r\n|\n|\r', text)
-    if lines and lines[-1] == '':
-        lines.pop()                                       # the text ended with a line terminator
-    complete = text.endswith(('\n', '\r'))                # a last line with no terminator is never dispatched
-    for i, line in enumerate(lines):
-        if i == len(lines) - 1 and not complete:
-            break                                         # an unterminated final line is incomplete
-        if line == '':
-            last_id = id_buf                              # the id buffer is not reset: it stays until the server changes it
-            if data:                                      # an event with no data lines is not dispatched
-                events.append((etype or 'message', '\n'.join(data), last_id))
-            data, etype = [], ''
-            continue
-        if line.startswith(':'):
-            continue
-        name, sep, value = line.partition(':')
-        if sep and value.startswith(' '):
-            value = value[1:]
-        if name == 'event':
-            etype = value
-        elif name == 'data':
-            data.append(value)
-        elif name == 'id':
-            if '\0' not in value:
-                id_buf = value
-        elif name == 'retry':
-            if value.isascii() and value.isdigit():
-                retry = int(value)
-    return events, last_id, retry
-```
+The failure that decides the design is not "the connection dropped", it is "which events did I miss?". The WHATWG HTML standard (section 9.2, read 2026-11-26) gives server-sent events the pieces for the answer. The stream is `text/event-stream`, UTF-8, made of fields separated by line breaks and events ended by a blank line. The `id` field sets the client's *last event id*, and when the client reconnects it sends that value in the `Last-Event-ID` header. The `retry` field sets the reconnect delay. A comment line starts with a colon. An event cut off before its blank line is never dispatched. The parser that implements those rules lives in the check script, which runs the standard's own examples through it (the four-block `first event` example, the `YHOO` example, the empty-data example, and the two equal events), plus carriage-return line endings, a byte-order mark, an `id` with a NUL, and 3,000 random strings against a second, character-at-a-time parser. The `Subscriber` below calls that parser.
 
 The `Last-Event-ID` header only says where the client got to. The server needs a log to answer from, and a log is bounded, so the answer has three cases: the missed events, nothing, or "I no longer have them". The last case needs a **snapshot**:
 
@@ -536,6 +441,8 @@ class EventLog:
     """Server side of a resumable stream of increments. Ids count up from 1 and only the newest `keep` events are
     kept; the running total is kept separately so a snapshot is always available."""
     def __init__(self, keep):
+        if keep < 1:
+            raise ValueError('keep at least one event')
         self.keep, self.events, self.next_id, self.total = keep, [], 1, 0
 
     def append(self, delta):
@@ -599,9 +506,9 @@ def run_stream(seed, keep, events=200):
     return (sub.total, sub.last_id) == (log.total, log.next_id - 1), sub.snapshots
 ```
 
-`run_stream` makes the server append increments in bursts while the client reconnects after each burst, and cuts the connection at a random character 70% of the time. Over 200 runs per row, the client's total and last id equal the server's in every run, and this is how often a snapshot was needed:
+`run_stream` makes the server append increments in bursts while the client reconnects after each burst, and cuts the connection at a random character 70% of the time. Over 200 runs per row, the client's total and last id equal the server's in every run, and this is how many snapshots the client applied (a snapshot response that is cut off is requested again, so the number of snapshots the server had to send is larger):
 
-| Events kept in the log | Snapshots needed in 200 runs |
+| Events kept in the log | Snapshots applied in 200 runs |
 |---|---|
 | 2 | 2,171 |
 | 5 | 1,920 |
@@ -613,16 +520,6 @@ def run_stream(seed, keep, events=200):
 - **WebSockets give you none of this.** The sections of RFC 6455 read here define the opening handshake (an HTTP upgrade, so it works on the usual HTTP ports and through proxies), messages made of frames, and ping and pong. They define no event ids, acknowledgements or replay, so a WebSocket application builds the same log, ids and snapshot itself, which is why SSE is the lighter choice when data flows only one way.
 
 Visual (planned): a timeline of event ids with a connection drop, the reconnect carrying `Last-Event-ID`, and the two outcomes: replay from the log, or a snapshot after a gap.
-
-### Choosing
-
-| Need | Choose | Watch for |
-|---|---|---|
-| a status page that changes every few seconds, few users | short polling with backoff | request volume grows with users divided by interval |
-| server to browser, one direction, resumable | server-sent events | client limits on connections per server, proxies and buffering, keepalive cost |
-| both directions, frequent client messages (chat, games, collaboration) | WebSocket | resume and ordering are yours; connection state on the server |
-| an environment where only ordinary request and response works | long polling | held requests at gateways, 30 s timeouts, headers on every message |
-| huge fan-out of rare events | push with a pub/sub tier routing events to the servers holding the connections | reconnect storms, snapshot load |
 
 ---
 
@@ -647,13 +544,7 @@ Visual (planned): a timeline of event ids with a connection drop, the reconnect 
 
 ---
 
-## 7. What Real Systems Document
-
-All read 2026-11-26. S3 documents multipart upload (limits, part overwrite, checksums, billing of incomplete uploads) and presigned URLs (bearer-token semantics, expiry checked per request). The tus project publishes a complete resumable-upload protocol with the 409 offset guard. Google Cloud Storage documents resumable sessions, persisted-offset resume and the advice not to chunk without a reason. Google's AIP-151 documents the long-running operation resource. The WHATWG HTML standard documents the event-stream format and reconnect behaviour, and RFC 6202 and RFC 6455 document long polling and the WebSocket opening handshake and control frames. What none of these tells you is your own failure rate or request cost, which is why the chunk-size table is a model to adapt, not a recommendation.
-
----
-
-## 8. Pitfalls Checklist
+## 7. Pitfalls Checklist
 
 1. **Routing large uploads through the API tier.** Count held connections with Little's law before you do.
 2. **One request per large file with no resume.** Expected cost explodes with size and failure rate.
@@ -686,7 +577,7 @@ All read 2026-11-26. S3 documents multipart upload (limits, part overwrite, chec
 
 1. Change `p` and the per-request overhead in `best_chunk` and find where the best numbered-part chunk reaches 10 times the size you got; explain it from the formula.
 2. Add per-part signed URLs to the upload client: each URL expires after a configurable number of simulated seconds, and a retry after expiry must ask for a new one. Count the extra requests.
-3. Add a checksum to each part in `PartStore` and make `complete` verify them; inject corruption in `Flaky` and show completion failing.
+3. Add a checksum to each part in `PartStore` and make `complete` verify them; inject corruption into the simulated network in the check and show completion failing.
 4. Add a retry delay with exponential backoff and a dead-letter list to `TaskStore`, then rerun the fleet at 40% crashes and report how long the poison tasks take to surface.
 5. Add a slow-worker model to `run_fleet` (a pause longer than the lease, not a crash) and count how many tasks are executed twice and how many results are fenced out.
 6. Write a WebSocket version of the stream: client messages carry the last id, the server replays or snapshots. Compare the code with the SSE version and say what the browser did for free in the SSE one.
