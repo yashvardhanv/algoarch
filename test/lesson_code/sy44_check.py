@@ -14,11 +14,13 @@ class Naive:
     def __init__(self):
         self.rest = []            # dicts: oid, side, price, qty, t
         self.t = 0
+        self.seen = set()         # every id ever accepted: ids are never reused
     def _key(self, o):
         return (o['price'] if o['side'] == 'S' else -o['price'], o['t'])
     def submit(self, oid, side, qty, price=None):
-        if any(o['oid'] == oid for o in self.rest) or qty <= 0 or (price is not None and price <= 0):
+        if oid in self.seen or qty <= 0 or (price is not None and (type(price) is not int or price <= 0)):
             raise ValueError('rejected')
+        self.seen.add(oid)
         trades = []
         while qty > 0:
             opp = sorted((o for o in self.rest if o['side'] != side), key=self._key)
@@ -110,14 +112,29 @@ for trial in range(150):
         assert resting(book) == naive.resting(), seq
         for side in 'BS':
             assert book.depth(side) == naive.depth(side)
+            heap = book.prices[side]
+            assert len(heap) == len(set(heap)), 'duplicate prices in the heap'
+        bb, ba = book._best('B'), book._best('S')            # never a crossed book
+        assert bb is None or ba is None or bb < ba
         steps += 1
-    # no crossed book: best bid < best ask whenever both exist
-    bb, ba = book._best('B'), book._best('S')
-    assert bb is None or ba is None or bb < ba
 
     # determinism: a replica fed the same log produces identical output
     b1, out1 = run(log)
     b2, out2 = run(log)
+    nv = Naive()
+    for seq, cmd, args in log:                                 # run() reports a market order's dropped remainder
+        if cmd == 'new':
+            try:
+                fills = nv.submit(*args)
+            except ValueError:
+                continue
+            want = args[2] - sum(f[3] for f in fills)
+            got = [e[2] for e in out1 if e[0] == seq and e[1] == 'cancelled']
+            assert got == ([(args[0], want)] if len(args) == 3 and want > 0 else []), (seq, args, got)
+        elif cmd == 'cancel':
+            nv.cancel(*args)
+        else:
+            nv.amend(*args)
     assert out1 == out2 and resting(b1) == resting(b2)
     # recovery: snapshot after a prefix, replay the rest
     if log:
@@ -140,6 +157,31 @@ assert bk.amend('A3', 9) and list(bk.levels['S'][102]) == ['A4', 'A3']
 assert bk.amend('A4', 1) and list(bk.levels['S'][102]) == ['A4', 'A3']        # reduction keeps its place
 assert bk.submit('M2', 'B', 100) == [('M2', 'A4', 102, 1), ('M2', 'A3', 102, 9)] and not bk.levels['S']
 assert bk.cancel('A3') is False and bk.cancel('B2') is True and bk.cancel('B2') is False
+
+# heap stays bounded: 10,000 rest-and-cancel cycles at one price behind the best bid
+bk = OrderBook()
+bk.submit('best', 'B', 1, 105)
+for i in range(10000):
+    bk.submit('c%d' % i, 'B', 1, 100)
+    bk.cancel('c%d' % i)
+assert len(bk.prices['B']) <= 2, len(bk.prices['B'])
+# ids are never reused, even after a fill or a cancel; prices must be integer ticks
+bk = OrderBook()
+bk.submit('a', 'S', 1, 100); bk.submit('b', 'B', 1, 100)       # a and b fully filled
+for bad in (('a', 'S', 1, 100), ('b', 'B', 1, 99), ('f', 'B', 1, 100.5)):
+    try:
+        bk.submit(*bad)
+        raise AssertionError('accepted %r' % (bad,))
+    except ValueError:
+        pass
+bk.submit('c', 'S', 2, 101); bk.cancel('c')
+try:
+    bk.submit('c', 'S', 2, 101)
+    raise AssertionError('cancelled id reused')
+except ValueError:
+    pass
+_, out = run([(0, 'new', ('s1', 'S', 3, 100)), (1, 'new', ('m1', 'B', 5))])
+assert out[-1] == (1, 'cancelled', ('m1', 2)) and out[-2] == (1, 'trades', [('m1', 's1', 100, 3)])
 
 # drill 1
 bk = OrderBook()
