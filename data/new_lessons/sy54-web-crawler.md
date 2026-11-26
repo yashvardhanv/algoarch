@@ -412,7 +412,10 @@ being re-scanned constantly. The lesson keeps the idea and drops the queues: pag
 that mints a new subdomain for every page (`s0.spam.example`, `s1.spam.example`, ...) got the floor budget on every
 new host: in a run, 2,999 of 3,000 fetches went to the farm. The code below keys the budget and the set of linking
 sites on the registered domain; `pld` approximates it with the last two labels, which is wrong for suffixes such as
-`co.uk`, so a real crawler uses the Public Suffix List. **Open limitation:** the budget is only as good as the in-links
+`co.uk`, so a real crawler uses the Public Suffix List. It also strips the port (a first version kept it, so every
+port was its own domain and a port farm fetched 2,999 of 3,000 pages) and treats IP literals as their own domain, so
+two networks do not share a budget because their last octets match. Still open: many IP addresses or many separately
+registered domains each get a fresh floor budget, and the Public Suffix List problem remains. **Open limitation:** the budget is only as good as the in-links
 it counts. Five domains that link to each other each see four linking domains, so each earns a cap of 40 pages instead of 10
 (the check measures exactly this). How IRLbot resists such link farms was not read, so no claim is made; discounting
 links from domains that are themselves low-budget is one plausible mitigation, not one this lesson implements.
@@ -427,7 +430,14 @@ class Budget:
 
 def pld(host):
     """Registered ("pay-level") domain by the two-label rule. Wrong for suffixes like co.uk: use the Public Suffix List."""
-    labels = host.split('.')
+    name = host.rsplit('@', 1)[-1]
+    if name.startswith('['):
+        name = name[:name.find(']') + 1]              # IPv6 literal: its own domain
+    else:
+        name = name.split(':', 1)[0]                  # the port is not part of the domain
+    labels = name.split('.')
+    if name.startswith('[') or all(l.isdigit() for l in labels):
+        return name                                   # an IP literal is its own domain, never "last two octets"
     return '.'.join(labels[-2:])
 
 def owner(host, n_partitions):

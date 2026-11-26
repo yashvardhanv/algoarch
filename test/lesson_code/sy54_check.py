@@ -240,6 +240,9 @@ b = Budget(per_link=10, floor=5)
 assert b.cap(set()) == 5 and b.cap({'x', 'y', 'z'}) == 30
 
 assert pld('s0.spam.example') == 'spam.example' and pld('a.b.c.example.com') == 'example.com' and pld('localhost') == 'localhost'
+assert pld('spam.example:1000') == 'spam.example' and pld('www.good.example:8080') == 'good.example'     # the port is not part of the domain
+assert pld('10.0.1.5') == '10.0.1.5' and pld('172.16.1.5') == '172.16.1.5' and pld('10.0.1.5:81') == '10.0.1.5'
+assert pld('[::1]:8080') == '[::1]' and pld('[2001:db8::1]') == '[2001:db8::1]'                      # IP literals are their own domain
 assert pld('a.b.co.uk') == 'co.uk'          # known limitation: the two-label rule is wrong for public suffixes like co.uk
 
 # ---- 6. the whole loop on a fake web, against a breadth-first reference --------------------------------------------
@@ -326,6 +329,26 @@ def fetch_trap(url):
 got = crawl(fetch_trap, ['http://good.example/a'], 'algobot', Budget(per_link=10, floor=7))
 traps = [u for u in got if 'trap.example' in u]
 assert len(traps) == 10 and len(got) == 13, (len(traps), len(got))            # one linking domain -> budget 10
+
+# a farm on one hostname with a new port per page: ports do not make new domains
+def fetch_ports(url):
+    s = urlsplit(url)
+    if s.path == '/robots.txt': return (404, '', [])
+    if s.netloc.startswith('spam.example:'):
+        k = int(s.netloc.split(':')[1]); return (200, 'port page %d' % k, ['http://spam.example:%d/' % (k + 1)])
+    return {'http://good.example/a': (200, 'A', ['http://spam.example:1000/'])}.get(url, (404, '', []))
+got = crawl(fetch_ports, ['http://good.example/a'], 'algobot', Budget(per_link=10, floor=5), max_pages=3000)
+assert len([u for u in got if 'spam.example' in u]) == 10 and len(got) == 11, len(got)
+# IP literals: two different networks must not share a budget just because their last two octets agree
+def fetch_ip(url):
+    s = urlsplit(url)
+    if s.path == '/robots.txt': return (404, '', [])
+    if s.netloc in ('10.0.1.5', '172.16.1.5'):
+        k = int(s.path[1:] or 0); return (200, 'ip %s %d' % (s.netloc, k), ['http://%s/%d' % (s.netloc, k + 1)])
+    return {'http://good.example/a': (200, 'A', ['http://10.0.1.5/', 'http://172.16.1.5/'])}.get(url, (404, '', []))
+got = crawl(fetch_ip, ['http://good.example/a'], 'algobot', Budget(per_link=10, floor=5))
+per = collections.Counter(urlsplit(u).netloc for u in got)
+assert per['10.0.1.5'] == 10 and per['172.16.1.5'] == 10, per          # one linking domain each: a cap of 10 apiece
 
 # two hosts of one domain linking to a site count as ONE linking domain
 def fetch_two(url):
