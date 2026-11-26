@@ -122,7 +122,7 @@ def sgd_step(params, grads, lr):
     return [p - lr * g for p, g in zip(params, grads)]
 
 class Momentum:
-    """v <- mu*v + g ; p <- p - lr*v   (the velocity form most libraries use)."""
+    """v <- mu*v + g ; p <- p - lr*v   (the velocity form)."""
     def __init__(self, lr, mu=0.9):
         self.lr, self.mu, self.v = lr, mu, None
     def step(self, params, grads):
