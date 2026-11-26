@@ -68,3 +68,12 @@ test('ds24 lesson code matches brute-force checks', { skip: py ? false : 'python
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.match(r.stdout, /ds24 code checks passed/);
 });
+
+test('ds25 lesson code matches brute-force checks', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'ds25_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'ds25.md'),
+  ], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /ds25 code checks passed/);
+});
