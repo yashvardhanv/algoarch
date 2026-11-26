@@ -175,8 +175,18 @@ test('sy42 lesson code matches reference models under random and threaded interl
   assert.match(r.stdout, /sy42 code checks passed/);
 });
 
+test('sy43 lesson code matches brute-force nearest-k, including poles and the antimeridian', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'sy43_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'sy43.md'),
+  ], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /sy43 code checks passed/);
+});
+
 const CAPACITY_LESSONS_B = [
   'sy42.md',
+  'sy43.md',
 ];
 
 test('sy42-sy44 capacity estimates are reproduced by script', { skip: py ? false : 'python not installed' }, () => {
