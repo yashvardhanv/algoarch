@@ -92,7 +92,7 @@ def sy40(src):
     minutes = 365 * 24 * 60
     assert minutes == 525600
     assert round(minutes * 1e-4, 2) == 52.56 and round(minutes * 1e-5, 3) == 5.256
-    need(src, '30 s x 200 us/s = 6 ms', '= 7 ms peak', 'at least 2 x average ε = 8 ms', '9.4 ms vs 14.4 ms: about 5 ms',
+    need(src, '30 s x 200 us/s = 6 ms', '= 7 ms peak', 'at least 2 x average ε = 8 ms', '9.4 ms vs 14.4 ms: about 5 ms of added write latency',
          '2 s x 5,000 = 10,000 committed transactions', '52.56 vs 5.256 minutes', '525,600 minutes per year',
          '10,000 transactions in the assumed scenario')
     return 'sy40'

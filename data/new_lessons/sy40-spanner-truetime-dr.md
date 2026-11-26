@@ -64,7 +64,7 @@ reproduced by `test/lesson_code/capacity_check.py`.
 | poll interval and drift rate | 30 s and 200 microseconds per second | paper, Section 3 |
 | drift part of ε | 30 s x 200 us/s = 6 ms, plus about 1 ms communication delay = 7 ms peak | derived |
 | expected commit wait | at least 2 x average ε = 8 ms | derived from the paper's rule |
-| measured write latency, one replica, commit wait off vs on | 9.4 ms vs 14.4 ms: about 5 ms of commit wait | paper, Table 3 |
+| measured write latency, one replica, commit wait off vs on | 9.4 ms vs 14.4 ms: about 5 ms of added write latency (the paper does not give ε for that run) | paper, Table 3 |
 | Paxos leader lease | 10 s by default | paper, Sections 2.1 and 4.1.1 |
 | write rate (assumed) | 5,000 transactions/s | assumption |
 | async replication lag at failure (assumed) | 2 s | assumption |
@@ -183,9 +183,9 @@ maintenance.
 | Strategy | RPO (data lost) | RTO (time to recover) | Write latency floor |
 |---|---|---|---|
 | async replica in another region | replication lag x write rate: 10,000 transactions in the assumed scenario | promote the replica and repoint clients; measure your own | local |
-| Spanner regional (3 read-write replicas in 3 zones) | zero for a zone loss | the database stays available if one zone fails | in-region quorum |
+| Spanner regional (3 read-write replicas in 3 zones) | zero (follows from the synchronous quorum; not stated in the docs read) | the database stays available if one zone fails | in-region quorum |
 | Spanner dual-region (6 replicas, 3 per region, writes need 2 voting replicas in each region) | zero: Google's docs say no data loss during a regional outage | manual failover to one region usually completes within a minute; Google-managed automatic failover can take up to 45 minutes | cross-region round trip |
-| Spanner multi-region (two read-write regions plus a witness, in most configurations) | zero | automatic leader failover during regional disruptions | cross-region round trip to form a quorum |
+| Spanner multi-region (two read-write regions plus a witness, in most configurations) | zero (follows from the synchronous quorum; not stated in the docs read) | automatic leader failover during regional disruptions | cross-region round trip to form a quorum |
 
 The documented availability targets are 99.99% for regional and 99.999% for dual- and multi-region configurations:
 52.56 versus 5.256 minutes of allowed downtime a year. Google's DR page also lists the logical failures replication
