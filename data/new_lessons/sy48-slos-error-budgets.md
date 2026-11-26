@@ -1,6 +1,6 @@
 # Lesson 48 — SLOs, SLIs and Error Budgets
 
-> **Priority:** ★★★★☆ — reliability prompts end with "how would you know it's working, and when do you page someone?", and the answer is an SLO with an alert you can defend.
+> **Priority:** ★★★★☆ (proposed; the curriculum data holds the final rating) — reliability prompts end with "how would you know it's working, and when do you page someone?", and the answer is an SLO with an alert you can defend.
 >
 > **Study time:** 60 minutes. **Do this after:** Observability: Metrics, Tracing & Alerting, and Resilience: Rate Limiting & Circuit Breakers.
 >
@@ -91,7 +91,7 @@ def budget_spent(window_minutes, burn, period_minutes=PERIOD):
     return burn * window_minutes / period_minutes
 ```
 
-**Budgets as counts.** The Workbook's worked example has 3,663,253 requests in four weeks. A 97% availability SLO allows `allowed_failures(3663253, 0.97)` = 109,897 failures; "90% of requests faster than 450 ms" allows 366,325 slow ones; "99% faster than 900 ms" allows 36,632. In that example a bad release that caused 14,066 errors spent 12.8% of the availability budget, and a 20-hour database restore that caused about 72,000 errors spent 65.5%. The Workbook's point is how to use the numbers: if the company sees two or three bad releases a year and one server failure in five years, releases cost about twice as much budget on average and are the better thing to fix. The budget turns a debate into a ranked list.
+**Budgets as counts.** The Workbook's worked example has 3,663,253 requests in four weeks. A 97% availability SLO allows `allowed_failures(3663253, 0.97)` = 109,897 failures; "90% of requests faster than 450 ms" allows 366,325 slow ones; "99% faster than 900 ms" allows 36,632. In that example a bad release that caused 14,066 errors spent 12.8% of the availability budget, and a 20-hour database restore that caused about 72,000 errors spent 65.5% (the Workbook rounds these to 13% and 65%). The Workbook's point is how to use the numbers: if the company sees two or three bad releases a year and one server failure in five years, releases cost about twice as much budget on average and are the better thing to fix. The budget turns a debate into a ranked list.
 
 **Burn rate and time to exhaustion.** `hours_to_exhaust` gives the same figures as the Workbook's table:
 

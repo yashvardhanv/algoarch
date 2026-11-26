@@ -129,6 +129,7 @@ for s in sc:
     need('%.1f%%' % pct)
 
 # ---------------------------------------------------------------- figures in the prose
-need('109,897', '366,325', '36,632', '12.8%', '65.5%', '7.2 failed requests', '13.9%', '100x', '1,000x',
+assert round(5 / 4320 * 100, 3) == 0.116
+need('0.116%', '13% and 65%', '109,897', '366,325', '36,632', '12.8%', '65.5%', '7.2 failed requests', '13.9%', '100x', '1,000x',
      '43.2 minutes', '25.92 seconds', '20.6 hours', '129.6 seconds', '24.7 minutes')
 print('sy48 code checks passed')
