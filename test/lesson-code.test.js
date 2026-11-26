@@ -41,3 +41,12 @@ test('ds21 lesson code matches brute-force checks', { skip: py ? false : 'python
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.match(r.stdout, /ds21 code checks passed/);
 });
+
+test('ds22 lesson code matches brute-force checks', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'ds22_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'ds22-math-sampling.md'),
+  ], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /ds22 code checks passed/);
+});
