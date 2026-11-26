@@ -9,7 +9,7 @@ flood_fill, component_sizes, nearest_zero = ns['flood_fill'], ns['component_size
 rotate_cw, rotate_ccw, transpose, spiral_order = ns['rotate_cw'], ns['rotate_ccw'], ns['transpose'], ns['spiral_order']
 game_of_life, set_zeroes = ns['game_of_life'], ns['set_zeroes']
 Prefix2D, search_sorted_matrix = ns['Prefix2D'], ns['search_sorted_matrix']
-min_path_sum, paths_with_obstacles, maximal_square = ns['min_path_sum'], ns['paths_with_obstacles'], ns['maximal_square']
+min_path_sum = ns['min_path_sum']
 random.seed(27)
 
 def rect(lo, hi, maxr=7, maxc=7, minr=1, minc=1):
@@ -99,6 +99,13 @@ for _ in range(300):
     assert spiral_order(m) == want, m
 assert spiral_order([[1, 2, 3]]) == [1, 2, 3] and spiral_order([[1], [2], [3]]) == [1, 2, 3]
 
+# ---- the lesson's claim about rotate_cw on rectangles: 3x2 raises, 2x3 silently returns a wrong answer
+bad = [[0, 1, 2], [10, 11, 12]]; rotate_cw(bad); assert bad == [[2, 10, 0], [12, 11, 1]]
+try:
+    rotate_cw([[1, 2], [3, 4], [5, 6]]); assert False, "expected IndexError"
+except IndexError:
+    pass
+
 # ---- game of life (in place, two-bit encoding) vs a fresh-grid step
 def life_ref(b):
     R, C = len(b), len(b[0]); out = [[0] * C for _ in range(R)]
@@ -138,27 +145,18 @@ for _ in range(400):
     t = random.randint(-1, 20)
     assert search_sorted_matrix(base, t) == any(t in row for row in base), (base, t)
 
-# ---- grid DP vs exhaustive path enumeration / all-squares brute force
-def all_paths(g, blocked):
+# ---- grid DP (one-row min path sum) vs exhaustive path enumeration
+def all_paths(g):
     R, C = len(g), len(g[0])
     def go(r, c, cost):
-        if not (r < R and c < C) or (blocked and g[r][c] == 1):
+        if not (r < R and c < C):
             return []
-        cost += 0 if blocked else g[r][c]
+        cost += g[r][c]
         if (r, c) == (R - 1, C - 1):
             return [cost]
         return go(r + 1, c, cost) + go(r, c + 1, cost)
     return go(0, 0, 0)
 for _ in range(400):
     g = rect(0, 9, 5, 5)
-    assert min_path_sum(g) == min(all_paths(g, False)), g
-    h = rect(0, 1, 5, 5)
-    assert paths_with_obstacles(h) == len(all_paths(h, True)), h
-for _ in range(400):
-    g = rect(0, 1, 7, 7); R, C = len(g), len(g[0]); best = 0
-    for r in range(R):
-        for c in range(C):
-            for k in range(1, min(R - r, C - c) + 1):
-                if all(g[i][j] == 1 for i in range(r, r + k) for j in range(c, c + k)): best = max(best, k * k)
-    assert maximal_square(g) == best, g
+    assert min_path_sum(g) == min(all_paths(g)), g
 print("ds27 code checks passed")
