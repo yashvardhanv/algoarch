@@ -80,3 +80,32 @@ test('the strict pattern catches codes, k-suffixes, multiples and grant percenta
   for (const s of planted) assert.notDeepEqual(findStrictCompClaims(s), [], `should flag: ${s}`);
   assert.deepEqual(findStrictCompClaims('Vest G/4 units after a one-year cliff; read your plan'), []);
 });
+
+// Staff arc (be09 to be12): no compensation figures, the standard's shape, honest labelling.
+const STAFF_ARC = [
+  ['be09-staff-scope-archetypes.md', 'Lesson 09 — What Staff Engineers Do: Scope and Archetypes'],
+  ['be10-engineering-strategy-design-docs.md', 'Lesson 10 — Writing Engineering Strategy and Design Docs'],
+  ['be11-operating-at-staff.md', 'Lesson 11 — Operating at Staff: Quality, Alignment and Presenting to Executives'],
+  ['be12-career-growth.md', 'Lesson 12 — Career Growth: Promotion Packets, Sponsors and Visibility'],
+];
+
+for (const [file, title] of STAFF_ARC) {
+  test(`${file.slice(0, 4)} lesson carries no compensation figures and follows the standard`, () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const md = fs.readFileSync(path.join(__dirname, '..', 'data', 'new_lessons', file), 'utf8');
+    assert.deepEqual(findCompClaims(md), []);
+    assert.deepEqual(findStrictCompClaims(md), []);
+    assert.equal(md.split(/\r?\n/)[0], `# ${title}`);
+    assert.match(md, /^> \*\*Level:\*\* advanced/m);
+    assert.match(md, /optional for a crash plan/i);
+    assert.match(md, /^## 1\. Mental Model$/m);
+    assert.match(md, /^## Drills$/m);
+    assert.match(md, /^## Homework$/m);
+    assert.match(md, /^## Sources$/m);
+    assert.match(md, /illustrative/i);
+    assert.match(md, /\*Last reviewed: 2026-11-26\./);
+    const drills = md.split(/^## Drills$/m)[1].split(/^## /m)[0];
+    assert.equal((drills.match(/^\d+\. /gm) || []).length, 8);
+  });
+}
