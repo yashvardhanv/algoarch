@@ -77,7 +77,7 @@ trick needs a **prime** modulus; with a composite modulus use `mod_inv_any`. (Py
 also has `pow(b, -1, m)`.)
 
 **Combinations, many queries.** Build `fact[i]` and `inv_fact[i]` once; each `nCr` is then three
-multiplications. Computing one inverse and walking down avoids `n` modular exponentiations.
+table lookups and two multiplications. Computing one inverse and walking down avoids `n` modular exponentiations.
 
 ```python
 def make_ncr(n_max, mod):
