@@ -43,6 +43,12 @@ const STRICT_COMP_RE = new RegExp([
   String.raw`\b\d+(?:\.\d+)?\s?[x×]\s*(?:(?:the|your|annual|target)\s+)*${PAY}\b`, // 2x base
   String.raw`\b\d+(?:\.\d+)?\s?(?:[-–]\s?\d+(?:\.\d+)?\s?)?%\s*(?:of\s+)?(?:[\w-]+\s+){0,3}?${PAY}\b`, // 15% of base, 25% of the initial grant
   String.raw`\b${PAY}\s+(?:of|at|is|was|=|:)\s*(?:about\s+|around\s+|~)?\d+(?:\.\d+)?\s?%`, // bonus of 15%
+  String.raw`\b(?:raise|hike|increment|increase|bump|pay\s?cut)\b[^.\n]{0,20}?\d+(?:\.\d+)?\s?%`, // a raise of 15%
+  String.raw`\d+(?:\.\d+)?\s?%\s*(?:raise|hike|increment|increase|bump|more\b|less\b)`, // a 20% hike, pays 30% more
+  String.raw`\b(?:salary|pay|base|CTC|compensation|package)\b[^.\n]{0,25}?\d+(?:\.\d+)?\s?(?:%|per\s?cent)`, // salary went up 15%
+  String.raw`\b\d[\d,.]*\s?(?:lakhs?|lacs?|crores?)\b`, // 25 lakh, 2 crore (any case)
+  String.raw`\b\d[\d,.]*\s?(?:dollars|rupees|euros|pounds)\b`, // 400,000 dollars
+  String.raw`\b\d+(?:\.\d+)?\s?(?:times|per\s?cent)\s+(?:of\s+)?(?:(?:the|your|annual|target)\s+)*${PAY}\b`, // 1.5 times base, 20 per cent of base
 ].join('|'), 'gi');
 
 function findStrictCompClaims(text) {
@@ -76,6 +82,15 @@ test('the strict pattern catches codes, k-suffixes, multiples and grant percenta
     'base 180k',
     'equity worth 2x base',
     '25% of the initial grant',
+    'a raise of 15%',
+    'a 20% hike',
+    'Staff pays 30% more',
+    'a 25 lakh package',
+    'she earns 2 crore',
+    'total comp of 400,000 dollars',
+    'equity worth 1.5 times base',
+    '20 per cent of base',
+    'salary went up 15%',
   ];
   for (const s of planted) assert.notDeepEqual(findStrictCompClaims(s), [], `should flag: ${s}`);
   assert.deepEqual(findStrictCompClaims('Vest G/4 units after a one-year cliff; read your plan'), []);
@@ -97,13 +112,15 @@ for (const [file, title] of STAFF_ARC) {
     assert.deepEqual(findCompClaims(md), []);
     assert.deepEqual(findStrictCompClaims(md), []);
     assert.equal(md.split(/\r?\n/)[0], `# ${title}`);
-    assert.match(md, /^> \*\*Level:\*\* advanced/m);
-    assert.match(md, /optional for a crash plan/i);
+    assert.match(md, /^> \*\*Level:\*\* advanced\. Optional for a crash plan\.$/m);
     assert.match(md, /^## 1\. Mental Model$/m);
     assert.match(md, /^## Drills$/m);
     assert.match(md, /^## Homework$/m);
     assert.match(md, /^## Sources$/m);
-    assert.match(md, /illustrative/i);
+    assert.ok((md.match(/illustrative/gi) || []).length >= 4, 'examples must be labelled illustrative');
+    assert.match(md, /^\*Illustrative scenario/m);
+    const homework = md.split(/^## Homework$/m)[1].split(/^## Sources$/m)[0];
+    assert.ok((homework.match(/^\*\*Part [A-Z]\.\*\*/gm) || []).length >= 4, 'homework needs at least four parts');
     assert.match(md, /\*Last reviewed: 2026-11-26\./);
     const drills = md.split(/^## Drills$/m)[1].split(/^## /m)[0];
     assert.equal((drills.match(/^\d+\. /gm) || []).length, 8);
