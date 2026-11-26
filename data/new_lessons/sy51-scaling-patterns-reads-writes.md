@@ -1,6 +1,6 @@
 # Lesson 51 — Scaling Patterns I: Reads, Writes and Contention
 
-> **Priority:** ★★★★★ — "it works for 1,000 users; what breaks at 100 million?" is answered by saying which of three different things is saturated, and each has a different cure.
+> **Priority:** ★★★★★ (proposed; the curriculum data holds the final rating) — "it works for 1,000 users; what breaks at 100 million?" is answered by saying which of three different things is saturated, and each has a different cure.
 >
 > **Study time:** 70 minutes. **Do this after:** Replication & Sharding, and Caching Patterns and Consistent Hashing.
 >
@@ -177,7 +177,7 @@ Take 1,000 records per second of 1 KiB each (so a full batch is 16 records) and 
 | 10 | 10 | 100 | 5.5 | 25 |
 | 50 | 16 | 62 | 7.5 | 17.5 |
 
-- **The first few milliseconds buy almost all of it.** A 5 ms linger cuts the modelled CPU from 205 to 45 ms per second for a mean added delay of 3 ms. Going from 5 to 50 ms adds delay and saves little more, because the batch fills at 16 records.
+- **The first few milliseconds buy almost all of it.** A 5 ms linger cuts the modelled CPU from 205 to 45 ms per second for a mean added delay of 3 ms. Going from 5 to 50 ms adds delay and saves little more, because the batch fills at 16 records. From a linger of 16 ms up, more linger changes neither the request rate nor the delay.
 - **The delay is paid by every record, but not equally.** The first record in a batch waits the whole linger; the last waits none. A latency-sensitive path that cannot afford the wait sets linger to zero and accepts the cost.
 - **A buffered record is not durable.** Records sitting in a batch are lost if the process dies before the send. Whether that is acceptable is a requirement for the use case, not a tuning detail.
 - **Real producers also batch under load without waiting.** The Kafka page says batching normally happens when records arrive faster than requests can be sent; linger adds artificial delay to batch at lower load. The model shows only the waiting part.
@@ -359,13 +359,13 @@ def shards_needed(write_rate, per_shard_rate):
 | 100 | 10 | 10 | 550 |
 
 - **One row costs `n(n+1)/2` attempts for `n` updates.** 100 contenders make 5,050 write attempts to apply 100 updates, and it takes 100 rounds because one wins per round. The check compares the simulation with that closed form for every case up to 39 clients.
-- **Splitting divides the waste by roughly the number of shards.** Ten shards for 100 clients: 550 attempts, 10 rounds. The waste is a sum of squares, so it falls faster than the throughput rises.
+- **Splitting divides the waste by roughly the number of shards.** Ten shards for 100 clients: 550 attempts, 10 rounds. Attempts fall 9.2 times and rounds fall 10 times. `n(n+1)/2` is quadratic in the contenders per row, so S shards cut the waste by about S, the same factor as the speed-up. What sharding buys is less contention per row, not cheaper retries.
 - **Backoff with jitter thins the herd** (see the Resilience lesson) but does not change the shape: one row still commits one write at a time.
 - **Pessimistic locking is the same ceiling with waiting instead of waste.** A row lock serialises the holders; throughput is one over the hold time. That is why the cure on the hot row is to hold it for less time, as in step 1.
 
 ### A worked fix: counting likes
 
-A post gets 5,000 likes per second, and the count lives in a document database where one document is designed to take about one write per second. The Firestore "distributed counters" page (read 2026-11-26) says a single document cannot be updated at an unlimited rate and shows the fix: a counter document with a subcollection of shards, the counter's value being the sum of the shards, throughput rising with the number of shards. Its sample code's comment says each shard can support being incremented once per second, so 5,000 shards are needed for 5,000 increments per second: `shards_needed(5000, 1)`. The same page lists the costs: too few shards means retries, too many means reads load every shard (cost linear in the shard count), and it suggests a separate roll-up document updated at a slower cadence for reads.
+A post gets 5,000 likes per second, and the count lives in a single document of a document database. The Firestore "distributed counters" page (read 2026-11-26) says a single document cannot be updated at an unlimited rate and shows the fix: a counter document with a subcollection of shards, the counter's value being the sum of the shards, throughput rising with the number of shards. Its sample code's comment says each shard can support being incremented once per second, so 5,000 shards are needed for 5,000 increments per second: `shards_needed(5000, 1)`. The same page lists the costs: too few shards means retries, too many means reads load every shard (cost linear in the shard count), and it suggests a separate roll-up document updated at a slower cadence for reads.
 
 Coalescing attacks the number the shard count comes from. If 50 application servers each add up their likes and flush once a second, the hot row sees `coalesced_write_rate(50, 1)` = 50 writes per second, so 50 shards are enough, and reads of the count load 50 documents instead of 5,000. The price is the one in section 4: up to a second of increments is lost if a server dies, and the displayed count lags by up to the flush interval. For a like count that is the right trade; for a balance it is not, and a balance takes the single-owner or conditional-update route instead (see the flash-sale lesson).
 
@@ -429,7 +429,7 @@ All read 2026-11-26. The Kafka 4.1 documentation states the producer's batching 
 
 1. A replica lags the primary by 80 ms, and your policy sends a session to the primary for 50 ms after it writes. Describe the failure, and say what changes with a version token.
 2. In the routing table, why does "primary for 200 ms after a write" send 19.42% of reads to the primary while the token policy sends 1.19%, and what does the token policy need from the replicas that the pin policy does not?
-3. With a 1 KiB record, a 16 KiB batch and 1,000 records per second, what does a 5 ms linger do to requests per second and mean added delay, and what would raise the delay without lowering the request rate?
+3. With a 1 KiB record, a 16 KiB batch and 1,000 records per second, what does a 5 ms linger do to requests per second and mean added delay, and what changes if the linger goes from 50 ms to 100 ms?
 4. A consumer serves 4,000 per second, base load is 3,500, and a burst of 9,000 per second lasts 20 seconds. How large is the backlog and how long does it take to drain?
 5. A key receives 4,136 writes per second and a partition takes 1,000. How many pieces does it need at minimum, why is that not the right number to deploy, and what does the table suggest instead?
 6. List the six interleavings of two read-then-write clients on a counter and say which end at 2.

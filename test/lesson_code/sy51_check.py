@@ -260,4 +260,13 @@ assert burst_backlog(3500, 9000, 20, 4000) == (100000, 200.0, 25.0)
 assert optimistic_attempts(1000)[1] == 500500
 need('5,050', '500,500' if False else 'half a million')
 
+assert round(5050 / 550, 1) == 9.2 and optimistic_attempts(100, 1)[1] / optimistic_attempts(100, 10)[1] < 10
+assert optimistic_attempts(100, 1)[0] / optimistic_attempts(100, 10)[0] == 10          # rounds fall exactly by the shard count
+for n in (50, 100, 400):                                                              # attempts never fall by more than S
+    for S in (2, 5, 10):
+        assert optimistic_attempts(n, 1)[1] / optimistic_attempts(n, S)[1] <= S
+assert 'sum of squares' not in src
+assert batch_shape(1, 16, 16) == batch_shape(1, 16, 100) == batch_shape(1, 16, 50)    # past the fill point linger changes nothing
+need('9.2 times', 'rounds fall 10 times', 'From a linger of 16 ms up')
+
 print('sy51 code checks passed')
