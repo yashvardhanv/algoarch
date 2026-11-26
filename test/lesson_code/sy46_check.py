@@ -116,10 +116,13 @@ stamps = {'x': 5, 'y': 1, 'z': 9}
 assert truncate({'x': 3, 'y': 1}, stamps, 1) == {'x': 3}                  # drops the oldest-updated node
 assert truncate({'x': 3, 'y': 1, 'z': 2}, stamps, 2) == {'x': 3, 'z': 2}
 assert truncate({'x': 3, 'y': 1}, stamps, 5) == {'x': 3, 'y': 1}
-older, newer = {'x': 2, 'y': 1}, {'x': 3, 'y': 1}
-assert rel_d(older, newer) == 'before' and rel_d(older, truncate(newer, stamps, 1)) == 'concurrent'    # false conflict
-c, other = {'x': 1, 'y': 1}, {'x': 2}
-assert rel_d(c, other) == 'concurrent' and rel_d(truncate(c, stamps, 1), other) == 'before'            # silent loss
+older, newer = {'x': 2, 'y': 1}, {'x': 2, 'y': 1, 'z': 1}
+assert len(truncate(older, stamps, 2)) == 2 and truncate(older, stamps, 2) == older
+assert rel_d(older, newer) == 'before' and truncate(newer, stamps, 2) == {'x': 2, 'z': 1}
+assert rel_d(truncate(older, stamps, 2), truncate(newer, stamps, 2)) == 'concurrent'                  # false conflict
+c, other = {'x': 1, 'y': 1, 'z': 1}, {'x': 2, 'z': 1}
+assert rel_d(c, other) == 'concurrent' and truncate(other, stamps, 2) == other
+assert rel_d(truncate(c, stamps, 2), truncate(other, stamps, 2)) == 'before'                          # silent loss
 need('false conflict', 'silently')
 
 # ---------------------------------------------------------------- linearizability checker against brute force
@@ -206,6 +209,7 @@ for n in (4, 6, 8, 10, 12):
     ans, states = check(ops)
     assert ans is False and states == n * 2 ** (n - 1) + 1, (n, states)
     explored[n] = states
+    assert check.calls <= 2 * n * states, (n, check.calls, states)           # memoised: calls stay a small multiple of the states
     need('| %d | %s |' % (n, format(states, ',')))
 need('n x 2^(n-1) + 1')
 assert explored[12] == 24577

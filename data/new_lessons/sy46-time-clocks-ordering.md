@@ -1,6 +1,6 @@
 # Lesson 46 — Time, Clocks and Ordering
 
-> **Priority:** ★★★★☆ — every "who wins when two writes conflict?" and "is this read allowed to be stale?" question is a question about ordering without a shared clock.
+> **Priority:** ★★★★☆ (proposed; the curriculum data holds the final rating) — every "who wins when two writes conflict?" and "is this read allowed to be stale?" question is a question about ordering without a shared clock.
 >
 > **Study time:** 60 minutes. **Do this after:** Replication & Sharding, and CAP Theorem to PACELC. Distributed Consensus & Raft is the natural next step.
 >
@@ -267,10 +267,10 @@ def truncate(clock, stamps, limit):
     return clock
 ```
 
-With `stamps = {'x': 5, 'y': 1, 'z': 9}` and a limit of one entry (a deliberately small limit to make the effect visible):
+With `stamps = {'x': 5, 'y': 1, 'z': 9}` and a limit of two entries (deliberately small, to make the effect visible; every clock below is truncated when it is stored):
 
-- A descendant `{'x': 3, 'y': 1}` of `{'x': 2, 'y': 1}` truncates to `{'x': 3}` and now compares as **concurrent** with its own ancestor: a *false conflict*. Safe, but it costs a reconciliation.
-- A genuinely concurrent version `{'x': 1, 'y': 1}` (concurrent with `{'x': 2}`) truncates to `{'x': 1}`, which now compares as **before** `{'x': 2}`. The system would discard it as an ancestor: a write is lost *silently*.
+- A descendant `{'x': 2, 'y': 1, 'z': 1}` of the stored ancestor `{'x': 2, 'y': 1}` has three entries, so `y` (the oldest) is dropped and it becomes `{'x': 2, 'z': 1}`, which now compares as **concurrent** with its own ancestor: a *false conflict*. Safe, but it costs a reconciliation.
+- A genuinely concurrent version `{'x': 1, 'y': 1, 'z': 1}` (concurrent with `{'x': 2, 'z': 1}`) also truncates to `{'x': 1, 'z': 1}`, which now compares as **before** `{'x': 2, 'z': 1}`. The system would discard it as an ancestor: a write is lost *silently*.
 
 The second case is this lesson's own derivation from the truncation rule, not something the paper reports; the paper says only that reconciliation becomes less precise. The pattern to remember: **anything that removes entries from a version vector can turn "concurrent" into "ordered"**, and that direction loses data.
 
@@ -300,9 +300,10 @@ def check(ops, init=0, real_time=True):
             real_time_earlier = real_time and b.ret < a.call
             if same_client_earlier or real_time_earlier:
                 must_precede[i] |= 1 << j
-    seen, full = set(), (1 << n) - 1
+    seen, full, calls = set(), (1 << n) - 1, [0]
 
     def search(done, state):
+        calls[0] += 1
         if done == full:
             return True
         if (done, state) in seen:
@@ -320,6 +321,7 @@ def check(ops, init=0, real_time=True):
         return False
 
     answer = search(0, init)
+    check.calls = calls[0]                   # how many times search ran, to confirm the memo does its job
     return answer, len(seen)
 ```
 
