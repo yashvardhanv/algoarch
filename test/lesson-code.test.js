@@ -218,3 +218,12 @@ test('sy37-sy40 capacity estimates are reproduced by script', { skip: py ? false
   assert.match(r.stdout, /capacity checks passed/);
   for (const f of CAPACITY_LESSONS) assert.match(r.stdout, new RegExp(f.slice(0, 4)));
 });
+
+test('ds26 lesson code matches reference checks', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'ds26_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'ds26-sorting-selection.md'),
+  ], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /ds26 code checks passed/);
+});
