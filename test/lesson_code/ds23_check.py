@@ -36,10 +36,10 @@ assert kmp_search("aaaa", "aa") == [0, 1, 2]
 
 # Repeated substring pattern
 for _ in range(500):
-    s = rand_str(random.randint(1, 10), 'ab')
+    s = rand_str(random.randint(0, 10), 'ab')
     exp = any(len(s) % k == 0 and s[:k] * (len(s) // k) == s for k in range(1, len(s)))
     assert repeated(s) == exp, s
-assert repeated("abab") and not repeated("aba") and not repeated("a")
+assert repeated("abab") and not repeated("aba") and not repeated("a") and not repeated("")
 
 # Shortest palindrome by prepending
 def brute_shortest_pal(s):

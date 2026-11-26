@@ -7,10 +7,10 @@
 
 Finding a pattern of length `m` inside a text of length `n` by trying every start position costs
 `O(n * m)` in the worst case. For `n = 10^5` and `m = 10^4` that is roughly `9 * 10^8` character
-comparisons. This lesson gives you two ways to do it in linear time (KMP, which never re-reads text,
-and Rabin-Karp, which compares fingerprints), and then shows that the machinery behind KMP also
-solves several "prefix is also a suffix" problems, and that palindromes have their own linear-time
-algorithm (Manacher).
+comparisons. This lesson gives you two ways to do it in linear time: KMP, which never re-reads
+text and is linear in the worst case, and Rabin-Karp, which compares fingerprints and is linear in
+expectation. It then shows that the machinery behind KMP also solves several "prefix is also a
+suffix" problems, and that palindromes have their own linear-time algorithm (Manacher).
 
 ---
 
@@ -38,7 +38,7 @@ algorithm (Manacher).
 | "does any window of length `m` equal / duplicate another" (many patterns, or many windows) | **Rolling hash** |
 | "is the string a repetition of a smaller block" | **Prefix function**: `n - pi[n-1]` is the candidate block length |
 | "shortest palindrome you can make by adding characters in front" | **Prefix function on `s + '#' + reverse(s)`** |
-| "longest palindromic substring" in linear time | **Manacher** (expand-around-centre is `O(n^2)` and is usually accepted first) |
+| "longest palindromic substring" in linear time | **Manacher** (expand-around-centre is `O(n^2)`; write that first and mention Manacher) |
 | "longest repeated substring" | **Binary search on length + rolling hash** |
 | short pattern, one-off search in a real program | the library's search; say so, then show you know how it works |
 
@@ -95,6 +95,8 @@ border given by `pi[k-1]`.
 def repeated_substring_pattern(s):
     """True if s is some block repeated two or more times."""
     n = len(s)
+    if n < 2:
+        return False
     border = prefix_function(s)[-1]       # longest proper prefix that is also a suffix
     block = n - border                    # the only candidate period
     return border > 0 and n % block == 0
@@ -183,8 +185,8 @@ def longest_palindromic_substring(s):
     return s[start:start + p[best]]
 ```
 
-It is linear because `right` only moves rightward and each expansion step extends it. Most
-interviews accept expand-around-centre in `O(n^2)`; mention Manacher, and write it only if asked.
+It is linear because `right` only moves rightward and each expansion step extends it. Write
+expand-around-centre in `O(n^2)` first, mention Manacher, and write it only if asked.
 
 ---
 
