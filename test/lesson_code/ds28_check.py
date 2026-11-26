@@ -25,10 +25,17 @@ for n in range(0, 21):
 c = [0]; ns['fib_naive'](25, c); assert c[0] == 242785           # the number printed in the lesson
 
 # ---- towers of hanoi: legal moves, solved, 2^n - 1 moves
+_hanoi, _hc = ns['hanoi'], [0]
+def _counted(*args):
+    _hc[0] += 1
+    return _hanoi(*args)
+ns['hanoi'] = _counted            # recursive calls look up the global name, so they are counted too
 for n in range(0, 11):
     moves = []
+    _hc[0] = 0
     ns['hanoi'](n, 'A', 'C', 'B', moves)
     assert len(moves) == 2 ** n - 1
+    assert _hc[0] == 2 ** (n + 1) - 1, (n, _hc[0])      # calls INCLUDING the n == 0 base calls
     pegs = {'A': list(range(n, 0, -1)), 'B': [], 'C': []}
     for s, d in moves:
         disc = pegs[s].pop()
@@ -103,5 +110,7 @@ for r in range(0, 9):
         memo = {}; calls = [0]
         assert ns['paths_memo'](r, c, memo, calls) == math.comb(r + c, r)
         assert len(memo) == ((r + 1) * (c + 1) - 1 if r and c else 1), (r, c, len(memo))   # (0, 0) is never reached
+        assert calls[0] == (1 + 2 * r * c if r and c else 1), (r, c, calls)          # the cache really collapses the tree
+c = [0]; ns['paths_memo'](10, 10, {}, c); assert c[0] == 201                  # number printed in the lesson
 c = [0]; ns['paths_naive'](10, 10, c); assert c[0] == 369511     # numbers printed in the lesson
 print("ds28 code checks passed")
