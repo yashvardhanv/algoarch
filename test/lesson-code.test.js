@@ -184,9 +184,19 @@ test('sy43 lesson code matches brute-force nearest-k, including poles and the an
   assert.match(r.stdout, /sy43 code checks passed/);
 });
 
+test('sy44 lesson code matches a naive price-time matcher and replays deterministically', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'sy44_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'sy44.md'),
+  ], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /sy44 code checks passed/);
+});
+
 const CAPACITY_LESSONS_B = [
   'sy42.md',
   'sy43.md',
+  'sy44.md',
 ];
 
 test('sy42-sy44 capacity estimates are reproduced by script', { skip: py ? false : 'python not installed' }, () => {

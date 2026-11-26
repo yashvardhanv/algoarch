@@ -64,7 +64,28 @@ def sy43(src):
          'thirteen times as many range scans')
     return 'sy43'
 
-SECTIONS = {'sy42': sy42, 'sy43': sy43}
+def sy44(src):
+    peak, hot, rec_b, hours, avg_share, replay, snap_s, subs = 1e6, 0.10, 64, 6.5, 0.20, 5e6, 600, 2000
+    hot_rate = peak * hot
+    budget_us = 1e6 / hot_rate
+    day_s = hours * 3600
+    per_day = peak * avg_share * day_s
+    journal_gb = per_day * rec_b / 1e9
+    peak_mb = peak * rec_b / 1e6
+    cold_s = per_day / replay
+    worst_msgs = snap_s * peak
+    worst_s = worst_msgs / replay
+    fanout = peak * subs
+    assert hot_rate == 100000 and budget_us == 10 and day_s == 23400
+    assert per_day == 4.68e9 and round(journal_gb) == 300 and peak_mb == 64
+    assert cold_s == 936 and round(cold_s / 60, 1) == 15.6 and worst_msgs == 6e8 and worst_s == 120 and fanout == 2e9
+    assert 1e6 / (peak * 0.25) == 4                              # drill 7
+    need(src, '100,000 messages per second on one thread', '10 microseconds, everything included', '23,400 seconds',
+         '| 4.68 billion |', 'about 300 GB', '64 MB per second', '936 seconds, about 15.6 minutes',
+         '600 million messages, 120 seconds', '2 billion messages per second')
+    return 'sy44'
+
+SECTIONS = {'sy42': sy42, 'sy43': sy43, 'sy44': sy44}
 
 if __name__ == '__main__':
     done = []
