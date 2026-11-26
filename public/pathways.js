@@ -55,7 +55,11 @@
       hoursPerWeek: Core.clampHours(hoursSel.value),
       weeks: weeks > 0 ? weeks : undefined,
     });
-    schedule.innerHTML = View.scheduleHtml(s, { completed: completed(), target: weeks > 0 ? weeks : null });
+    schedule.innerHTML = View.scheduleHtml(s, {
+      completed: completed(),
+      target: weeks > 0 ? weeks : null,
+      totalLessons: (p.lessons || []).length,
+    });
   }
 
   function setStatus(html) {
@@ -75,12 +79,27 @@
     setStatus('');
     controls.hidden = true;
     schedule.innerHTML = '';
+    let list;
     try {
       const res = await fetch('/api/pathways');
       if (!res.ok) throw new Error('status ' + res.status);
       const data = await res.json();
-      const list = data && Array.isArray(data.pathways) ? data.pathways : null;
-      if (!list || !list.length) throw new Error('empty');
+      list = data && Array.isArray(data.pathways) ? data.pathways : null;
+      if (!list) throw new Error('bad response');
+    } catch (e) {
+      pathways = null;
+      grid.innerHTML = '';
+      schedule.innerHTML = View.errorHtml('Could not load pathways. Check your connection and try again.');
+      loading = false;
+      return;
+    }
+    try {
+      if (!list.length) {
+        pathways = null;
+        grid.innerHTML = '';
+        schedule.innerHTML = View.emptyHtml('No pathways available yet.');
+        return;
+      }
       pathways = list;
       const saved = load();
       const hasOption = (sel, v) => v != null && [...sel.options].some((o) => o.value === String(v));
@@ -91,16 +110,13 @@
       selectedId = [saved.id, 'crash', pathways[0].id].find((id) => id && usable(id)) || pathways[0].id;
       controls.hidden = false;
       render();
-    } catch (e) {
-      pathways = null;
-      grid.innerHTML = '';
-      schedule.innerHTML = View.errorHtml('Could not load pathways. Check your connection and try again.');
     } finally {
       loading = false;
     }
   }
 
   function onShow() {
+    setStatus('');
     if (pathways) render();
     else fetchPathways();
   }
@@ -118,6 +134,8 @@
       setStatus('');
       save();
       render();
+      const again = [...grid.querySelectorAll('[data-pathway]')].find((c) => c.dataset.pathway === p.id);
+      if (again) again.focus();
       return;
     }
     const btn = e.target.closest('[data-action]');
@@ -129,16 +147,23 @@
       btn.disabled = true;
       const id = btn.dataset.lesson;
       const wasDone = completed().includes(id);
-      try { await window.toggleCompleteLesson(id); } finally { render(); }
+      try { await window.toggleCompleteLesson(id); } catch (err) { console.error(err); }
+      setStatus('');
+      render();
       const nowDone = completed().includes(id);
-      if (nowDone === wasDone) { setStatus(''); return; }
+      if (nowDone === wasDone) return;
       setStatus(View.statusHtml(lessonTitle(id), id, nowDone));
       status.focus();
     } else if (action === 'undo') {
       const id = btn.dataset.lesson;
+      const wasDone = completed().includes(id);
       btn.disabled = true;
-      try { await window.toggleCompleteLesson(id); } finally { render(); }
-      setStatus(View.statusHtml(lessonTitle(id), id, false));
+      try { await window.toggleCompleteLesson(id); } catch (err) { console.error(err); }
+      setStatus('');
+      render();
+      const nowDone = completed().includes(id);
+      if (nowDone === wasDone) return;
+      setStatus(View.statusHtml(lessonTitle(id), id, nowDone));
       status.focus();
     }
   });
