@@ -30,14 +30,14 @@ def sy54(src):
     seeks = 1 / seek_s
     submissions = seeks * miss_one_in
     assert seeks == 125 and submissions == 750 and submissions / links_per_page == 75
-    # the paper's own opening figure: a billion pages in a month
-    assert round(1e9 / (30 * 86400)) == 386
-    # drill 6: 2 billion pages per week
-    assert round(2e9 / (7 * 86400)) == 3307
+    # the report says a billion pages in a month needs "about 400 pages every second"; exact division gives 386
+    paper_rate = 1e9 / (30 * 86400)
+    assert round(paper_rate) == 386 and round(rate / paper_rate) == 10      # this lesson's cycle is ten times larger
     need(src, '3,858 pages per second', '9.3 Gbit/s', '| 3 PB |', '154,321 URLs per second',
          '3,858 fetches in flight', '42,438 hosts', 'one request every 11 seconds', '1,273 days',
          '400 GB', 'about 68 colliding pairs', '125 seeks', '750 DUE submissions', '75 downloads per second',
-         '781,250,000 URLs', 'about 19.7%', '1,157 robots.txt fetches per second', 'about 386 per second')
+         '781,250,000 URLs', 'about 19.7%', '1,157 robots.txt fetches per second', 'about 400 pages every second', '386 by exact division',
+         'ten times that')
     return 'sy54'
 
 def sy55(src):

@@ -14,7 +14,7 @@ canonicalize, remove_dot_segments = ns['canonicalize'], ns['remove_dot_segments'
 parse_robots, robots_policy = ns['parse_robots'], ns['robots_policy']
 Frontier, host_of = ns['Frontier'], ns['host_of']
 BatchDue, fingerprint = ns['BatchDue'], ns['fingerprint']
-Budget, owner, crawl = ns['Budget'], ns['owner'], ns['crawl']
+Budget, owner, crawl, pld = ns['Budget'], ns['owner'], ns['crawl'], ns['pld']
 
 # ---- 1. canonical URLs -------------------------------------------------------------------------------------------
 def rfc_dots(inp):                       # RFC 3986 section 5.2.4, two-buffer version, transcribed literally
@@ -148,7 +148,8 @@ def simulate(seed, wait_factor=10):
     return seen, log, info, fr
 
 for seed in range(400):
-    seen, log, info, fr = simulate(seed)
+    wf = 1 + seed % 12                                          # the multiplier is a parameter, not a constant
+    seen, log, info, fr = simulate(seed, wf)
     assert sorted(u for u, _, _ in log) == sorted(seen), seed                 # every discovered URL fetched exactly once
     assert fr.pending() == 0
     by_host = collections.defaultdict(list)
@@ -157,7 +158,7 @@ for seed in range(400):
         spans.sort()
         for (s1, e1), (s2, e2) in zip(spans, spans[1:]):
             took = e1 - s1
-            assert s2 >= e1 + 10 * took, (seed, h, spans)       # never overlaps, and waits 10x the last download time
+            assert s2 >= e1 + wf * took, (seed, h, spans)        # never overlaps, and waits wf x the last download time
 
 # one host, one worker: spacing is exact and nothing is skipped
 fr = Frontier(1, 1, 10, random.Random(0))
@@ -169,6 +170,15 @@ while fr.pending() or fr.next_ready() is not None or fr.back:
         now = fr.next_ready(); continue
     starts.append(now); now += 2; fr.done(u, now, 2)
 assert starts == [0, 22, 44], starts
+fr = Frontier(1, 1, 3, random.Random(0))                        # another multiplier: wait 3x the 2 second download
+for i in range(3): fr.add('http://solo.example/%d' % i, 0)
+now, starts = 0, []
+while fr.pending() or fr.next_ready() is not None or fr.back:
+    u = fr.pop(now)
+    if u is None:
+        now = fr.next_ready(); continue
+    starts.append(now); now += 2; fr.done(u, now, 2)
+assert starts == [0, 8, 16], starts
 
 # a host whose queue drained must still be rate limited when new URLs for it arrive later
 fr = Frontier(1, 2, 10, random.Random(0))
@@ -228,6 +238,9 @@ cnt = collections.Counter(owner('host%d.example' % i, 16) for i in range(16000))
 assert len(cnt) == 16 and min(cnt.values()) > 800 and max(cnt.values()) < 1200, cnt
 b = Budget(per_link=10, floor=5)
 assert b.cap(set()) == 5 and b.cap({'x', 'y', 'z'}) == 30
+
+assert pld('s0.spam.example') == 'spam.example' and pld('a.b.c.example.com') == 'example.com' and pld('localhost') == 'localhost'
+assert pld('a.b.co.uk') == 'co.uk'          # known limitation: the two-label rule is wrong for public suffixes like co.uk
 
 # ---- 6. the whole loop on a fake web, against a breadth-first reference --------------------------------------------
 def make_web(seed):
@@ -292,6 +305,14 @@ for seed in range(250):
     bodies = {web[u][1] for u in got if u in web}
     assert stats['processed'] == len(bodies), (seed, stats, len(bodies))       # content-seen: one processing per distinct body
 
+# robots rules see the query string: /a?x=1 is blocked, /a?x=2 is not
+qweb = {'http://q.example/a?x=1': (200, 'one', []), 'http://q.example/a?x=2': (200, 'two', [])}
+def fetch_q(url):
+    s = urlsplit(url)
+    if s.path == '/robots.txt': return (200, 'user-agent: *' + chr(10) + 'disallow: /a?x=1' + chr(10), [])
+    return qweb.get(url, (404, '', []))
+assert crawl(fetch_q, list(qweb), 'algobot', Budget(per_link=10 ** 6, floor=10 ** 6)) == ['http://q.example/a?x=2']
+
 # spider trap: a host that mints a new URL on every fetch stops at its budget while the rest of the web finishes
 good = {'http://good.example/a': (200, 'A', ['http://good.example/b', 'http://trap.example/0']),
         'http://good.example/b': (200, 'B', ['http://other.example/c']),
@@ -305,4 +326,34 @@ def fetch_trap(url):
 got = crawl(fetch_trap, ['http://good.example/a'], 'algobot', Budget(per_link=10, floor=7))
 traps = [u for u in got if 'trap.example' in u]
 assert len(traps) == 10 and len(got) == 13, (len(traps), len(got))            # one linking domain -> budget 10
+
+# two hosts of one domain linking to a site count as ONE linking domain
+def fetch_two(url):
+    s = urlsplit(url)
+    if s.path == '/robots.txt': return (404, '', [])
+    if s.netloc == 'trap.example':
+        k = int(s.path[1:]); return (200, 'trap page %d' % k, ['http://trap.example/%d' % (k + 1)])
+    return {'http://www.good.example/a': (200, 'A', ['http://blog.good.example/b', 'http://trap.example/0']),
+            'http://blog.good.example/b': (200, 'B', ['http://trap.example/0'])}.get(url, (404, '', []))
+got = crawl(fetch_two, ['http://www.good.example/a'], 'algobot', Budget(per_link=10, floor=5))
+assert len([u for u in got if 'trap.example' in u]) == 10, len(got)
+
+# a farm of subdomains: one fresh host per page. The budget is per registered domain, so the farm stops at its cap
+def fetch_farm(url):
+    s = urlsplit(url)
+    if s.path == '/robots.txt': return (404, '', [])
+    if s.netloc.endswith('.spam.example'):
+        k = int(s.netloc.split('.')[0][1:]); return (200, 'farm page %d' % k, ['http://s%d.spam.example/' % (k + 1)])
+    return {'http://good.example/a': (200, 'A', ['http://s0.spam.example/'])}.get(url, (404, '', []))
+got = crawl(fetch_farm, ['http://good.example/a'], 'algobot', Budget(per_link=10, floor=5))
+assert len([u for u in got if 'spam.example' in u]) == 10 and len(got) == 11, len(got)      # one linking domain: cap 10
+# limitation, measured: five domains that link to each other raise each other's caps (4 linking domains each: cap 40)
+def fetch_ring(url):
+    s = urlsplit(url)
+    if s.path == '/robots.txt': return (404, '', [])
+    k, n = int(s.netloc[1]), int(s.path[1:])
+    return (200, 'ring %d %d' % (k, n), ['http://f%d.example/%d' % (k, n + 1)] + ['http://f%d.example/0' % j for j in range(5) if j != k])
+got = crawl(fetch_ring, ['http://f0.example/0'], 'algobot', Budget(per_link=10, floor=5))
+per_domain = collections.Counter(urlsplit(u).netloc for u in got)
+assert set(per_domain.values()) == {40} and len(per_domain) == 5, per_domain          # 4x the single-trap cap of 10
 print('sy54 code checks passed')
