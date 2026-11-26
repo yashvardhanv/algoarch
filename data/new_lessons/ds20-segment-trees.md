@@ -1,6 +1,6 @@
 # Lesson 20 — Segment Trees & Fenwick Trees
 
-> **Priority:** ★★★★☆ — rare in a first-round loop, decisive when a hard round asks for "update and query a range, many times".
+> **Priority:** ★★★★★ — the structure to reach for when a hard problem says "update and query a range, many times".
 >
 > **Study time:** 65 minutes. **Do this after:** Lesson 5 (prefix sums) and Lesson 10 (trees and recursion).
 > **Level:** advanced. Optional for a crash plan; worth doing if your target loops include hard rounds.
@@ -263,7 +263,7 @@ Solve these, in this order. Names are the common problem titles; numbers are Lee
 2. **Count of Smaller Numbers After Self** (315) — Fenwick with compression.
 3. **Reverse Pairs** (493) — compression plus a twist: the compared value is `2 * a[j]`, so compress both.
 4. **Range Sum Query 2D - Mutable** (308) — a 2D Fenwick.
-5. **The Skyline Problem** (218) or **Falling Squares** (699) — range-max with range assign; this is where tag composition bites.
+5. **Falling Squares** (699) — range-max with range assign; this is where tag composition bites.
 
 Then write the Fenwick tree from a blank page in under five minutes and explain `i & -i` aloud.
 
