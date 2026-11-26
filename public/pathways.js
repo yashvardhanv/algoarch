@@ -10,6 +10,7 @@
   const grid = $('pw-grid');
   const controls = $('pw-controls');
   const schedule = $('pw-schedule');
+  const status = $('pw-status');
   const hoursSel = $('pw-hours');
   const weeksSel = $('pw-weeks');
   const KEY = 'algoarch.pathways';
@@ -29,6 +30,13 @@
 
   const fullPlanner = () => can('plannerFull');
   const completed = () => (state.progress && state.progress.completed) || [];
+  const lessonTitle = (id) => {
+    for (const p of pathways || []) {
+      const l = (p.lessons || []).find((x) => x.id === id);
+      if (l) return l.title;
+    }
+    return id;
+  };
   const current = () => pathways.find((p) => p.id === selectedId) || pathways[0];
 
   function renderCards() {
@@ -50,6 +58,11 @@
     schedule.innerHTML = View.scheduleHtml(s, { completed: completed(), target: weeks > 0 ? weeks : null });
   }
 
+  function setStatus(html) {
+    status.innerHTML = html;
+    status.hidden = !html;
+  }
+
   function render() {
     if (!pathways) return;
     renderCards();
@@ -59,6 +72,7 @@
   async function fetchPathways() {
     if (loading) return;
     loading = true;
+    setStatus('');
     controls.hidden = true;
     schedule.innerHTML = '';
     try {
@@ -69,8 +83,9 @@
       if (!list || !list.length) throw new Error('empty');
       pathways = list;
       const saved = load();
-      if (saved.hours && hoursSel.querySelector('option[value="' + saved.hours + '"]')) hoursSel.value = saved.hours;
-      if (saved.weeks != null && weeksSel.querySelector('option[value="' + saved.weeks + '"]')) weeksSel.value = saved.weeks;
+      const hasOption = (sel, v) => v != null && [...sel.options].some((o) => o.value === String(v));
+      if (saved.hours && hasOption(hoursSel, saved.hours)) hoursSel.value = String(saved.hours);
+      if (hasOption(weeksSel, saved.weeks)) weeksSel.value = String(saved.weeks);
       const usable = (id) => pathways.some((p) => p.id === id) &&
         !Core.isPathwayLocked(pathways.find((p) => p.id === id), fullPlanner());
       selectedId = [saved.id, 'crash', pathways[0].id].find((id) => id && usable(id)) || pathways[0].id;
@@ -100,6 +115,7 @@
         return;
       }
       selectedId = p.id;
+      setStatus('');
       save();
       render();
       return;
@@ -111,11 +127,23 @@
     else if (action === 'open') window.openLesson(btn.dataset.lesson, btn.dataset.track);
     else if (action === 'toggle') {
       btn.disabled = true;
-      try { await window.toggleCompleteLesson(btn.dataset.lesson); } finally { render(); }
+      const id = btn.dataset.lesson;
+      const wasDone = completed().includes(id);
+      try { await window.toggleCompleteLesson(id); } finally { render(); }
+      const nowDone = completed().includes(id);
+      if (nowDone === wasDone) { setStatus(''); return; }
+      setStatus(View.statusHtml(lessonTitle(id), id, nowDone));
+      status.focus();
+    } else if (action === 'undo') {
+      const id = btn.dataset.lesson;
+      btn.disabled = true;
+      try { await window.toggleCompleteLesson(id); } finally { render(); }
+      setStatus(View.statusHtml(lessonTitle(id), id, false));
+      status.focus();
     }
   });
 
-  [hoursSel, weeksSel].forEach((sel) => sel.addEventListener('change', () => { save(); render(); }));
+  [hoursSel, weeksSel].forEach((sel) => sel.addEventListener('change', () => { setStatus(''); save(); render(); }));
 
   const previous = window.switchView;
   window.switchView = function (name) {

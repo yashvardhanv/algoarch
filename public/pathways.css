@@ -96,3 +96,8 @@
 }
 
 .pw-controls[hidden] { display: none; }
+
+.pw-status { margin: 0 0 var(--s-md); padding: var(--s-xs) var(--s-md); border-radius: var(--r-inner); background: var(--well); color: var(--ink-2); font-size: var(--text-small); }
+.pw-status[hidden] { display: none; }
+.pw-status:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pw-undo { min-height: 44px; padding: 0 var(--s-xs); background: none; border: 0; color: var(--accent); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
