@@ -254,3 +254,12 @@ test('ai28 lesson code matches finite differences and reference optimizers', { s
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.match(r.stdout, /ai28 code checks passed/);
 });
+
+test('ai29 lesson code matches reference counts, finite-difference gradients and the printed loss numbers', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'ai29_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'ai29-language-model-from-scratch.md'),
+  ], { encoding: 'utf8', timeout: 180000 });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /ai29 code checks passed/);
+});
