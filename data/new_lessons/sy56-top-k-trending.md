@@ -100,7 +100,8 @@ Survives a node restart by rebuilding from the event log.
 
 Four conclusions. **Exact counting is cheaper than it first looks, and the sketch still wins on bounds.** A window cannot
 hold more distinct keys than events: at most 3.3 GB for the hour and 55.6 MB for a minute bucket, never the 16 GB a
-billion-key table would suggest (real Zipf traffic has far fewer distinct keys than events, so these are ceilings). The
+billion-key table would suggest. Under this lesson's Zipf model the hour would hold about 49 million distinct keys (4.2 times
+fewer than its events) and a minute about 1.5 million (2.3 times fewer), so 3.3 GB and 55.6 MB are ceilings, not predictions. The
 summaries (14.4 MB to 32.6 MB) are about 100 to 230 times smaller than that ceiling, not thousands of times. The honest
 argument for a sketch is that its size is fixed in advance whatever the key cardinality, that it merges across servers,
 and that the saving multiplies once you keep one per region, category and window. **The error is absolute, not relative:**

@@ -65,6 +65,10 @@ def sy55(src):
     assert blocks_in_list == 25 and blocks_in_list * hash_b == 800
     assert blocks == 2.5e11 and index_tb == 16
     assert conns == 2e8 and conns / conn_per_server == 2000 and round(notif) == 34722
+    need(src, 'the edit wins in either arrival order', 'conflicted copy named by client and journal id',
+         'about 80 bytes on average')
+    for stale in ('edit wins; the delete is dropped', 'Nothing is lost, and the two', 'average about 64 bytes'):
+        assert stale not in src, 'stale wording is back: %r' % stale
     assert first_sync_s == 4000 and round(first_sync_s / 60) == 67 and round(saving * 100) == 19
     # a 100 MB file with a few bytes inserted at the front: fixed 4 MB blocks all change
     assert 100 / 4 == 25
@@ -105,6 +109,15 @@ def sy56(src):
     assert round(rank(1000), -1) == 9780 and int(cutoff) == 469
     assert round(100 / h, 1) == 4.7 and round(hot, -1) == 8150
     assert ordered == 21 and round(gap(100)) == 968
+    def distinct(n_events):                                   # expected distinct keys under Zipf(1) over `vids` keys
+        tot = sum(1 - math.exp(-n_events / (k * h)) for k in range(1, 10001))
+        a, b, steps = math.log(10000.5), math.log(vids + 0.5), 100000
+        step = (b - a) / steps
+        return tot + sum((1 - math.exp(-n_events / (math.exp(a + (i + .5) * step) * h))) * math.exp(a + (i + .5) * step) * step
+                         for i in range(steps))
+    d_hour, d_min = distinct(n_hour), distinct(n_min)
+    assert round(d_hour / 1e6) == 49 and round(n_hour / d_hour, 1) == 4.2
+    assert round(d_min / 1e6, 1) == 1.5 and round(n_min / d_min, 1) == 2.3
     assert round(ratio_lo, -1) == 100 and round(ratio_hi, -1) == 230
     assert minutes * m == 600000
     # the per-minute bucket guarantee: N_minute / m per bucket, and 60 buckets add up to the hourly bound
@@ -116,6 +129,13 @@ def sy56(src):
          'H = 21.3', 'about 978,000 views', 'about 97,800 views', 'about 9,780 views', 'rank 469', '4.7%',
          '8,150 views per second', '600,000 candidates')
     assert src.count('| 3.3 GB |') >= 2
+    need(src, 'about 49 million distinct keys (4.2 times', 'about 1.5 million (2.3 times',
+         'Sizing exact counts from the key universe instead of the window', 'ends at rank 21',
+         'why can the sketch detect rank 100 yet not order it against rank 101',
+         'No minimum volume in the trend score', 'with the default, and explain what smoothing fixes')
+    for stale in ('960 GB', '| 16 GB |', 'four orders', 'Exact counts for a billion keys', 'beyond about 469',
+                  'order ranks 10 and 100 but not rank 1,000', 'No smoothing in the ratio'):
+        assert stale not in src, 'stale wording is back: %r' % stale
     return 'sy56'
 
 SECTIONS = {'sy54': sy54, 'sy55': sy55, 'sy56': sy56}
