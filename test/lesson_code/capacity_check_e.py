@@ -77,7 +77,35 @@ def sy58(src):
     return 'sy58'
 
 
-SECTIONS = {'sy57': sy57, 'sy58': sy58}
+def sy59(src):
+    # ---- assumptions (every input is the lesson's own; no company figures were read) ----
+    bids_per_day, busiest_share, row_bytes = 10_000_000, 0.15, 100
+    hot_bids, hot_seconds, watchers = 3_000, 10, 50_000
+    soft_cap = 300
+    # eBay's published increment table (cents), the same one the lesson code carries
+    ladder = [(1, 5), (100, 25), (500, 50), (2500, 100), (10000, 250), (25000, 500), (50000, 1000), (100000, 2500), (250000, 5000), (500000, 10000)]
+    inc = lambda p: [i for lo, i in ladder if p >= lo][-1]
+    # ---- results ----
+    assert round(bids_per_day / 86_400) == 116
+    assert round(bids_per_day * busiest_share / 3600) == 417
+    assert bids_per_day * row_bytes == 1_000_000_000 and round(bids_per_day * row_bytes * 365 / 1e9) == 365
+    rate = hot_bids / hot_seconds
+    assert rate == 300 and round(1000 / rate, 1) == 3.3
+    assert rate * watchers == 15_000_000
+    assert watchers * 1 == 50_000 and rate * watchers / (watchers * 1) == 300
+    price, steps, by_bracket = 100, 0, {}
+    while price < 10_000:                                                       # climb from $1.00 to $100.00 one increment at a time
+        by_bracket[inc(price)] = by_bracket.get(inc(price), 0) + 1
+        price += inc(price); steps += 1
+    assert steps == 131 and by_bracket == {25: 16, 50: 40, 100: 75}
+    assert soft_cap == 300
+    need(src, '116 bids per second', '417 bids per second', '1.0 GB per day, 365 GB per year', '300 bids per second on one row', '3.3 ms',
+         '15,000,000 messages per second', '50,000 messages per second', '300 times fewer', '131 raises (16 + 40 + 75)', '300 seconds')
+    forbid(src, 'eBay uses a soft close', 'eBay uses a hard close', 'eBay orders bids')
+    return 'sy59'
+
+
+SECTIONS = {'sy57': sy57, 'sy58': sy58, 'sy59': sy59}
 done = []
 for path in sys.argv[1:]:
     key = os.path.basename(path)[:4]

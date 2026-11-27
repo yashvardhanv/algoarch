@@ -412,6 +412,7 @@ test('sy68 capacity estimates are reproduced by script', { skip: py ? false : 'p
 });
 
 
+
 // wave3 task2 begin
 test('sy57 lesson code matches Floyd-Warshall on random directed graphs, a hierarchy built in any order, brute-force time-dependent paths and a decayed-sample estimator', { skip: py ? false : 'python not installed' }, () => {
   const r = spawnSync(py, [
@@ -431,12 +432,22 @@ test('sy58 lesson code matches a list-based booking model, 12 threads on one dat
   assert.match(r.stdout, /sy58 code checks passed/);
 });
 
+test('sy59 lesson code matches an every-cent increment table, a ledger model of proxy bidding, a replayed ledger after a thread race and a late-bid simulation', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'sy59_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'sy59-online-auction.md'),
+  ], { encoding: 'utf8', timeout: 180000 });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /sy59 code checks passed/);
+});
+
 const CAPACITY_LESSONS_E = [
   'sy57-maps-routing-eta.md',
   'sy58-hotel-flight-booking.md',
+  'sy59-online-auction.md',
 ];
 
-test('sy57-sy58 capacity estimates are reproduced by script', { skip: py ? false : 'python not installed' }, () => {
+test('sy57-sy59 capacity estimates are reproduced by script', { skip: py ? false : 'python not installed' }, () => {
   const r = spawnSync(py, [
     path.join(__dirname, 'lesson_code', 'capacity_check_e.py'),
     ...CAPACITY_LESSONS_E.map((f) => path.join(__dirname, '..', 'data', 'new_lessons', f)),
