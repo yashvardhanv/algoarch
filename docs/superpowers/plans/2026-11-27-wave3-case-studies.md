@@ -41,3 +41,20 @@
 - [ ] **Step 1:** Read the outline row, the sources and the neighbouring lessons; write the failing checks first.
 - [ ] **Step 2:** Write the lesson, run checks, mutation-test (two or more breaks), `npm test`, `npm run lint:comp`, commit.
 - [ ] **Step 3:** Write the report to the path given in the dispatch.
+
+---
+
+## Tasks 2 to 7 (approved by the owner after the sy68 sample)
+
+Each task writes its lessons as `data/new_lessons/<id>-<slug>.md` with `test/lesson_code/<id>_check.py` per lesson that has code (every lesson should have at least a small tested model), one shared `capacity_check_<letter>.py` for the task's capacity numbers, and a wrapper in `test/lesson-code.test.js`. Use the sy68 lesson and its Fix round (`.superpowers/sdd/wave3/task1-report.md`, `task1-review.md`) as the style and as a list of mistakes to avoid. Outline rows give each lesson's title and scope. Statements about real companies cite a source actually read or are omitted; where no engineering source for a product can be read, say so and teach the general design, labelled as such.
+
+- **Task 2** (capacity letter `e`): `sy57` Maps Routing and ETA (Google Maps), `sy58` Hotel and Flight Booking, `sy59` Online Auction.
+- **Task 3** (letter `f`): `sy60` Online Judge with sandboxed execution, `sy61` Video Conferencing (WebRTC), `sy62` Music Streaming.
+- **Task 4** (letter `g`): `sy63` Email Service, `sy64` Food Delivery Dispatch, `sy65` Live Streaming with Live Comments.
+- **Task 5** (letter `h`): `sy66` Log Aggregation and Search, `sy67` Content Delivery Network, `sy69` Dynamo-style Key-Value Store (read `sy45`/`sy46` first: do not repeat consistent hashing and vector clocks; link them).
+- **Task 6** (letter `i`): `sy70` Dating App Matching and Swipe Feed, `sy71` Fitness Activity Tracking, `sy72` Multiplayer Game Backend and Matchmaking, `sy73` Price Tracker and Alerts.
+- **Task 7** (letter `j`): `sy74` News Aggregator, `sy75` Feature Flags and Config Service, `sy76` Social Graph and People You May Know, `sy77` DNS at Scale.
+
+- [ ] **Step 1:** Read the outline rows, neighbouring lessons for overlap, and the primary sources; write the failing checks first.
+- [ ] **Step 2:** Write the lessons; run checks; mutation-test twice or more each; `npm test`; `npm run lint:comp`; one commit per lesson.
+- [ ] **Step 3:** Write the report to the path given in the dispatch.
