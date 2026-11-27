@@ -25,14 +25,16 @@ function codeTest(id, file, title) {
   });
 }
 
+codeTest('sy74', 'sy74-news-aggregator.md', 'shingle and Jaccard definitions, MinHash bias, the banding curve, exact pairwise components and entry revisions');
 codeTest('sy75', 'sy75-feature-flags-config.md', 'a nested-ramp, independence and ordering suite, a never-throw client and a propagation simulation');
 codeTest('sy76', 'sy76-social-graph-pymk.md', 'the two-hop definition, the hub guard, the ranking rules and the shard fan-out formula');
 codeTest('sy77', 'sy77-dns-at-scale.md', 'a packet parser, resolver boundary cases, coalescing and a Poisson simulation');
 
-test('sy75 and sy77 capacity estimates are reproduced by script', { skip: py ? false : 'python not installed' }, () => {
-  const r = spawnSync(py, [check('capacity_check_j.py'), lesson('sy77-dns-at-scale.md'), lesson('sy75-feature-flags-config.md'), lesson('sy76-social-graph-pymk.md')], { encoding: 'utf8', timeout: 180000 });
+test('sy74 to sy77 capacity estimates are reproduced by script', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [check('capacity_check_j.py'), lesson('sy77-dns-at-scale.md'), lesson('sy75-feature-flags-config.md'), lesson('sy76-social-graph-pymk.md'), lesson('sy74-news-aggregator.md')], { encoding: 'utf8', timeout: 180000 });
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.match(r.stdout, /capacity_check_j \(sy77\) passed/);
   assert.match(r.stdout, /capacity_check_j \(sy75\) passed/);
   assert.match(r.stdout, /capacity_check_j \(sy76\) passed/);
+  assert.match(r.stdout, /capacity_check_j \(sy74\) passed/);
 });

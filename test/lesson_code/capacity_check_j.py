@@ -4,6 +4,7 @@ import sys, re
 text = open(sys.argv[1], encoding='utf-8').read()
 text75 = open(sys.argv[2], encoding='utf-8').read() if len(sys.argv) > 2 else None
 text76 = open(sys.argv[3], encoding='utf-8').read() if len(sys.argv) > 3 else None
+text74 = open(sys.argv[4], encoding='utf-8').read() if len(sys.argv) > 4 else None
 
 # ---- sy77: DNS at scale ---------------------------------------------------------------------------------------------
 N, TOTAL, TTL = 1_000_000, 20_000, 60
@@ -95,3 +96,29 @@ if text76 is not None:
     for company in ('Facebook', 'LinkedIn', 'Instagram', 'Twitter', 'TikTok', 'Meta', 'Pinterest', 'Snapchat'):
         assert company not in text76, company
     print("capacity_check_j (sy76) passed")
+
+
+# ---- sy74: news aggregator ---------------------------------------------------------------------------------------------
+if text74 is not None:
+    FEEDS, GAP, ITEMS, FULL, SHORT, CHANGED, DAYS = 100_000, 900, 5_000_000, 50_000, 300, 0.15, 7
+    polls = FEEDS / GAP
+    assert round(polls) == 111 and round(ITEMS / 86400) == 58
+    full_bw = polls * FULL / 1e6
+    cond_bw = polls * (CHANGED * FULL + (1 - CHANGED) * SHORT) / 1e6
+    assert round(full_bw, 1) == 5.6 and round(cond_bw, 2) == 0.86 and round(full_bw / cond_bw, 1) == 6.4
+    kept = ITEMS * DAYS
+    assert kept == 35_000_000 and kept * 800 / 1e9 == 28.0 and kept * 400 / 1e9 == 14.0 and kept * 20 * 8 / 1e9 == 5.6
+    assert round(ITEMS / 86400 * 20) == 1157
+    curve = {s: 1 - (1 - s ** 5) ** 20 for s in (0.5, 0.6, 0.7, 0.8, 0.9)}
+    assert [round(100 * curve[s], 1) for s in (0.5, 0.6, 0.7)] == [47.0, 80.2, 97.5]
+    assert round(100 * curve[0.8], 2) == 99.96 and round(100 * curve[0.9], 6) == 99.999998
+    assert round(0.5 ** (12 / 6) * (1 + 4), 2) == 1.25 and 4.0 * 0.0625 == 0.25      # the ranking examples in the lesson
+    for must in ('111 per second', '58 per second', '5.6 MB/s', '0.86 MB/s: 6.4 times less', '35 million', '28 GB (14 GB if each minimum is cut to 4 bytes)',
+                 '5.6 GB', '1,157 per second', '| 0.5 | 47.0% |', '| 0.6 | 80.2% |', '| 0.7 | 97.5% |', '| 0.8 | 99.96% |', '99.999998%',
+                 '101 of 125 true pairs (81%)', 'all 156 true pairs', '`4.0 x 0.0625 = 0.25`'):
+        assert must in text74, must
+    for must_not in ('99.99998%', 'more than 99% of the true pairs', 'capacity_check_k'):
+        assert must_not not in text74, must_not
+    for company in ('Google News', 'Apple News', 'Flipboard', 'Feedly', 'SmartNews', 'Reddit', 'Twitter', 'Facebook'):
+        assert company not in text74, company
+    print("capacity_check_j (sy74) passed")
