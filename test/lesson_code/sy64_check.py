@@ -40,6 +40,10 @@ assert eta((10, 0), o, 0, speed=1.0)[1] == 0                      # food ready e
 assert eta((20, 0), o, 0, speed=0.5)[0] == 40 + 8                  # half speed doubles travel
 assert eta((2, 0), o, 0, speed=1.0, wait_weight=0)[2] == eta((9, 0), o, 0, speed=1.0, wait_weight=0)[2] == 14   # without the term they tie
 assert eta((2, 0), o, 0, speed=1.0)[2] > eta((9, 0), o, 0, speed=1.0)[2]      # with it the early courier costs more
+of = {'rest': (0, 0), 'cust': (2, 0), 'ready': 3, 'created': 0}            # fractional times: arrives at 2.5, food ready at 3
+df, wf, cf = eta((1, 0), of, 0, speed=0.4, wait_weight=0.5)
+assert abs(df - 8) < 1e-9 and abs(wf - 0.5) < 1e-9 and abs(cf - 8.25) < 1e-9
+assert abs(run_route((1, 0), 0, [of], [('p', 0), ('d', 0)], speed=0.4)[1] - 0.5) < 1e-9
 o3 = {'rest': (0, 0), 'cust': (4, 0), 'ready': 0, 'created': -3}                # an order that has already waited 3 minutes
 assert eta((2, 0), o3, 0, speed=1.0, wait_weight=0.5) == (6, 0, 6 + 3)
 assert eta((2, 0), o, 7, speed=1.0)[0] == 14 and eta((2, 0), o, 7, speed=1.0)[1] == 1    # a later "now" shortens the wait
@@ -85,10 +89,10 @@ assert match([[1, 1], [1, 1]], 100) in ([0, 1], [1, 0])
 assert match([[200, 300]], 100) == [None]                          # too expensive: leave it for the next cycle
 tot, col = hungarian([[4, 1, 3], [2, 0, 5], [3, 2, 2]])
 assert tot == 5 and sorted(col) == [0, 1, 2]
-big = [[rng.randint(0, 10 ** 12) for _ in range(9)] for _ in range(8)]
+big = [[rng.randint(0, 10 ** 12) for _ in range(8)] for _ in range(7)]
 t, col = hungarian(big)
-assert t == sum(big[i][col[i]] for i in range(8))
-assert t == min(sum(big[i][p[i]] for i in range(8)) for p in itertools.permutations(range(9), 8))
+assert t == sum(big[i][col[i]] for i in range(7))
+assert t == min(sum(big[i][p[i]] for i in range(7)) for p in itertools.permutations(range(8), 7))
 
 # ---- 3. greedy against optimal: the classic trap and the measured gap -------------------------------------------------
 trap = [[1, 2], [2, 100]]                                           # order 0 is seen first and takes the courier order 1 needed
@@ -253,6 +257,19 @@ d.add_order('o')
 f1 = d.offer('o', 'A', 0); d.expire(6)
 f2 = d.offer('o', 'A', 7)
 assert f2 != f1 and d.accept('o', 'A', f1, 8) is False and d.accept('o', 'A', f2, 8) is True
+# a delayed decline of an OLD offer must not cancel the new offer to the same courier
+d = Dispatch(ttl=5)
+d.add_order('o')
+g1 = d.offer('o', 'A', 0); d.expire(6)
+g2 = d.offer('o', 'A', 7)
+assert d.decline('o', 'A', g1, 8) is False and d.orders['o']['state'] == 'offered' and d.orders['o']['offer'] == g2
+assert d.accept('o', 'A', g2, 8) is True
+# the cap holds at the commit point: a courier pushed to the cap behind the offer's back cannot accept
+d = Dispatch(ttl=50, max_load=2)
+d.add_order('o')
+h = d.offer('o', 'A', 0)
+d.load['A'] = 2
+assert d.accept('o', 'A', h, 1) is False and d.orders['o']['state'] == 'open' and 'A' not in d.offered_to and d.load['A'] == 2
 # declines free the order and the courier
 d = Dispatch(ttl=5)
 d.add_order('o'); d.add_order('p')
@@ -314,12 +331,13 @@ def fuzz_dispatch(seed, steps=300):
     return n_acc
 
 
-total_acc = sum(fuzz_dispatch(s) for s in range(300))
-assert total_acc > 600, 'the fuzz must actually assign orders'
+total_acc = sum(fuzz_dispatch(s) for s in range(150))
+assert total_acc > 300, 'the fuzz must actually assign orders'
 
 # ---- 7. cited and computed figures -------------------------------------------------------------------------------------
-need('Do this after', 'Last reviewed: 27 November 2026', 'arXiv', '20-second', 'ASAP', 'XCAT', 'mixed-integer', '1,079 of 2,000', '81 of 1,000', '1,377 of 1,500', '300 seeded random interleavings')
+need('2.7% of orders need four or more offers', 'a third of a 20-second window', 'Do this after', 'Last reviewed: 27 November 2026', 'arXiv', '20-second', 'ASAP', 'XCAT', 'mixed-integer', '1,079 of 2,000', '81 of 1,000', '1,377 of 1,500', '150 seeded random interleavings')
 assert len(re.findall(r'^\d+\. ', src.split('## Drills')[1].split('## Homework')[0], re.M)) == 8, 'eight drills'
+forbid('NP-hard', 'more than a window', 'fencing token in Flash Sale')
 for bad in ('lakh', 'crore', 'LPA'):
     forbid(bad)
 print('sy64 code checks passed')

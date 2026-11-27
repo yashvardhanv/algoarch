@@ -65,7 +65,7 @@ A delivery order has three parties with three clocks: a customer who wants it so
 | location updates | 4,000 / 5 | 800 per second per metro |
 | offers per order | 1 / 0.7 | 1.43; 6.4 s of expected waiting from refused offers |
 
-Four conclusions. **Matching is tiny:** 33 orders against 1,500 couriers per window. Speed of the solver is not the issue, and a design that opens with "we need a distributed matching engine" has the problem wrong. **The cost of a cell is the cost:** 49,500 route-time predictions per window is where the compute goes, which is why candidates are pruned by geography first (section 5 measures what pruning can lose). **Little's law as a sanity check:** 2,500 orders held at once cannot exceed what couriers can carry; without batching that is 62.5% busy, which is plausible, and had the table said 1,500 couriers the same demand would need 1.7 orders per courier at all times. **Refusals are a latency tax:** at a 0.7 acceptance rate each order costs 1.43 offers and about 6.4 seconds of waiting, more than a window; so the protocol and the acceptance prediction matter.
+Four conclusions. **Matching is tiny:** 33 orders against 1,500 couriers per window. Speed of the solver is not the issue, and a design that opens with "we need a distributed matching engine" has the problem wrong. **The cost of a cell is the cost:** 49,500 route-time predictions per window is where the compute goes, which is why candidates are pruned by geography first (section 5 measures what pruning can lose). **Little's law as a sanity check:** 2,500 orders held at once cannot exceed what couriers can carry; without batching that is 62.5% busy, which is plausible, and had the table said 1,500 couriers the same demand would need 1.7 orders per courier at all times. **Refusals are a latency tax:** at a 0.7 acceptance rate each order costs 1.43 offers and about 6.4 seconds of waiting on average, a third of a 20-second window, with a tail: 2.7% of orders need four or more offers and wait 45 seconds or more at 15 seconds per refusal; so the protocol and the acceptance prediction matter.
 
 ---
 
@@ -252,7 +252,7 @@ def batch_ok(start, t0, orders, seq, max_extra, speed=SPEED):
     return True
 ```
 
-The check works the small cases by hand (two orders, the first at once and the second's kitchen ready at 6: picking both up first gives drops at 8 and 10 with a 5-minute wait; serving the first and then the second gives 3 and 10 with a 1-minute wait, so the weighted costs are 20.5 and 13.5) and compares `best_route` with an independently written enumerator (6 and 90 valid sequences for 2 and 3 orders). **Cheapest insertion is a heuristic, and it is measured:** adding orders one at a time, it matched the exact route on **1,377 of 1,500** random instances of 1 to 3 orders (always for one order), and was never cheaper than the exact route. The misses come from an early commitment that a later order would have wanted undone. Real routing at scale uses heuristics for the same reason; DoorDash describes the route problem as a known hard (NP-hard) one in a post that was not read here (section 9, search snippets only), so this lesson does not describe their method.
+The check works the small cases by hand (two orders, the first at once and the second's kitchen ready at 6: picking both up first gives drops at 8 and 10 with a 5-minute wait; serving the first and then the second gives 3 and 10 with a 1-minute wait, so the weighted costs are 20.5 and 13.5) and compares `best_route` with an independently written enumerator (6 and 90 valid sequences for 2 and 3 orders). **Cheapest insertion is a heuristic, and it is measured:** adding orders one at a time, it matched the exact route on **1,377 of 1,500** random instances of 1 to 3 orders (always for one order), and was never cheaper than the exact route. The misses come from an early commitment that a later order would have wanted undone. Real routing at scale uses heuristics for the same reason; Pickup-and-delivery routing is, as a general operations-research fact (not something taken from a DoorDash source here), a hard combinatorial problem, so exact search is limited to a few stops and real systems use heuristics; this lesson does not describe anyone's method.
 
 **The limit on batching.** A batch is acceptable if `batch_ok` holds: each order's drop time is within `max_extra` of its solo time with that courier. The check asserts the boundary (5 minutes passes where the first order is 5 later, 4.99 fails) and that an infeasible route is never ok. A recent DoorDash paper describes the trade directly: batching can improve courier efficiency while faster execution reduces lateness, and over-batching in congestion can increase lateness (section 9). The weights and caps are knobs; whoever runs the marketplace sets them.
 
@@ -260,7 +260,7 @@ The check works the small cases by hand (two orders, the first at once and the s
 
 ## 7. Deep Dive 3: Offers, Refusals and Never Double-Booking
 
-The matching gives a pairing; a courier then sees an offer and may accept, decline or ignore it. The order's state machine is: open, offered (to one courier, with a deadline and an offer id), assigned, done. Rules: an order can be offered to one courier at a time; a courier has at most one open offer and at most `max_load` assigned orders; an accept counts only if the order is still offered to that courier **with that offer's id** and the deadline has not passed; an offer that lapses returns the order to open and the next offer gets a **new** id.
+The matching gives a pairing; a courier then sees an offer and may accept, decline or ignore it. The order's state machine is: open, offered (to one courier, with a deadline and an offer id), assigned, done. Rules: an order can be offered to one courier at a time; a courier has at most one open offer and at most `max_load` assigned orders; an accept counts only if the order is still offered to that courier **with that offer's id** and the deadline has not passed; an offer that lapses returns the order to open and the next offer gets a **new** id; accept and decline are both fenced by that id, since a delayed decline of an old offer must not cancel the new one.
 
 ```python
 class Dispatch:
@@ -287,6 +287,9 @@ class Dispatch:
     def accept(self, oid, courier, offer_id, now):
         if not self._live(oid, courier, offer_id) or now > self.orders[oid]['expires']:
             return False
+        if self.load.get(courier, 0) >= self.max_load:   # the cap holds at the commit point, whatever offers were out
+            self._release(oid)
+            return False
         self.offered_to.pop(courier)
         self.orders[oid]['state'] = 'assigned'
         self.load[courier] = self.load.get(courier, 0) + 1
@@ -309,9 +312,9 @@ class Dispatch:
         return True
 ```
 
-The failure the offer id exists for: courier A's offer lapses, the order is re-offered to B, and A's accept, delayed on a bad connection, arrives afterwards. Without the id check, A's late accept, arriving while the order is merely offered to someone, or while it was re-offered to A itself, can win. The check runs each case: wrong courier, wrong id, accept at exactly the deadline (counts), one tick later (does not), the late accept from A after B took the order (refused, B assigned, A's load 0), the same courier re-offered the same order (the old id stays dead), decline by the wrong courier (refused), one open offer per courier, the load cap and a double completion freeing nothing. Then 300 seeded random interleavings of offers, accepts with any offer id ever issued (fresh or stale), declines, expiries and completions, asserting after every step that the orders recorded as assigned are exactly the orders whose accept returned true (each at most once), every courier's load equals the orders assigned to it and never exceeds 2, every courier has at most one open offer, and the open-offer index matches the order states.
+The failure the offer id exists for: courier A's offer lapses, the order is re-offered to B, and A's accept, delayed on a bad connection, arrives afterwards. Without the id check, A's late accept, arriving while the order is merely offered to someone, or while it was re-offered to A itself, can win. The check runs each case: wrong courier, wrong id, accept at exactly the deadline (counts), one tick later (does not), the late accept from A after B took the order (refused, B assigned, A's load 0), the same courier re-offered the same order (the old id stays dead), decline by the wrong courier (refused), **a late decline of the old offer id after the same courier was re-offered the order (refused, the new offer stays live and can be accepted)**, one open offer per courier, the load cap at offer time and again at accept time (a courier pushed to the cap behind the offer's back cannot accept) and a double completion freeing nothing. Then 150 seeded random interleavings of offers, accepts with any offer id ever issued (fresh or stale), declines, expiries and completions, asserting after every step that the orders recorded as assigned are exactly the orders whose accept returned true (each at most once), every courier's load equals the orders assigned to it and never exceeds 2, every courier has at most one open offer, and the open-offer index matches the order states.
 
-This is the same idea as the fencing token in Flash Sale & Ticket Reservation (a held reservation that lapses) and the attempt number of Scaling Patterns II (a lease plus a counter the receiver checks); here the "resource" is the order record, which the dispatch service owns, so a single compare inside one process or one row is enough. Chubby-style tokens (Case Study: Distributed Lock Service) are for resources you do not own.
+This is the same idea as the hold in Flash Sale & Ticket Reservation (a row with an expiry that a conditional update and the confirm step re-check, so a lapsed hold cannot be used) and the attempt number of Scaling Patterns II (a lease plus a counter the receiver checks); here the "resource" is the order record, which the dispatch service owns, so a single compare inside one process or one row is enough. Chubby-style tokens (Case Study: Distributed Lock Service) are for resources you do not own.
 
 **What the state machine does not cover.** A courier who accepts and then disappears (the order is assigned and nobody is moving): a separate watchdog on the courier's pings reopens the order; it is a timeout on `assigned` with its own rules, not modelled here. A restaurant that cancels or delays: the ready time changes, so the cost of an already-assigned courier changes and the system may re-plan; also not modelled.
 
@@ -325,7 +328,7 @@ This is the same idea as the fencing token in Flash Sale & Ticket Reservation (a
 | greedy dispatch | locally best, globally worse (1,079 of 2,000 instances in the simulation) | match the window jointly |
 | pruning too tight | the best joint answer is not among the candidates (81 of 1,000) | measure k; widen in sparse regions |
 | offer lapses, late accept | two couriers think they have the order | offer id compared on accept |
-| courier at the load cap offered another | an order assigned beyond the cap | the cap is checked at offer time and the load is counted at accept time |
+| courier at the load cap offered another | an order assigned beyond the cap | the cap is enforced at accept (the commit point) and checked at offer time to avoid wasted offers; one open offer per courier |
 | courier vanishes after accepting | the order is held by nobody | watchdog on pings (not modelled) |
 | a region's dispatch is down | that region stops matching | one state per region; other regions are unaffected |
 | over-batching in a rush | late orders pile up | per-order cap on added delay (`batch_ok`) |
@@ -352,7 +355,7 @@ Only what was read; nothing here describes Swiggy's design (no Swiggy engineerin
 5. Batching with no cap on the delay it adds to each order.
 6. Accepting on (order, courier) alone: a late accept wins.
 7. Reusing an offer id for a re-offer.
-8. Checking the load cap only at accept: two offers pass the check together.
+8. Enforcing the load cap in only one place: it must hold at accept, the commit point (offer-time checks and one open offer per courier only avoid wasted offers), or a courier with several open offers can accept past the cap.
 9. One global dispatch process for all cities.
 10. Claiming a company's algorithm ("DoorDash uses X") with no source.
 
