@@ -14,7 +14,7 @@ A route is a shortest path on a road graph, and an ETA is the same path priced a
 
 > **Routing is a shortest-path query on a graph that was prepared for the question. Preprocessing buys query speed by freezing edge weights; live traffic changes the weights; so every design is a choice about how much of the preparation survives a change.**
 
-- **Plain Dijkstra is exact and too slow at continental scale:** the survey this lesson reads reports 9,326,696 vertices scanned and about 2.2 seconds per random query on a 18.0-million-vertex road network.
+- **Plain Dijkstra is exact and too slow at continental scale:** the survey this lesson reads reports 9,326,696 vertices scanned and about 2.2 seconds per random query on an 18.0-million-vertex road network.
 - **A geographic guess barely helps.** A* with "straight-line distance over top speed" is correct but the bound is poor, because one fast road makes everything look close.
 - **A hierarchy helps a lot** because long trips all funnel onto a few important roads: contract the unimportant vertices, keep shortcuts, search only upward.
 - **The hierarchy assumes the weights.** Change a weight and the shortcuts built from it are wrong. Customization, repair or a different time model is the price.
@@ -51,8 +51,8 @@ A route is a shortest path on a road graph, and an ETA is the same path priced a
 | bidirectional Dijkstra | 1,205,660 microseconds *(survey)* |
 | contraction hierarchy query | 280 vertices scanned, 110 microseconds, distance only *(survey, Table 1; the Table 2 variant with paths is 0.21 ms)* |
 | partition overlay (CRP) | 1.81 ms for a path; a new cost function applied in about 370 ms on a 12-core server *(survey, Table 2 and text)* |
-| peak request rate, one region | 50,000 route requests per second *(assumed)* |
-| navigating drivers in the region | 1,000,000, one GPS ping per 5 seconds, 100 bytes each *(assumed)* |
+| peak request rate over that whole network | 50,000 route requests per second *(assumed)* |
+| navigating drivers on that network | 1,000,000, one GPS ping per 5 seconds, 100 bytes each *(assumed)* |
 | history | a week in 15-minute buckets, one byte of quantised speed per bucket *(assumed)* |
 
 | Result | Arithmetic | Value |
@@ -186,7 +186,7 @@ def bidirectional(adj, radj, s, t):
 
 **What the checks do.** Every algorithm is compared with Floyd-Warshall on 600 random directed graphs of up to 13 vertices, **all** pairs, with tiny weight ranges so zero-weight arcs, parallel arcs, ties and unreachable pairs are common; each returned path must exist arc by arc and add up to the reported distance. Then they are compared with a separate O(n²) array Dijkstra on graphs of 100 to 220 vertices, because a bug can hide in a 13-vertex graph. A fixed graph (`trap`) has a first meeting that is not shortest: stopping there returns 20 instead of 4.
 
-**A* needs a feasible bound.** On a 14 by 14 grid the Manhattan distance times the cheapest step is exact; the same bound multiplied by 3 is wrong on more than ten of 150 random queries, with no warning.
+**A* needs a feasible bound.** On a 14 by 14 grid the Manhattan distance times the cheapest step gives exact answers; the same bound multiplied by 3 is wrong on more than ten of 150 random queries, with no warning.
 
 **Measured here (illustrative; a toy graph, not a road network).** On a 40 by 40 road-like grid (1,600 vertices, 6,240 arcs; local streets cost 8 to 12, every fifth row and column is a fast road costing 2 or 3), averaged over 100 random pairs, the searches settle:
 
@@ -322,15 +322,16 @@ class CH:
 - **Correct for any order.** The order changes the number of shortcuts and the query speed, never the answer. The checks build the hierarchy with a *random* order as well as the edge-difference order (shortcuts added minus arcs removed), and then run two broken copies (a witness search allowed to pass through `v`, and a query that stops at the first meeting) to prove the comparison with Floyd-Warshall catches them; both are caught within the first five random graphs.
 - **A bounded witness search is safe.** It settles at most 60 vertices; giving up finds no witness, so a possibly unnecessary shortcut is added. Missing a witness costs space; wrongly finding one loses a shortcut and breaks answers.
 
-**Where it works and where it does not (measured).** On the 40 by 40 road-like grid above, contraction adds 3,852 shortcuts over the 6,240 original arcs and the query settles 71.8 vertices against 888.3 for Dijkstra. On a 14 by 14 grid of nearly uniform streets (weights 3 to 7, no fast roads) there is no hierarchy to exploit: 830 shortcuts over 728 arcs and 39.5 vertices settled per query against 39.8 for A* and 104.1 for Dijkstra. The idea pays only where long trips funnel onto few roads, which real road networks do. The survey adds that finding the best contraction order is NP-hard, so orders are heuristic, and it notes the common belief that turn penalties cost little turned out to be wrong for CH (its Table 2 row with the compact turn representation scans 1,998 vertices in 2.27 ms against 280 vertices and 0.11 ms without turns).
+**Where it works and where it does not (measured).** On the 40 by 40 road-like grid above, contraction adds 3,852 shortcuts over the 6,240 original arcs and the query settles 71.8 vertices against 888.3 for Dijkstra. On a 14 by 14 grid of nearly uniform streets (weights 3 to 7, no fast roads) there is no hierarchy to exploit: 830 shortcuts over 728 arcs and 39.5 vertices settled per query against 39.8 for A* and 104.1 for Dijkstra. The idea pays only where long trips funnel onto few roads, which real road networks do. The survey adds that finding the best contraction order is NP-hard, so orders are heuristic, and it notes the common belief that turn penalties cost little turned out to be wrong for CH (its Table 2 row with the compact turn representation scans 1,998 vertices in 2.27 ms against 280 vertices and 0.11 ms without turns; the arc-based representation scans 404 vertices in 0.20 ms but needs 3.14 GiB, so the cost can fall on space instead of time).
 
-**Traffic changes the weights; the survey lists four responses.**
+**Traffic changes the weights.** The survey treats rerunning the preprocessing as the obvious answer, then lists four other approaches.
 
 | Response | What it does | Cost |
 |---|---|---|
-| rebuild | rerun the preprocessing | exact, but minutes: too slow to follow traffic |
+| rebuild (the obvious answer, not one of the four) | rerun the preprocessing | exact, but minutes: too slow to follow traffic |
 | repair | track which shortcuts depended on the changed arcs and redo only those | works best when the changed arcs are unimportant ones; the survey reports mixed success |
 | adapt the query | keep the old preprocessing and let the search route around shortcuts that are now wrong | fine when queries are rare relative to updates; ALT-style bounds stay valid when weights only increase |
+| completely metric-independent preprocessing | no weights in the preprocessing, so costs are set at query time | queries become significantly slower |
 | split preprocessing | topology-only work once, a cheap metric-dependent step per update | for a partition overlay, about 370 ms to apply a new cost function; 36 ms with GPUs |
 
 That last row is why a design can honestly say: "contraction hierarchy for static or slowly changing weights, a metric-independent overlay or customizable hierarchy when weights change often". In section 3 the overlay costs 90.5 cores against 10.5 for the hierarchy at the same request rate, and buys fresh traffic. **Do not say which of these a given company runs unless a source says so**: the survey states that companies tend to be secretive and names only a few (OSRM uses a hierarchy for its queries; Bing Maps uses the overlay method), and this lesson read nothing from Google about its routing algorithm.
@@ -424,7 +425,7 @@ def estimate_speed(samples, now, hist, half_life, prior):
 
 ## 9. What Real Companies Did
 
-- **The research survey** (Bast et al., arXiv 1504.05140, 20 April 2015, read 2026-11-27 as extracted text): the source for every search figure in this lesson. Its concluding section says companies tend to be secretive about the algorithms they use, then lists a few known ones: TomTom (a variant of arc flags with shortcuts for time-dependent queries), Bing Maps (the partition overlay), OSRM (contraction hierarchies for queries), and Transfer Patterns for public-transit journey planning on Google Maps since 2010.
+- **The research survey** (Bast et al., arXiv 1504.05140, 20 April 2015, read 2026-11-27 as extracted text): the source for every search figure in this lesson. Its concluding section says companies tend to be secretive about their algorithms and names a few: TomTom, Bing Maps (the partition overlay), OSRM (contraction hierarchies) and, for public transit on Google Maps, Transfer Patterns since 2010.
 - **Google Maps, traffic and route choice** (Google blog, 3 September 2020; DeepMind blog, 3 September 2020; both read 2026-11-27): live traffic comes from aggregated location data of people navigating; historical patterns are combined with live conditions by machine learning; DeepMind's work used graph neural networks over "Supersegments" (adjacent road segments sharing significant traffic) and reports ETA accuracy gains of up to 50% in some cities; the blog lists predicted traffic, road quality, directness of the road, authoritative data from local governments and incident reports among the inputs to route choice. During the pandemic the models weighted the last two to four weeks of history more heavily. **Neither post describes the shortest-path algorithm**, so this lesson does not attribute one to Google.
 - **Uber** (engineering blog, 10 February 2022, read 2026-11-27): the hybrid of a routing-engine ETA and a learned residual described in section 7; a gateway service (uRoute) calls the routing engine and then the prediction service.
 
@@ -450,7 +451,7 @@ def estimate_speed(samples, now, hist, half_life, prior):
 1. Why can bidirectional Dijkstra not stop when the two searches first reach a common vertex? Build a four-line counterexample.
 2. A* is run with `h(u) = 3 x (Manhattan distance x cheapest step)`. Is the first answer wrong, and why does it give no error?
 3. In a contraction hierarchy, you contract `v` with neighbours `u` and `w`, and a path `u -> x -> w` has the same length as `u -> v -> w`. Do you add the shortcut? What breaks if you add it, and what breaks if you skip it when the witness actually passes through `v`?
-4. Traffic changes a few thousand edge weights a minute. List the four responses and pick one for a design that has 50,000 requests per second, with the cores from section 3.
+4. Traffic changes a few thousand edge weights a minute. List the obvious answer and the survey's four other approaches, and pick one for a design that has 50,000 requests per second, with the cores from section 3.
 5. Show with the section 3 numbers why 200,000 pings per second still leaves most edges with no live sample in a minute.
 6. A segment is 10 km, history is 20 m/s, live is 2 m/s and the live reading fades over an hour. Why can leaving 100 seconds later arrive earlier, and what two changes fix it?
 7. How does `estimate_speed` behave with no samples, with thirty fresh samples, and with day-old samples?

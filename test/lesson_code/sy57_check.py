@@ -22,6 +22,13 @@ def need(*phrases):
         assert p in src, 'lesson text is missing the checked figure: %r' % p
 
 
+def forbid_claims(subject, verbs):
+    """no un-negated sentence may have the company as subject with one of the claim verbs (an allow-by-negation rule)"""
+    for sentence in re.split(r"(?<=[.!?])\s+|\n", src.split('## Further reading')[0]):
+        if re.search(subject, sentence) and re.search(verbs, sentence) and not re.search(r"\b(not|no|nor|never|without|neither|none)\b|n't", sentence, re.I):
+            raise AssertionError('unsourced claim about a company: %r' % sentence[:160])
+
+
 def forbid(*phrases):
     for p in phrases:
         assert p not in src, 'lesson text still contains stale wording: %r' % p
@@ -335,6 +342,7 @@ UNIFORM = ('%.1f' % (sd / 200), '%.1f' % (sa / 200), '%.1f' % (sc / 200), uch.n_
 need('%.1f' % SEARCH_FIGS[0], '%.1f' % SEARCH_FIGS[1], '%.1f' % SEARCH_FIGS[2], '{:,}'.format(SEARCH_FIGS[3]), '{:,}'.format(SEARCH_FIGS[4]),
      '%d shortcuts over %d arcs' % (UNIFORM[3], UNIFORM[4]), UNIFORM[0], UNIFORM[1], UNIFORM[2],
      'returns %d instead of 4' % TRAP_FIRST, 'within the first five random graphs', 'about 4.5 m/s', 'to 15.75', 'arrives at 4,100', '1,648 s', 'across 145 departures',
-     'leaving now arrives at 5,000 s', '600 random directed graphs', '400 random small graphs', '500 random sample sets')
-forbid('about 4.9 m/s', 'returns 12', 'Google uses contraction hierarchies')
+     'leaving now arrives at 5,000 s', 'arc-based representation scans 404', 'The survey treats rerunning the preprocessing as the obvious answer', 'completely metric-independent preprocessing', 'queries become significantly slower', '600 random directed graphs', '400 random small graphs', '500 random sample sets')
+forbid('about 4.9 m/s', 'returns 12')
+forbid_claims(r'Google', r'\b(uses|use|runs|routes with|implements)\b')
 print('sy57 code checks passed')

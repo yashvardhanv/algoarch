@@ -46,7 +46,7 @@ def sy57(src):
     assert round(100 * crp_custom_ms / 1000 / 60, 2) == 0.62      # refresh once a minute: share of one 12-core server
     need(src, '9,326,696', '2,195,080', '110 microseconds', '19,955 times', '50,000 route requests per second',
          '109,754 cores', '10.5 cores', '90.5 cores', '200,000 pings per second', '12,000,000', '28.2%', '28.6 GB', '86 MB',
-         '333 times', '370 ms', '0.38 GiB')
+         '333 times', '370 ms', '0.38 GiB', '60,283', '0.62%', 'about nine times', '3.14 GiB')
     forbid(src, 'Google uses contraction hierarchies', 'Google Maps uses contraction')
     return 'sy57'
 
