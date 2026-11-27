@@ -14,11 +14,11 @@ DNS is the largest cache hierarchy most engineers use without designing, and "ho
 
 > **DNS scales because answers are cached with a lifetime chosen by the owner of the data, not by the reader. Load on the authoritative servers is set by how many caches there are and how long they hold an answer; the time to move traffic is set by the same number.**
 
-- **A resolver asks upstream once per cycle:** a cache hit lasts the TTL; the next miss comes whenever the next client happens to ask. For one name at one resolver that gives `rate = q / (1 + q·TTL)` upstream queries per second for a client rate of `q` (section 4).
+- **A resolver asks upstream once per cycle:** a cache hit lasts the TTL; the next miss comes whenever the next client happens to ask. For one name at one resolver that gives `rate = q / (1 + q·TTL)` upstream queries per second for a client rate of `q` (section 5).
 - **The same TTL is your failover time.** Anyone who cached the old answer keeps using it until it expires. Lowering the TTL is not free, because it multiplies authoritative load (section 3).
-- **Caching helps the head of the distribution, not the tail.** Names asked for rarely expire before they are asked for again.
+- **Caching helps the head of the distribution most; the tail still mostly misses.** A name asked for less than once per TTL on average usually expires before it is asked again; a longer TTL helps such names most in relative terms and still leaves most of their queries as misses (section 3).
 - **Negative answers are cached too,** with a lifetime taken from the zone's SOA record, so a typo storm or a missing record is also a cache question.
-- **Resolvers can answer from expired data when upstream is down.** That turns an authoritative outage into a degradation (section 6), at the price of serving old addresses.
+- **Resolvers can answer from expired data when upstream is down.** That turns an authoritative outage into a degradation (section 7), at the price of serving old addresses.
 
 *Visual (planned): a row of resolvers each holding one name with a countdown bar, a record change at a chosen instant, and a histogram of how long each one keeps handing out the old address. Not built yet.*
 
@@ -30,10 +30,10 @@ DNS is the largest cache hierarchy most engineers use without designing, and "ho
 |---|---|
 | "fail over to another region", "move traffic in seconds" | the TTL on the record, and the arithmetic in section 3; DNS alone gives a bound, not a guarantee |
 | "our authoritative servers are overloaded" | too many caches missing: raise TTLs on the heads, check negative caching, look for zero-TTL records |
-| "a popular name expires and everything stampedes" | merge simultaneous misses into one upstream query (section 5) |
+| "a popular name expires and everything stampedes" | merge simultaneous misses into one upstream query (section 6) |
 | "what if the DNS provider is down" | serve-stale at the resolver; for your own clients, a second provider and sensible TTLs |
-| "why is a lookup slow or failing for big answers" | the 512-byte UDP limit, the truncation bit and the TCP retry (section 7) |
-| "do we cache NXDOMAIN?" | yes, for `min(SOA minimum, SOA TTL)` of the zone (section 4) |
+| "why is a lookup slow or failing for big answers" | the 512-byte UDP limit, the truncation bit and the TCP retry (section 8) |
+| "do we cache NXDOMAIN?" | yes, for `min(SOA minimum, SOA TTL)` of the zone (section 5) |
 
 ---
 
@@ -61,18 +61,39 @@ DNS is the largest cache hierarchy most engineers use without designing, and "ho
 | upstream queries from that resolver | sum over names of q / (1 + q·60) | 3,564 per second out of 20,000 |
 | hit ratio | 1 − 3,564 / 20,000 | 82.2% |
 | entries alive at any moment | sum over names of q·60 / (1 + q·60) | 213,814 entries, 21 MB at 100 bytes each |
-| names that expire before they are asked again | names with q·60 < 1 | 916,625 of 1,000,000, carrying 17.3% of the queries |
+| names asked less than once per TTL on average | names with q·60 < 1 | 916,625 of 1,000,000, carrying 17.3% of the queries |
 | one very hot name, q = 1,000 per second | 1,000 / (1 + 1,000·60) | one upstream query per 60 seconds, hit ratio 99.998% |
-| one tail name, q = 0.001 per second | 0.001 / (1 + 0.06) | hit ratio 5.7% |
+| one tail name, q = 0.001 per second | 0.001·60 / (1 + 0.001·60) | hit ratio 5.7% |
+| the same tail name at TTL 600 | 0.001·600 / (1 + 0.001·600) | hit ratio 37.5%, 6.6 times the TTL-60 figure |
+| the whole resolver at TTL 600 | the sums above with 600 in place of 60 | 1,095 upstream queries per second, hit ratio 94.5%, 657,150 entries alive (66 MB) |
 | authoritative load for one popular name, TTL 5 / 60 / 300 s | 100,000 · 2 / (1 + 2·TTL) | 18,182 / 1,653 / 333 per second |
 | the ceiling for that load | resolvers / TTL | 20,000 / 1,667 / 333 per second |
 | mean time resolvers keep serving the old address after a change | (TTL / 2) · q·TTL / (1 + q·TTL) | 2.3 / 29.8 / 149.8 seconds |
 
-Four conclusions. **The tail sets your miss rate.** 916,625 names are cheap to hold and almost never hit, and they carry 17.3% of the traffic: the overall hit ratio of 82.2% is the head's near-perfect hits diluted by those misses. Raising the TTL helps the head only a little (it is already above 99%) and the tail not at all. **A 12x TTL cut is an 11x authoritative bill.** At 5 seconds against 60 the popular name costs 18,182 queries per second instead of 1,653, and it approaches the `resolvers / TTL` ceiling from below. **A change takes up to one TTL to be seen everywhere, and about half of it on average,** in this model (resolvers that do not hold the name at the moment of the change contribute zero). **The memory is not the problem:** 21 MB for a million names. The cost is the miss traffic, which is why this lesson counts queries, not bytes.
+Four conclusions. **The tail sets your miss rate.** 916,625 names are cheap to hold and almost never hit, and they carry 17.3% of the traffic: the overall hit ratio of 82.2% is the head's near-perfect hits diluted by those misses. A longer TTL changes the head little (it is already above 99%) and helps the tail most in relative terms, because a tail name's hit ratio is about `q·TTL`, linear in the TTL: the tail name above goes from 5.7% to 37.5% at TTL 600, and the whole resolver from 82.2% to 94.5%. But a tail name still misses most of its queries at either TTL, and the price is a ten times longer bound on how fast a change is seen, so the TTL is a trade with failover time, not a way to rescue the tail. **A 12x TTL cut is an 11x authoritative bill.** At 5 seconds against 60 the popular name costs 18,182 queries per second instead of 1,653, and it approaches the `resolvers / TTL` ceiling from below. **A change takes up to one TTL to be seen everywhere, and about half of it on average,** in this model (resolvers that do not hold the name at the moment of the change contribute zero). **The memory is not the problem:** 21 MB for a million names. The cost is the miss traffic, which is why this lesson counts queries, not bytes.
 
 ---
 
-## 4. The Model: A Caching Resolver
+## 4. API and Data Model
+
+This is the lesson's own design, not any product's, and it matches the model below.
+
+```
+resolve(name, now) -> (rcode, address, ttl, source)     source: cache | upstream | stale | failure   Resolver.resolve
+Zone.query(name, now) -> (rcode, address, ttl)           rcode: OK | NXDOMAIN | FAIL                  the authoritative side
+wire (UDP)  header 12 B | question: name, type, class | answers: pointer to the name, type, class, TTL, length, address
+            a response over 512 bytes is truncated with the TC bit set and the client retries over TCP (section 8)
+
+zone record   {name -> (address, ttl)}   plus the SOA numbers: minimum and ttl
+cache entry   {name -> (rcode, address, expires_at)}
+failure memo  {name -> time of the last failed upstream attempt}     per name, the lesson's choice
+```
+
+A negative answer is a cache entry with rcode `NXDOMAIN` and an expiry from the SOA. Sizes are the 100-byte entry assumed in section 3; no other size is claimed.
+
+---
+
+## 5. The Model: A Caching Resolver
 
 ```python
 class Zone:
@@ -126,11 +147,11 @@ class Resolver:
 
 What each piece comes from, and what is the lesson's own choice:
 
-- **A positive answer is cached for its TTL.** RFC 2181 defines the TTL as an unsigned number between 0 and 2,147,483,647 (2^31 - 1) and requires the TTLs of all records in a set of records of one name and type to be the same, deprecating differing TTLs because they can cause partial replies from a cache. A TTL of 0 is therefore a record nobody may reuse: every client query becomes an upstream query. That is a classic accident on the authoritative side (a zero TTL left on a busy name).
+- **A positive answer is cached for its TTL.** RFC 2181 defines the TTL as an unsigned number between 0 and 2,147,483,647 (2^31 - 1), and RFC 8767 updates it: a value with the high-order bit set is treated as positive and then clamped, not as 0, with a suggested cap of 7 days (next bullet). RFC 2181 also requires the TTLs of all records in a set of records of one name and type to be the same, deprecating differing TTLs because they can cause partial replies from a cache. A TTL of 0 is therefore a record nobody may reuse: every client query becomes an upstream query. That is a classic accident on the authoritative side (a zero TTL left on a busy name).
 - **`max_ttl` is a clamp.** RFC 8767 describes a maximum cache TTL in many resolvers as a clamp on the TTL values received and notes that its own definition recommends 7 days, "rather than the 68 years allowed" by the full 31 bits. The default here follows that.
 - **A negative answer is cached for `min(SOA minimum, SOA TTL)`.** RFC 2308, section 5 says the authoritative server puts the zone's SOA record in the authority section, taking its TTL from the lesser of the SOA minimum field and the SOA record's own TTL, and caches count that down like any other answer.
 - **Serve-stale follows RFC 8767 in shape:** answers served from expired data carry a TTL greater than 0 (the RFC recommends 30 seconds, and explains that 0 has been problematic and very short TTLs invite a refresh storm); refresh attempts against a failing server are recommended no more often than every 30 seconds (the failure recheck timer); and a maximum stale timer caps how long data is kept past expiry, with a suggested value between 1 and 3 days. The default `max_stale` here is one day.
-- **Lesson's own choices, not RFC text:** serving stale only for positive answers (negative answers fall through to a failure); the exact boundary convention at the TTL instant; the model's failure recheck being keyed per name; and all the times above being exact instead of "around 10 to 30 seconds" timers. The RFC's client response timer and query resolution timer are not modelled.
+- **Lesson's own choices, not RFC text:** serving stale only for positive answers (negative answers fall through to a failure); the exact boundary convention at the TTL instant; the model's failure recheck being keyed per name; and all the times above being exact values. The RFC's client response timer and query resolution timer are not modelled.
 
 **The rate formula, derived.** After a miss the answer is held for `TTL`; the next query then arrives on average `1 / q` later (Poisson arrivals, rate `q`). One cycle is `TTL + 1/q` long and contains one upstream query, so the upstream rate is `1 / (TTL + 1/q) = q / (1 + q·TTL)`, and the share of time the name is held is `q·TTL / (1 + q·TTL)`.
 
@@ -152,7 +173,7 @@ The check simulates Poisson arrivals through the real `Resolver` for five (rate,
 
 ---
 
-## 5. Deep Dive 1: The Stampede on Expiry
+## 6. Deep Dive 1: The Stampede on Expiry
 
 A popular name expires. In the next round trip every client that asks finds the cache empty, and a resolver that sends one upstream query per client sends a burst proportional to the traffic. The remedy is to merge identical in-flight queries.
 
@@ -171,11 +192,11 @@ def burst(arrival_times, rtt, coalesce):
     return sent
 ```
 
-With 500 clients asking at the same instant and a 200 ms round trip, the unmerged resolver sends 500 queries and the merging one sends 1; a client arriving exactly when the answer lands is a cache hit, not a new query. The check pins each case against an independent count. In the Zipf model of section 3, the head names are where this matters: the busiest name sees 1,390 queries per second, so at a 200 ms upstream round trip, about 278 clients ask during one refresh. The merge removes 277 of them. **What the model leaves out:** the time a merged client waits is the upstream round trip, and if that query fails or times out all merged clients fail together (a thundering herd of retries on the client side is real; its size is not modelled).
+With 500 clients asking at the same instant and a 200 ms round trip, the unmerged resolver sends 500 queries and the merging one sends 1; a client arriving exactly when the answer lands is a cache hit, not a new query. The check pins each case against an independent count. In the Zipf model of section 3, the head names are where this matters: the busiest name sees 1,390 queries per second, so at a 200 ms upstream round trip, about 278 further clients ask during the 200 ms after the first miss. The first miss sends one query; unmerged, the others add about 278 more (279 in all, the expected number of Poisson arrivals in 200 ms), and the merge removes those 278. **What the model leaves out:** the time a merged client waits is the upstream round trip, and if that query fails or times out all merged clients fail together (a thundering herd of retries on the client side is real; its size is not modelled).
 
 ---
 
-## 6. Deep Dive 2: When the Authoritative Side Is Down
+## 7. Deep Dive 2: When the Authoritative Side Is Down
 
 Three behaviours, all checked by exact scenarios:
 
@@ -189,7 +210,7 @@ The failure recheck is what stops a resolver's own retries from becoming the loa
 
 ---
 
-## 7. Deep Dive 3: The 512-Byte Limit and the TCP Fallback
+## 8. Deep Dive 3: The 512-Byte Limit and the TCP Fallback
 
 RFC 1035 restricts DNS messages over UDP to 512 bytes (not counting IP or UDP headers); a longer message is truncated and the TC bit is set so the client retries over TCP. RFC 9210 (2022) says all resolvers and servers must support and service both UDP and TCP, and that servers must support TCP so clients can reliably receive responses too large for UDP; the older text making TCP optional is replaced.
 
@@ -224,14 +245,14 @@ Two consequences worth saying aloud. **Hundreds of addresses on one name do not 
 
 ---
 
-## 8. Failure Modes
+## 9. Failure Modes
 
 | Failure | What goes wrong | What the model or RFCs say |
 |---|---|---|
 | record with TTL 0 | no cache can reuse it; every client query reaches the zone | modelled: six queries, six upstream |
 | authoritative outage | caches expire inside one TTL and the name fails | modelled: `SERVFAIL` at the expiry instant without serve-stale |
 | outage with serve-stale | stale addresses are served until `max_stale` | modelled; the cost is wrong addresses after a move |
-| expiry of a hot name | a burst of identical upstream queries | merge identical in-flight queries (section 5) |
+| expiry of a hot name | a burst of identical upstream queries | merge identical in-flight queries (section 6) |
 | mistyped or deleted name | every client asks, each answer is a negative one | cached for `min(SOA minimum, SOA TTL)` |
 | record changed, old address removed too early | resolvers keep handing out the old address for up to the TTL | modelled: mean about half a TTL, maximum one TTL |
 | answer too large for UDP | truncated; clients retry over TCP | RFC 1035 and RFC 9210 |
@@ -239,13 +260,13 @@ Two consequences worth saying aloud. **Hundreds of addresses on one name do not 
 
 ---
 
-## 9. What Real Systems Did
+## 10. What Real Systems Did
 
 No engineering post or paper from any DNS operator or large resolver was read for this lesson. What it relies on is the standards text above (RFC 1035, 2181, 2308, 8767 and 9210), plus the model. Two caveats it states rather than hides: **real clients and intermediate caches do not all follow the TTL** (this lesson reads the standards, not measured behaviour, so it does not claim how often TTLs are ignored or clamped); and **serve-stale as specified is a recommendation to resolver operators,** so what any given public resolver does is not asserted here.
 
 ---
 
-## 10. Pitfalls Checklist
+## 11. Pitfalls Checklist
 
 1. **Treating DNS failover as instant.** The bound is the TTL; the mean, in the model, is about half of it, and an outage with serve-stale can extend it.
 2. **Cutting the TTL without recounting authoritative load.** 5 seconds instead of 60 is about 11x the load, bounded by `resolvers / TTL`.

@@ -29,15 +29,20 @@ assert all(auth[t] < ceil[t] for t in auth)                      # the load neve
 assert round(auth[5] / auth[60], 1) == 11.0                       # a 12x TTL cut is an 11x bill
 stale = {t: t / 2 * 2 * t / (1 + 2 * t) for t in (5, 60, 300)}
 assert [round(stale[t], 1) for t in (5, 60, 300)] == [2.3, 29.8, 149.8]
-assert round(rates[0] * 0.2) == 278                               # clients asking during one 200 ms refresh of the hottest name
+up600 = sum(q / (1 + q * 600) for q in rates)
+live600 = sum(q * 600 / (1 + q * 600) for q in rates)
+assert round(up600) == 1095 and round(100 * (1 - up600 / TOTAL), 1) == 94.5 and round(live600) == 657150 and round(live600 * 100 / 1e6) == 66
+tail_hit60, tail_hit600 = 0.06 / 1.06, 0.6 / 1.6
+assert round(100 * tail_hit600, 1) == 37.5 and round(tail_hit600 / tail_hit60, 1) == 6.6     # a longer TTL does help the tail, in relative terms
+assert round(rates[0] * 0.2) == 278 and 1 + 278 == 279                               # clients asking during one 200 ms refresh of the hottest name
 
 # the numbers are in the lesson, spelled the way the lesson spells them
 for must in ('1,390 per second', '3,564 per second out of 20,000', '82.2%', '213,814 entries, 21 MB', '916,625 of 1,000,000',
              '17.3% of the queries', '99.998%', '5.7%', '18,182 / 1,653 / 333', '20,000 / 1,667 / 333', '2.3 / 29.8 / 149.8',
-             'about 278 clients', 'removes 277', '**29** address records', 'costs **20** upstream attempts', 'an 11x authoritative bill'):
+             'about 278 further clients', 'the merge removes those 278', '37.5%', '6.6 times the TTL-60 figure', '1,095 upstream queries per second, hit ratio 94.5%', '657,150 entries alive (66 MB)', 'RFC 8767 updates it', '**29** address records', 'costs **20** upstream attempts', 'an 11x authoritative bill'):
     assert must in text, must
 # stale wording that must not come back
-for must_not in ('12x authoritative', 'a 12x increase', 'five queries, five upstream', 'guarantees clients obey'):
+for must_not in ('12x authoritative', 'a 12x increase', 'five queries, five upstream', 'guarantees clients obey', 'the tail not at all', 'removes 277', 'expire before they are asked again', '0.001 / (1 + 0.06)', 'around 10 to 30 seconds'):
     assert must_not not in text, must_not
 # no claim about a named operator's behaviour
 for op in ('Cloudflare', 'Route 53', 'Route53', 'Google Public DNS', 'Akamai', 'Verisign', 'Quad9', 'OpenDNS'):

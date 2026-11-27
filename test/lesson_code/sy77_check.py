@@ -76,10 +76,28 @@ r.resolve('a.example', 0)
 assert r.resolve('a.example', 100) == ('OK', '192.0.2.1', 30, 'stale')
 assert r.resolve('a.example', 259)[3] == 'stale'                        # 60 + 200 = 260 is the last second boundary
 assert r.resolve('a.example', 260)[0] == 'SERVFAIL'
+# serve-stale INSIDE the failure-recheck window: the attempt at 100 failed, so 101 and 129 must not query upstream, and must still be stale
+z, r = fresh(outages=[(100, 400)], serve_stale=True, max_stale=200)
+r.resolve('a.example', 0)
+assert r.resolve('a.example', 100)[3] == 'stale' and z.queries == 2
+assert r.resolve('a.example', 101) == ('OK', '192.0.2.1', 30, 'stale') and z.queries == 2     # inside the recheck window: stale, no new attempt
+assert r.resolve('a.example', 129)[3] == 'stale' and z.queries == 2
+assert r.resolve('a.example', 130)[3] == 'stale' and z.queries == 3                           # the recheck is due: one attempt, still stale
+# once max_stale has passed, a query inside the recheck window is a failure, not stale
+assert r.resolve('a.example', 259)[3] == 'stale'
+assert r.resolve('a.example', 260)[0] == 'SERVFAIL'
 # negative answers are not served stale (the lesson's simplification)
 z, r = fresh(outages=[(1000, 2000)], serve_stale=True)
 r.resolve('nope.example', 0)
 assert r.resolve('nope.example', 1000)[0] == 'SERVFAIL'
+# the recheck is per name: a failure of one name does not suppress the first attempt for another
+z, r = fresh(outages=[(0, 600)])
+r.resolve('a.example', 0)
+assert z.queries == 1
+r.resolve('big.example', 1)
+assert z.queries == 2                                                    # a different name is still tried at once
+r.resolve('a.example', 2)
+assert z.queries == 2                                                    # the first name is still inside its own window
 # failure recheck: a name queried every second during a 600 s outage costs 20 upstream attempts, not 600
 z, r = fresh(outages=[(0, 600)])
 for t in range(600):
