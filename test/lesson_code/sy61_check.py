@@ -168,12 +168,42 @@ f.select('A')
 for q in range(70000):
     f.forward('A', q % M16, q, q == 0)
 assert len(f.sent) <= f.WINDOW and f.lookup(69999 % M16) == ('A', 69999 % M16) and f.lookup((69999 - 2000) % M16) is None
-# a source whose sequence numbers jump (a restarted sender) does not break the receiver
+# a switch between sources whose numbers are unrelated does not disturb the receiver
 f = Forwarder(0)
 f.select('A')
 assert f.forward('A', 60000, 0, True) == (0, 0) and f.forward('A', 60001, 1, False) == (1, 1)
 f.select('B')
 assert f.forward('B', 3, 5, True) == (2, 5) and f.forward('B', 4, 6, False) == (3, 6)
+# a real restart inside one source: numbers jump, with a keyframe it starts a new run straight after the last number
+f = Forwarder(0)
+f.select('A')
+assert [f.forward('A', q, q, q == 100) for q in (100, 101, 102)] == [(0, 100), (1, 101), (2, 102)]
+assert f.forward('A', 40000, 7, True) == (3, 7) and f.forward('A', 40001, 8, False) == (4, 8)
+assert f.lookup(3) == ('A', 40000)
+g = Forwarder(0)
+g.select('A')
+assert g.forward('A', 100, 0, True) == (0, 0) and g.forward('A', 102, 0, False) == (2, 0)
+assert g.forward('A', 10000, 0, False) is None                                          # a jump of 9,898 without a keyframe waits
+assert g.forward('A', 3101, 0, False) == (3001, 0)                                      # a gap of 2,999 is still just loss
+assert g.forward('A', 6101, 0, False) is None                                           # 3,000 is the first jump
+assert f.forward('A', 5000, 1, False) is None and f.forward('A', 5001, 2, True) == (5, 2)
+assert f.forward('A', 5001 - 50, 3, False) is None      # a restart to a number just below the keyframe is indistinguishable from a straggler: dropped      # a jump without a keyframe waits for one
+# restart across the 16-bit wrap is just an ordinary gap-free run
+f = Forwarder(65530)
+f.select('A')
+assert f.forward('A', 65530, 0, True) == (65530, 0) and f.forward('A', 3, 1, False) == (65539 % M16, 1)
+# a reordered packet of the new source that arrives after the switch keyframe, from before it, must not reuse an output number
+f = Forwarder(0)
+f.select('A')
+for q in range(1, 11):
+    assert f.forward('A', q, q, q == 1) == (q - 1, q)
+f.select('B')
+assert f.forward('B', 1000, 1, True) == (10, 1)
+assert f.forward('B', 999, 0, False) is None and f.lookup(9) == ('A', 10)                       # A's packet 9 is still A's
+assert f.forward('B', 1001, 2, False) == (11, 2) and f.forward('B', 65535, 3, False) is None   # across the wrap: also older
+f = Forwarder(0)
+f.select('B')
+assert f.forward('B', 2, 0, True) == (0, 0) and f.forward('B', 65535, 0, False) is None and f.forward('B', 3, 0, False) == (1, 0)
 
 # ---- 4. NACK packing (RFC 4585 section 6.2.1): PID + 16-bit mask ---------------------------------------------------------------
 assert nack_fcis([]) == [] and nack_fcis([100]) == [(100, 0)]
@@ -229,7 +259,18 @@ assert pick == [2, 1, 1, 1, 1, 1, 1, 1, 1] and val == 14, (val, pick)           
 assert sum(LAYERS[c][0] for c in pick) == 1700
 val, pick = allocate(1500, tiles)
 assert val == 12 and pick[0] == 2 and pick.count(0) == 2 and sum(LAYERS[c][0] for c in pick) == 1400    # two thumbnails switched off
-assert allocate(2000, tiles)[0] == 14 and allocate(2500, tiles)[0] == 16             # at 2,000 two different plans tie at 14
+assert allocate(2000, tiles)[0] == 14 and allocate(2500, tiles)[0] == 16
+best_val, plans = -1, set()                                                            # exactly two plans tie at 2,000 kbps
+for ch in itertools.product(range(4), repeat=9):
+    cost = sum(LAYERS[c][0] for c in ch)
+    if cost <= 2000:
+        v = 3 * LAYERS[ch[0]][1] + sum(LAYERS[c][1] for c in ch[1:])
+        if v > best_val:
+            best_val, plans = v, set()
+        if v == best_val:
+            plans.add((ch[0], tuple(sorted(ch[1:])), cost))
+assert best_val == 14 and plans == {(2, (1,) * 8, 1700), (2, (0, 1, 1, 1, 1, 1, 1, 2), 1900)}, plans
+             # at 2,000 two different plans tie at 14
 # greedy by marginal value per kbps against the exact answer, over random calls (illustrative)
 worse, worst = 0, 0.0
 rr = random.Random(7)

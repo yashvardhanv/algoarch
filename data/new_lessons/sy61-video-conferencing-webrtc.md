@@ -32,7 +32,7 @@ A video call is many small flows, each useful for a few hundred milliseconds and
 | "everyone must see one composite picture", "dial in from a phone or room system" | a mixer (MCU): decode, compose, re-encode; costly, but one stream per receiver |
 | "users behind firewalls and NATs" | ICE with STUN, and a TURN relay as the last pair (section 6) |
 | "video freezes when someone joins or the speaker changes" | layer switches only at keyframes; request one (section 7) |
-| "one SFU is full" | place rooms across SFUs by region and load; cascading one room over SFUs is possible but is not covered by what was read here |
+| "one SFU is full" | place rooms across SFUs by region and load; RFC 7667 notes that selective forwarding middleboxes can be cascaded, but no design for it was read here |
 
 ---
 
@@ -150,14 +150,19 @@ M16 = 1 << 16
 class Forwarder:
     """One receiver's view of one forwarded stream. Forwards a single source at a time. A switch (or a resume after
     a pause) waits for a keyframe of the wanted source. Within a source the receiver sees the upstream sequence gaps
-    (so it can ask for the missing packets); at a switch the numbers continue straight on, with no gap. Timestamps pass through."""
+    (so it can ask for the missing packets); at a switch the numbers continue straight on, with no gap. A packet from just before (within 100 numbers of)
+    the keyframe the run started on is dropped (it would reuse a number already sent). A keyframe whose sequence number jumps
+    (a sender that restarted its numbering) starts a new run the same way; a jump without a keyframe waits for one. Timestamps pass through."""
     WINDOW = 1024
+    MAX_DROPOUT, MAX_MISORDER = 3000, 100      # the thresholds RFC 3550 appendix A.1 uses to judge a sequence number
 
     def __init__(self, first_out: int = 0):
         self.next_out = first_out % M16
         self.src = None            # the source currently forwarded
         self.want = None           # the source the receiver should get
-        self.offset = 0            # out = (source seq + offset) mod 2^16, valid for the current source
+        self.offset = 0            # out = (source seq + offset) mod 2^16, valid for the current run
+        self.anchor = 0            # source seq of the keyframe the current run started on
+        self.hi = 0                # highest source seq seen in the current run
         self.sent = {}             # out seq -> (source, source seq), the most recent WINDOW
 
     def select(self, src):
@@ -165,14 +170,27 @@ class Forwarder:
         if src is None:
             self.src = None        # paused: nothing flows until a keyframe of a wanted source arrives
 
+    def _start_run(self, src, seq):
+        self.src, self.anchor, self.hi = src, seq, seq
+        self.offset = (self.next_out - seq) % M16
+
     def forward(self, src, seq: int, ts: int, key: bool):
         if src == self.want and src != self.src:
             if not key:
                 return None        # cannot start in the middle of a picture
-            self.src = src
-            self.offset = (self.next_out - seq) % M16
+            self._start_run(src, seq)
+        elif src is not None and src == self.src:
+            delta = (seq - self.hi) % M16
+            if self.MAX_DROPOUT <= delta < M16 - self.MAX_MISORDER:      # neither next nor a little late: the numbering restarted
+                if not key:
+                    return None
+                self._start_run(src, seq)
         if src != self.src:
             return None
+        if (seq - self.anchor) % M16 >= M16 - self.MAX_MISORDER:
+            return None            # a straggler from just before the keyframe this run started on
+        if (seq - self.hi) % M16 < M16 // 2:
+            self.hi = seq
         out = (seq + self.offset) % M16
         if (out + 1 - self.next_out) % M16 < M16 // 2:     # a late packet must not move the counter backwards
             self.next_out = (out + 1) % M16
@@ -187,7 +205,7 @@ class Forwarder:
         return self.sent.get(out)
 ```
 
-The check does not trust a reference copy of this code: it generates 400 random sessions (three sources with start numbers near the 16-bit wrap, random selects and pauses, random upstream gaps, random keyframes) and verifies the **receiver-visible spec** on every pair of consecutive forwarded packets: within one source, the distance between output numbers equals the distance between upstream numbers; across a switch, it is exactly one; timestamps are untouched; the first packet takes the receiver's first number; and every recent output number maps back to its source packet. Hand cases pin that nothing flows before a keyframe, that the old source keeps flowing until the new keyframe arrives, that a late packet takes its own number without moving the counter, and that a restarted sender whose numbers jump does not affect the receiver.
+The check does not trust a reference copy of this code: it generates 400 random sessions (three sources with start numbers near the 16-bit wrap, random selects and pauses, random upstream gaps, random keyframes) and verifies the **receiver-visible spec** on every pair of consecutive forwarded packets: within one source, the distance between output numbers equals the distance between upstream numbers; across a switch, it is exactly one; timestamps are untouched; the first packet takes the receiver's first number; and every recent output number maps back to its source packet. Hand cases pin that nothing flows before a keyframe, that the old source keeps flowing until the new keyframe arrives, that a late packet takes its own number without moving the counter, that a restarted sender (a keyframe whose sequence number jumps, in the same source) starts a new run with no gap, that a jump without a keyframe is dropped, and that a packet of the new source older than the switch keyframe is dropped instead of reusing a number already sent. A restart normally brings a new SSRC, which this model would treat as a new source; the same-source case is covered because a sender may keep its SSRC. The limit, as in RFC 3550's own heuristic: a restart to a number within 100 below the last one looks like a late packet and is dropped until the numbers move on.
 
 **NACK.** Loss feedback is RFC 4585's Generic NACK: a packet id (PID) and a 16-bit mask for the 16 packets after it, so one entry reports up to **17 packets** (the sender must not infer that unmarked packets arrived). The packing is a covering problem on extended sequence numbers (the receiver already keeps 32 bits per RFC 3550), with the 16-bit reduction applied last so a run across the wrap packs into one entry:
 
@@ -287,7 +305,7 @@ Discord's failover design, as read: the signalling component constantly monitors
 
 | What breaks | What you see | Defence |
 |---|---|---|
-| SFU process crash | media stops for a few seconds | the signalling side restarts it and replays room state; clients reconnect |
+| SFU process crash | a brief interruption (Discord's post says a few dropped packets when its SFU process is restarted; a host failure takes longer, and no figure for it was read) | the signalling side restarts it and replays room state; clients reconnect |
 | SFU host lost or attacked | everyone in the rooms on it drops | remove from discovery, reassign rooms, push state (Discord's pattern) |
 | sequence copied across a switch | receivers request tens of thousands of "lost" packets | rewrite per receiver (section 7) |
 | layer flapping | repeated keyframes, frozen video | hysteresis on the allocator, a minimum time between changes |
