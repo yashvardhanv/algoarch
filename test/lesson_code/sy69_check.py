@@ -37,16 +37,16 @@ assert reconcile([]) == []
 
 
 # ---- 2. strict quorums: R + W > N always overlap; R + W <= N need not ---------------------------------------------------
-def acked_then_read(n, r, w, sloppy=False, down=(), heal_before_read=True, deliver=False):
+def acked_then_read(n, r, w, sloppy=False, down=(), heal_before_read=True, deliver=False, read_hints=False):
     """Every set of (w - 1) non-coordinator acks x every set of r responders. Returns (reads that missed the write, reads)."""
     nodes = ['n%d' % i for i in range(n + 2)]
-    probe = Dynamo(nodes, n, r, w, sloppy)
+    probe = Dynamo(nodes, n, r, w, sloppy, read_hints=read_hints)
     for x in down:
         probe.fail(probe.preference_list('k')[x])
     rest = [hd for hd, _ in probe.contacts('k')[1:]]
     missed = total = 0
     for acks in itertools.combinations(rest, w - 1):
-        d = Dynamo(nodes, n, r, w, sloppy)
+        d = Dynamo(nodes, n, r, w, sloppy, read_hints=read_hints)
         for x in down:
             d.fail(d.preference_list('k')[x])
         assert d.put('k', 'new', others=set(acks)) is not None
@@ -79,6 +79,14 @@ assert acked_then_read(3, 1, 3) == (0, 3) and acked_then_read(3, 1, 1) == (2, 3)
 assert acked_then_read(3, 2, 2, sloppy=False, down=(0,)) == (0, 3)
 # sloppy quorum, same failure, hints not yet delivered: the stand-in's copy is a hint and is not read
 assert acked_then_read(3, 2, 2, sloppy=True, down=(0,)) == (1, 6)
+# the miss when A is back is C's: C did not take the write and the stand-in is outside the read set, so reading hints changes nothing
+assert acked_then_read(3, 2, 2, sloppy=True, down=(0,), read_hints=True) == (1, 6)
+# read while A is STILL down: the read set {B, C, D} is drawn from the same three healthy nodes as the write set, and the
+# model's choice not to serve a hint from D is what produces the miss; serving hints removes it
+assert acked_then_read(3, 2, 2, sloppy=True, down=(0,), heal_before_read=False) == (1, 6)
+assert acked_then_read(3, 2, 2, sloppy=True, down=(0,), heal_before_read=False, read_hints=True) == (0, 6)
+# with a strict quorum nothing is parked anywhere, so reading while down is safe
+assert acked_then_read(3, 2, 2, sloppy=False, down=(0,), heal_before_read=False) == (0, 1)
 # once the stand-in hands the hint back, the same read sets all see the write
 assert acked_then_read(3, 2, 2, sloppy=True, down=(0,), deliver=True)[0] == 0
 # with W = N the stand-in counts toward W but is never a read replica: still stale
@@ -90,7 +98,12 @@ d.fail(home0)
 assert d.put('k', 'x') is not None
 assert [v for _, v in d.get('k')[0]] == ['x']                              # the two live home nodes answer first
 assert d.hints[d.contacts('k')[-1][0]] and d.data[home0] == {}              # the hint is parked, the home node has nothing yet
+standin = d.contacts('k')[-1][0]
+d.fail(standin)                                                              # a crashed stand-in cannot hand anything back
 d.heal(home0)
+d.deliver_hints()
+assert d.data[home0] == {} and d.hints[standin]
+d.heal(standin)
 d.deliver_hints()
 assert [v for _, v in d.data[home0]['k']] == ['x'] and all(not x for x in d.hints.values())
 

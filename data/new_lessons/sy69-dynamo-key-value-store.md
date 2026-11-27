@@ -28,7 +28,7 @@ A Dynamo-style store chooses to accept every write and sort out conflicts later.
 | "always writable, even during a partition", "shopping cart" | Dynamo-style: sloppy quorum, hinted handoff, siblings merged by the application |
 | "which replicas does a key live on" | the preference list from Caching Patterns and Consistent Hashing |
 | "how many replicas must answer" | N, R, W; (3,2,2) is the common setting the paper reports; R + W > N for overlap |
-| "a node is down for an hour, then returns" | hinted handoff first; a long outage is cheaper to repair from the replicas (section 3) |
+| "a node is down for an hour, then returns" | hinted handoff first; Merkle anti-entropy for whatever the hints miss (section 6) |
 | "replicas have drifted, how do you find out cheaply" | Merkle trees: compare roots, descend only where hashes differ |
 | "two clients write the same key at once" | version vectors detect it; the client merges (Time, Clocks and Ordering) |
 | "need strictly one winner, or a transaction across keys" | not this design: it offers no isolation and single-key updates only (paper) |
@@ -58,8 +58,9 @@ A Dynamo-style store chooses to accept every write and sort out conflicts later.
 | tail, W = 2 | 3 x 0.01^2 x 0.99 + 0.01^3 | 0.0298% |
 | tail, W = 1 | 0.01^3 | 0.0001% |
 | slow-replica rate that still meets a 99.9% target | solve for q | 1.84% at W = 2, 0.033% at W = 3 |
-| hints for a node down one hour, one hint per write | 4,500 x 1 KB x 3,600 | 16.2 GB |
-| the same node's data against that rate | 15 GB / 4.5 MB per second | 3,333 s (56 minutes) |
+| hint writes for a node down one hour | 4,500 x 3,600 | 16.2 million (16.2 GB if every write kept its own hint) |
+| distinct keys among them, writes spread evenly over the node's 15 million keys *(assumed)* | 15M x (1 - e^(-16.2/15)) | 9.9 million keys, 9.9 GB |
+| the same when the writes equal the key count, at 3,333 s | 15M x (1 - 1/e) | 9.5 million keys, 9.5 GB |
 | Merkle diff, 1 million keys, 100 differing leaves | 1 + 2 x 100 x 20 hashes of 20 bytes | at most 4,001 hashes, about 80 KB, against 20 MB for all key hashes |
 
 ```python
@@ -73,7 +74,7 @@ def p_slow(n, k, q):
 
 The check compares this with a simulation on four (n, k, q) settings, and with the hand-written cases (W = 3 gives 1 - 0.99^3).
 
-Five conclusions. **The cluster is request-bound, not disk-bound:** 15 GB per node is small; fan-out is the cost (3 writes per put, 3 reads per get). **Replicas fail independently only if you place them so;** the tail figures assume independence, which a shared rack or data centre breaks (the paper spreads each preference list over several data centres). **Why R and W below N:** the paper says latency is "dictated by the slowest of the R (or W)" replicas, and the table shows how much waiting for one fewer replica removes. **Hints stop paying off after about an hour in this example:** past 3,333 seconds the parked writes exceed a full copy of the node's data, assuming every write keeps its own hint and none overwrites another (hot keys would dedupe; this is an upper bound). **The Merkle cost scales with differences, not data.**
+Five conclusions. **The cluster is request-bound, not disk-bound:** 15 GB per node is small; fan-out is the cost (3 writes per put, 3 reads per get). **Replicas fail independently only if you place them so;** the tail figures assume independence, which a shared rack or data centre breaks (the paper spreads each preference list over several data centres). **Why R and W below N:** the paper says latency is "dictated by the slowest of the R (or W)" replicas, and the table shows how much waiting for one fewer replica removes. **Hints are bounded by the node's key count, not by the outage length:** a hint store that keeps the newest version of each key cannot grow past the 15 GB the node holds, and after an hour it holds about 9.9 GB of distinct keys (9.5 GB at 3,333 s, when the writes equal the key count). Anti-entropy afterwards moves only the keys that changed, the same set, so volume does not decide between them. What does: hints sit on stand-ins that can fail, which the paper gives as the reason for anti-entropy; they take space on the stand-ins; and a hint log that appends one entry per write grows without bound (16.2 GB in the hour). **The Merkle cost scales with differences, not data.**
 
 ---
 
@@ -122,9 +123,10 @@ def reconcile(versions):
 LEAVES = 8
 
 class Dynamo:
-    """One key space over a ring of nodes. This lesson's model: hinted replicas sit in a separate store and are not read."""
-    def __init__(self, nodes, n=3, r=2, w=2, sloppy=True):
-        self.nodes, self.n, self.r, self.w, self.sloppy = list(nodes), n, r, w, sloppy
+    """One key space over a ring of nodes. Hinted replicas sit in a separate store (paper, 4.6); whether a read served by the stand-in returns them is the
+    `read_hints` switch, because the paper does not say. The default is that it does not."""
+    def __init__(self, nodes, n=3, r=2, w=2, sloppy=True, read_hints=False):
+        self.nodes, self.n, self.r, self.w, self.sloppy, self.read_hints = list(nodes), n, r, w, sloppy, read_hints
         self.up = set(nodes)
         self.data = {x: {} for x in nodes}      # node -> key -> [(clock, value)]
         self.hints = {x: [] for x in nodes}     # stand-in -> [(intended, key, clock, value)]
@@ -168,7 +170,9 @@ class Dynamo:
         c = self.contacts(key)
         got = c[:self.r] if responders is None else [t for t in c if t[0] in responders]
         if len(got) < self.r: return None
-        versions = reconcile([v for hd, _ in got for v in self.data[hd].get(key, [])])
+        seen = [v for hd, _ in got for v in self.data[hd].get(key, [])]
+        if self.read_hints: seen += [(cl, val) for hd, _ in got for it, k, cl, val in self.hints[hd] if k == key]
+        versions = reconcile(seen)
         if repair:                                            # read repair: outstanding replies bring stale home nodes up to date
             for hd, it in c:
                 if hd == it: self.data[hd][key] = reconcile(self.data[hd].get(key, []) + versions)
@@ -189,7 +193,12 @@ class Dynamo:
 
 **Strict quorum.** The check enumerates, for N from 1 to 5 and every R and W, every set of acknowledging nodes (the coordinator plus W-1 others) against every set of R responders. When R + W > N, no read set misses the write, in all of them; when R + W is at most N, some pair does. For (3, 2, 2) the three read pairs all meet the acknowledged pair; for (3, 1, 1) two of the three single-node reads miss. This is the overlap argument and it is exact, but it needs both sets drawn from the same N nodes.
 
-**Sloppy quorum.** Take N = 3, R = W = 2, the first home node A down, and a write that stands in a fourth node D for it. The write is acknowledged by the coordinator B and one more node: C or the stand-in D. A returns before D has handed its hint back. A read of two of {A, B, C}: if the second acknowledger was C, every pair meets it. If it was D, whose copy is a hint and is not read (the paper keeps hints in a separate database and does not say reads consult it), the pair {A, C} sees nothing. The check enumerates all 6 combinations of acknowledger and responder pair: **1 of 6 acknowledged writes is missed, with R + W > N**. After `deliver_hints` the same enumeration misses none. With a strict quorum and the same failure the write needs both live home nodes, and no read misses it.
+**Sloppy quorum.** Take N = 3, R = W = 2, the first home node A down, and a write that stands in a fourth node D for it. The write is acknowledged by the coordinator B and one more node: C or the stand-in D. If it was C, B and C both hold a real copy and every read pair meets them. If it was D, only B holds a real copy and D holds a hint. Two reads then miss it, depending on when they happen.
+
+- **A has come back, hints not yet delivered.** The read set is the first three healthy nodes, {A, B, C}. D is no longer asked, and the pair {A, C} sees nothing: C never took the write. Reading hints would change nothing.
+- **A is still down.** The read set is {B, C, D}, the same three nodes the write used, which is the case the overlap rule is supposed to cover. The pair {C, D} misses the write if D does not serve its hint. The paper says reads and writes use the first N healthy nodes, which includes D, but not whether D answers from its hint store; the model's default is that it does not, and with `read_hints=True` this miss disappears.
+
+The check enumerates all 6 combinations of acknowledger and responder pair in each case: **1 of 6 acknowledged writes is missed, with R + W > N**, both after A returns and (in the model's default) while it is down. With hints served, the while-down case misses 0 of 6 and the after-return case still 1 of 6. After `deliver_hints` the enumeration misses none. With a strict quorum and the same failure the write needs both live home nodes, and no read misses it.
 
 So the honest statement is: **a sloppy quorum guarantees durability on W nodes somewhere, not an overlap with later reads.** The paper says as much in its own terms: it uses the sloppy quorum to keep reads and writes from failing during temporary failures. Cassandra's documentation, read for this lesson, lists a consistency level ANY where the coordinator may store a hint instead of a replica write, the same trade in another product. Two consequences the model also pins: **a put that reaches fewer than W nodes returns failure yet the copies it wrote are not rolled back** (the model's choice; the paper does not say), so a "failed" write can appear later; and **W = 1 accepts a write while a single node is up**, the paper's always-writable end, with a durability window it names itself.
 
@@ -199,9 +208,9 @@ So the honest statement is: **a sloppy quorum guarantees durability on W nodes s
 
 **Read repair** (paper, section 5): after a read returns, the coordinator waits briefly for outstanding replies and, if any replica returned a stale version, writes the newest to it. The check makes a home node miss a write, shows a read without repair leaves it stale, and a read with repair brings it up to date.
 
-**Hinted handoff**: the stand-in keeps the replica with the intended node's name, scans periodically and hands it back when the node returns; then it may delete its copy (paper, section 4.6). Its limit is in section 3: after about an hour in the example the hints outweigh the node. The paper itself says hinted handoff works best when churn is low and failures are transient.
+**Hinted handoff**: the stand-in keeps the replica with the intended node's name, scans periodically and hands it back when the node returns; then it may delete its copy (paper, section 4.6). Its limits: hints live on a stand-in that can fail first, they take space there, and delivery needs a scan; this lesson's section 3 shows the store is bounded by the node's key count. The paper itself says hinted handoff works best when churn is low and failures are transient.
 
-**Anti-entropy with Merkle trees** covers permanent loss and anything hints missed. A Merkle tree hashes each key range's values at the leaves and each parent from its children; two replicas compare roots, equal roots mean nothing to do, and otherwise they descend only into children whose hashes differ (paper, section 4.7). The paper keeps one tree per key range a node hosts and notes the drawback: when membership changes, many ranges change and their trees must be recomputed, which its later fixed-partition scheme addresses. Here:
+**Anti-entropy with Merkle trees** covers permanent loss and anything hints missed. A Merkle tree is a hash tree whose parents hash their children and whose leaves are hashes of the values of individual keys (paper; the code below lets each leaf cover a hash bucket of keys, this lesson's simplification); two replicas compare roots, equal roots mean nothing to do, and otherwise they descend only into children whose hashes differ (paper, section 4.7). The paper keeps one tree per key range a node hosts and notes the drawback: when membership changes, many ranges change and their trees must be recomputed, which its later fixed-partition scheme addresses. Here:
 
 ```python
 def bucket(key, leaves=LEAVES): return h(key) % leaves
@@ -297,7 +306,7 @@ def gossip_rounds(n, rng):
 
 The check simulates synchronous push-pull rounds: with 16 nodes the news reaches everyone in 4.1 rounds on average over 200 runs, with 200 nodes in 7.4 rounds (200 runs), with 2,000 nodes in 10.0 rounds (30 runs) (simulation, illustrative; one round stands for one second only if rounds are synchronous, which real gossip is not). It asserts the mean is at least 0.8 log2(n) rounds and no run exceeds 4 log2(n): spread takes logarithmically many rounds, not one.
 
-**Who coordinates.** Requests go through a load balancer to any node, which forwards to a coordinator in the key's preference list; or a partition-aware client library sends them directly (paper, 4.5, 6.4). Table 2 of the paper, a 24-hour comparison, reports 99.9th-percentile read latency of 68.9 ms server-driven against 30.4 ms client-driven, and averages of 3.9 and 1.55 ms; the client polls a random node for membership every 10 seconds, so it can hold a stale view for that long. The paper also lets any of the top N nodes coordinate writes, choosing the node that answered the previous read fastest, to cut tail latency and improve the chance of read-your-writes.
+**Who coordinates.** Requests go through a load balancer to any node: any node can coordinate a read, and a write is forwarded to a node in the key's preference list (which creates the new version stamp); or a partition-aware client library sends them directly (paper, 4.5, 6.4). Table 2 of the paper, a 24-hour comparison, reports 99.9th-percentile read latency of 68.9 ms server-driven against 30.4 ms client-driven, and averages of 3.9 and 1.55 ms; the client polls a random node for membership every 10 seconds, so it can hold a stale view for that long. The paper also lets any of the top N nodes coordinate writes, choosing the node that answered the previous read fastest, to cut tail latency and improve the chance of read-your-writes.
 
 ---
 
@@ -306,7 +315,7 @@ The check simulates synchronous push-pull rounds: with 16 nodes the news reaches
 | What breaks | What you see | Defence |
 |---|---|---|
 | a home node down | sloppy write lands on a stand-in; a read before handoff can miss it (1 of 6 above) | hinted handoff; reads that need the latest must wait out repair, or use R = N |
-| node down too long | hints exceed the node's data (56 minutes in the example) | stop hinting, rebuild from replicas with anti-entropy |
+| stand-in space | hints pile up on the stand-ins, one per write if not deduplicated | keep the newest version per key; bound the hint store; fall back to anti-entropy |
 | stand-in dies before handing back | the replica is lost | anti-entropy (paper: hints can become unavailable) |
 | concurrent writers | siblings | client merge; busy automated clients drove most divergence in the paper |
 | union merge of a cart | deleted items return | observed-remove merge, with tombstone expiry |
@@ -318,7 +327,7 @@ The check simulates synchronous push-pull rounds: with 16 nodes the news reaches
 
 ## 10. What Real Systems Did
 
-- **Dynamo** (DeCandia et al., SOSP 2007, read 2026-11-27): N = 3 typical; (3, 2, 2) common; 99.9th percentile around 200 ms in the production graph, an order of magnitude above the mean; a 24-hour sample of the cart service saw exactly one version in 99.94% of requests, two in 0.00057%, three in 0.00047%, four in 0.00009% (these printed figures sum to 99.9411%, not 100%; the paper does not explain the gap, so treat them as the paper's approximate figures). It reports 99.9995% of requests answered successfully with no data loss in its first two years of use, and a write buffer in memory cut the 99.9th percentile by a factor of 5 at the price of durability, mitigated by having one replica write durably. Its storage engines included Berkeley DB Transactional Data Store, used by most production instances.
+- **Dynamo** (DeCandia et al., SOSP 2007, read 2026-11-27): N = 3 typical; (3, 2, 2) common; 99.9th percentile around 200 ms in the production graph, an order of magnitude above the mean; a 24-hour sample of the cart service (Time, Clocks and Ordering already uses this measurement) saw exactly one version in 99.94% of requests, two in 0.00057%, three in 0.00047%, four in 0.00009% (these printed figures sum to 99.9411%, not 100%; the paper does not explain the gap, so treat them as the paper's approximate figures). It reports 99.9995% of requests answered successfully with no data loss in its first two years of use, and a write buffer in memory cut the 99.9th percentile by a factor of 5 at the price of durability, mitigated by having one replica write durably. Its storage engines included Berkeley DB Transactional Data Store, used by most production instances.
 - **Cassandra** (documentation, read 2026-11-27, architecture page only): describes its architecture alongside the Dynamo paper, lists read repair, hinted handoff and Merkle-tree repair as its convergence mechanisms, and adds sub-range and incremental repair that the paper does not have. Its consistency levels include QUORUM (n/2 + 1) and ANY. Nothing else about its current behaviour is claimed.
 
 ---
@@ -326,13 +335,13 @@ The check simulates synchronous push-pull rounds: with 16 nodes the news reaches
 ## 11. Pitfalls Checklist
 
 1. **"R + W > N means strongly consistent."** Only for strict quorums over the same N nodes, with no concurrent writes; the check shows a miss with R + W > N under a sloppy quorum.
-2. **Reading a hinted replica as if it were a member of the quorum.** It counts toward W and not toward reads in this model.
+2. **Assuming a stand-in's hinted replica answers reads.** The paper does not say; decide, and test both ways (the check does).
 3. **Treating a failed put as not written.** Copies remain.
 4. **Merging siblings by union.** Deleted items return.
 5. **Two writes with the same clock.** The coordinator must go past what it holds.
 6. **Comparing Merkle buckets as strings** ("10" before "2") or hashing only the root.
 7. **Assuming independent replica failures** when replicas share a rack.
-8. **Hinting forever.** Past the crossover a rebuild is cheaper.
+8. **A hint log with one entry per write.** It grows without bound; keep the newest version per key.
 9. **Quoting the paper's percentages as a distribution.** They do not sum to 100%.
 
 ---
@@ -343,7 +352,7 @@ The check simulates synchronous push-pull rounds: with 16 nodes the news reaches
 2. Explain the 1-in-6 miss with R + W > N: who acknowledged, who answered, and what changes after hint delivery.
 3. Why does the coordinator wait for W-1 other acknowledgements, and what happens to the copies of a put that got fewer?
 4. Compute the chance a (3, 2, 2) write is slow when each replica is slow 1% of the time, and compare with W = 3.
-5. A node is down for 90 minutes in the example cluster. Hints or rebuild? Show the arithmetic and its assumption.
+5. A node is down for 90 minutes in the example cluster. How large is the hint store with and without deduplication by key, and why does anti-entropy afterwards move about the same keys? State the assumption on how writes spread.
 6. Two replicas of a million keys differ in 100 keys. How many hashes does the Merkle comparison exchange at most, and what drives that number?
 7. Why does a union merge of two cart versions resurrect a deleted item, and what does the observed-remove cart store to prevent it?
 8. Why does the paper's gossip survive a couple of hundred nodes and not tens of thousands, and what does the simulation say about rounds as nodes grow?
@@ -353,7 +362,7 @@ The check simulates synchronous push-pull rounds: with 16 nodes the news reaches
 ## Homework
 
 1. Run `sy69_check.py` on this file. Make `put` use the ctx counter only (not what the coordinator holds) and find the failing assertion.
-2. Let hinted replicas be read and re-measure `acked_then_read`: which entries change, and why does the paper's silence matter?
+2. Run `acked_then_read(3, 2, 2, sloppy=True, down=(0,), heal_before_read=False)` with and without `read_hints=True` and explain the change from 1 of 6 to 0 of 6. Then run it with A healed first and explain why nothing changes.
 3. Add tombstone expiry to `Cart` and write a check that finds the case it gets wrong (an old replica returning).
 4. Implement fixed partitions (as in Caching Patterns and Consistent Hashing) with one Merkle tree per partition and measure how many trees change when a node joins.
 

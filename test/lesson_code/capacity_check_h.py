@@ -115,10 +115,15 @@ def sy69(src):
     assert round(p_slow(3, 3, .01) * 100, 2) == 2.97 and round(p_slow(3, 2, .01) * 100, 4) == 0.0298
     assert round(p_slow(3, 1, .01) * 100, 4) == 0.0001
     assert round(solve_q(3, 2, 0.001) * 100, 2) == 1.84 and round(solve_q(3, 3, 0.001) * 100, 3) == 0.033
-    hint_bytes = wr * value_b * 3600            # upper bound: every write keeps its own hint
-    assert hint_bytes == 16.2e9
-    crossover = per_node_bytes / (wr * value_b)
-    assert round(crossover) == 3333 and round(crossover / 60) == 56
+    keys_node = per_node_bytes / value_b                       # 15 million keys held by one node
+    assert keys_node == 15e6
+    hint_writes = wr * 3600                                    # writes aimed at a node that is down for an hour
+    assert hint_writes == 16.2e6 and hint_writes * value_b == 16.2e9      # 16.2 GB only if every write kept its own hint
+    distinct = lambda w: keys_node * (1 - math.exp(-w / keys_node))       # distinct keys among w uniform writes
+    assert round(distinct(hint_writes) / 1e6, 1) == 9.9 and round(distinct(hint_writes) * value_b / 1e9, 1) == 9.9
+    assert round(distinct(keys_node) / 1e6, 1) == 9.5 and distinct(keys_node) < keys_node
+    assert round(keys_node / wr) == 3333                       # the writes equal the key count after 3,333 s
+    assert distinct(10 * keys_node) < keys_node                # however long the outage, the deduplicated store stays under the node's data
     leaves_log2, differing, hash_b = 20, 100, 20
     hashes = 1 + 2 * differing * leaves_log2
     assert hashes == 4001 and hashes * hash_b == 80_020 and 1_000_000 * hash_b == 20_000_000
@@ -126,8 +131,8 @@ def sy69(src):
     parts = [99.94, 0.00057, 0.00047, 0.00009]
     assert round(sum(parts), 4) == 99.9411
     need(src, '4,500 per second', '15,000 per second', '2.97%', '0.0298%', '0.0001%', '1.84% at W = 2', '0.033% at W = 3',
-         '16.2 GB', '3,333 s (56 minutes)', '4,001 hashes', '15 GB', '99.9411%')
-    forbid(src, 'R + W > N always reads the latest write, sloppy or not', '1.83%')
+         '16.2 million (16.2 GB if every write', '9.9 million keys, 9.9 GB', '9.5 million keys, 9.5 GB', '3,333 s', '4,001 hashes', '15 GB', '99.9411%')
+    forbid(src, 'R + W > N always reads the latest write, sloppy or not', '1.83%', '56 minutes', 'rebuild is cheaper', 'exceed a full copy')
     return 'sy69'
 
 
