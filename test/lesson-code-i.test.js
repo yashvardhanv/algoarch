@@ -26,9 +26,11 @@ function codeTest(id, file, title) {
 }
 
 codeTest('sy70', 'sy70-dating-app-matching.md', 'every swipe interleaving, the Bloom filter and the exposure cap');
+codeTest('sy71', 'sy71-fitness-activity-tracking.md', 'distance and climb checks, the polyline format, Douglas-Peucker, a brute-force segment matcher and crash replays');
 
 const CAPACITY_LESSONS_I = [
   'sy70-dating-app-matching.md',
+  'sy71-fitness-activity-tracking.md',
 ];
 
 test('task 6 capacity estimates are reproduced by script', { skip: py ? false : 'python not installed' }, () => {

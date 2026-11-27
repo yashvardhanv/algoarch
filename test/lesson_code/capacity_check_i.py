@@ -36,7 +36,46 @@ def sy70(src):
     return 'sy70'
 
 
-SECTIONS = {'sy70': sy70}
+def lesson_ns(src):
+    import re
+    ns = {}
+    for b in re.findall(r"```python\n(.*?)```", src, re.S):
+        exec(b, ns)
+    return ns
+
+
+def sy71(src):
+    import random
+    ns = lesson_ns(src)
+    per_day, peak_x, pts = 5_000_000, 10, 3600
+    assert round(per_day / 86400) == 58 and round(per_day / 86400 * peak_x) == 579
+    raw = pts * 16
+    assert raw == 57_600 and per_day * raw == 288_000_000_000
+    assert round(per_day / 86400 * peak_x * 2) == 1157
+    scan, grid = pts * 20_000_000, pts * 9 * 5
+    assert scan == 72_000_000_000 and grid == 162_000 and round(scan / grid) == 444_444
+    # synthetic winding track: 1 hour at 3 m/s, one point per second (illustrative)
+    rng = random.Random(71)
+    lat, lon, h, ll = 40.0, -75.0, 0.0, []
+    for _ in range(pts):
+        ll.append((round(lat, 5), round(lon, 5)))
+        h += rng.uniform(-0.05, 0.05)
+        lat += 3 * math.cos(h) / 111195
+        lon += 3 * math.sin(h) / (111195 * math.cos(math.radians(40)))
+    enc = ns['encode_polyline'](ll)
+    assert len(enc) == 7208 and round(raw / len(enc), 1) == 8.0
+    xy = [((b + 75) * 111195 * math.cos(math.radians(40)), (a - 40) * 111195) for a, b in ll]
+    kept = ns['rdp'](xy, 5)
+    assert len(kept) == 64
+    keptll = [ll[xy.index(q)] for q in kept]
+    assert len(ns['encode_polyline'](keptll)) == 252
+    need(src, '58 per second', '579 per second', '57,600 bytes', '288 GB', '7,208 bytes', '8.0 times', '64 of 3,600 points', '252 bytes',
+         '1,157', '72 billion', '162,000', '444,444')
+    forbid(src, 'Strava uses ', 'Strava stores each', 'Strava runs ')
+    return 'sy71'
+
+
+SECTIONS = {'sy70': sy70, 'sy71': sy71}
 done = []
 for path in sys.argv[1:]:
     key = os.path.basename(path)[:4]
