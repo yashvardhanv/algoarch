@@ -30,7 +30,7 @@ A million people watching one broadcaster is a read problem: the same few bytes,
 | "viewers are 20 seconds behind" | segment length and the playlist join rule (section 5); low-latency modes exist and were not read |
 | "a new segment makes the origin fall over" | request coalescing at every cache tier, plus an origin shield (section 6) |
 | "millions in one chat room" | thin the room (cap messages per second delivered), batch per connection, fan out in a tree (section 7) |
-| "chat disconnects and reconnects" | per-room sequence numbers and a bounded resume buffer; a "gap" answer when the buffer was overrun |
+| "chat disconnects and reconnects" | numbered frames (one per tick, so a hole means a lost frame) and a bounded resume buffer measured in frames; a "gap" answer when the buffer was overrun |
 | "moderators, bans, slow mode" | a rules service in front of the room's post; it adds work to every message, so it needs timeouts that cancel the work (section 9 describes a related outage: CPU exhaustion plus uncancelled work in that backend, not the rules logic itself) |
 
 ---
@@ -81,7 +81,7 @@ Four conclusions. **Video bandwidth is a CDN problem and the origin is a coalesc
 ```
 ingest:    broadcaster --RTMP--> ingest PoP --> transcode (5 renditions) --> segmenter --> origin
 playback:  GET master.m3u8 -> GET media.m3u8 (live window) -> GET segment_N.ts      (HTTP, through the CDN)
-chat:      WebSocket to an edge node: JOIN room, SEND text, resume(last_seq)  -> frames [{seq, user, text, prio}]
+chat:      WebSocket to an edge node: JOIN room, SEND text, resume(last_frame)  -> numbered frames {frame, [{user, text, prio}]}
 rules:     check(room, user, text) -> ok | slow_mode | banned | timeout           (before publish)
 room       {id, n (log number of messages), seq (number of frames), ring of the last N frames}      edge {id, room -> connections}
 ```
@@ -275,7 +275,7 @@ def select(batch, cap, rng):
 
 **Sizing the resume ring.** The ring is measured in frames, so in seconds: 120 frames at one per second is two minutes of history in 360 KB (section 3). If an edge node dies and its viewers reconnect within the ring's span, `since` fills the hole; those that return later get `gap` and a visible break. The reconnect traffic is itself a load (3 GB for a node's 100,000 viewers in the lesson's numbers), so reconnects should be spread, with jitter added to any backoff, as the reconnect discussion in Scaling Patterns II advises.
 
-**Chat against video time.** The video is 7.5 to 9.5 seconds behind live (section 5); chat arrives in a fraction of a second, so a viewer reads the reaction before the event. A client can hold chat back by its own measured video delay. This is the lesson's suggestion, not a described design, and it needs a reference clock for video position that the playlist's program date-time tags may provide; not read.
+**Chat against video time.** The video is 7.5 to 9.5 seconds behind live (section 5); chat arrives within about one tick (at most a second in this model, since a frame is sent once per tick), so a viewer reads the reaction before the event. A client can hold chat back by its own measured video delay. This is the lesson's suggestion, not a described design, and it needs a reference clock for video position that the playlist's program date-time tags may provide; not read.
 
 ---
 
@@ -341,7 +341,7 @@ Only what was read.
 
 ## Homework
 
-1. Run `test/lesson_code/sy65_check.py`; change the retention rule in `fetchable` from 2W to W + 1 (the reading the first draft of this lesson got wrong) and say which assertion fails and what the new pause budget is.
+1. Run `test/lesson_code/sy65_check.py`; change the retention rule in `fetchable` so a removed segment is kept one segment less than it is now (the first draft kept it too briefly) and say which assertion fails and what the new pause budget is.
 2. Extend `CacheNode` with a retry on failure: the first fetch fails, one waiter retries for all. Write the test that fails if each waiter retries.
 3. Add per-user slow mode to `Hub.post` (one message per N seconds per user) and show how it changes the number of messages entering the room in a simulated burst.
 4. Implement per-viewer thinning and compare the deliveries and the random draws per second with room-level thinning at 1,000 viewers.
