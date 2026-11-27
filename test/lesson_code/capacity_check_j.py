@@ -91,7 +91,7 @@ if text76 is not None:
                  '20% of the new total of 5 x 10^12', '86.6 of 100', '100.0 of 100 (99.996)', '80 GB', '200 seconds',
                  'a fifth of the job', '9.6 shards', 'factors of 40 to 50', '25 times fewer', '`1/log 2 = 1.44` against `1/log 22 = 0.32`'):
         assert must in text76, must
-    for must_not in ('capacity_check_k', 'under a third of the unguarded work'):
+    for must_not in ('capacity_check_k', 'under a third of the unguarded work', "the abstract's statement"):
         assert must_not not in text76, must_not
     for company in ('Facebook', 'LinkedIn', 'Instagram', 'Twitter', 'TikTok', 'Meta', 'Pinterest', 'Snapchat'):
         assert company not in text76, company

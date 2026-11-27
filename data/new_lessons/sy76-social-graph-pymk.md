@@ -28,12 +28,12 @@ The first idea everyone has is right: suggest the people who share the most frie
 
 | If the prompt says... | Reach for |
 |---|---|
-| "suggest people you may know" | two-hop traversal, count common neighbours, drop friends, self and blocked (section 4) |
-| "a celebrity has millions of friends" | skip or sample intermediates above a degree cap; measure what recall you lose (section 5) |
+| "suggest people you may know" | two-hop traversal, count common neighbours, drop friends, self and blocked (section 5) |
+| "a celebrity has millions of friends" | skip or sample intermediates above a degree cap; measure what recall you lose (section 6) |
 | "rank the suggestions" | common neighbours first; then weight rare shared friends more (Adamic/Adar); then features beyond the graph |
 | "latency of the recommendation page" | read a precomputed top-k list per user; refresh in batch |
-| "the graph does not fit on one machine" | shard by user id; a two-hop query fans out to most shards (section 5) |
-| "what if two users blocked each other, or want privacy" | filters on both sides, and no counts that reveal a hidden relationship (section 8) |
+| "the graph does not fit on one machine" | shard by user id; a two-hop query fans out to most shards (section 7) |
+| "what if two users blocked each other, or want privacy" | filters on both sides, and no counts that reveal a hidden relationship (section 9) |
 | "how do we know the suggestions are good" | measure against a random baseline and against the simple counter, offline and with acceptance rates |
 
 ---
@@ -72,7 +72,25 @@ Three conclusions. **One hub is a fifth of the job.** An account with a million 
 
 ---
 
-## 4. The Model: Candidates and Two Scores
+## 4. API and Data Model
+
+This is the lesson's own design, not any product's, and it matches the model below.
+
+```
+GET /pymk/{user}?limit=10    -> [{user, score}]      reads the stored list, then filters friends and blocks at read time (section 8)
+batch(user)                  -> stored list          candidates(g, user, max_fanout, blocked) then top_k, section 5
+friends(user)                -> [id]                 one adjacency read, routed to the shard that owns `user` (section 7)
+
+adjacency    {user -> friend ids}                    sharded by user id; undirected, so each edge is stored twice
+suggestions  {user -> [(candidate, score)]}          up to 100 per user, written by the batch job
+blocks       {user -> blocked ids}                   read at read time, both directions
+```
+
+The stored list is a derived table that can be rebuilt from `adjacency` at any time; the adjacency table is the source of truth. Sizes are those of section 3 (160 GB of adjacency, 80 GB of lists).
+
+---
+
+## 5. The Model: Candidates and Two Scores
 
 ```python
 import math
@@ -130,15 +148,15 @@ What the check proves against definitions written separately:
 
 ---
 
-## 5. Deep Dive 1: The Hub Guard and What It Costs
+## 6. Deep Dive 1: The Hub Guard and What It Costs
 
-Hubs are skipped as intermediates: a friend with more than `max_fanout` friends contributes no candidates. The model measures the trade on a random graph of 4,000 users and 24,000 random edges plus one account that is friends with everyone. For 400 sampled users, the guard (cap 100) cuts the total visits from about 1.67 million to about 67 thousand, 25 times fewer, and the check asserts a reduction of more than 20 times. **The top-10 lists do not change, and that is an artefact of how the graph was built:** an account that is friends with everyone adds exactly one common neighbour to every candidate, a constant that cannot reorder anyone, so skipping it loses nothing here. On a real graph, where a large account is friends with some people and not others, the lists would change; the method (run both, compare the lists, choose the cap from the loss you accept) transfers and the zero loss does not. Real graphs also have community structure that this random one lacks.
+Hubs are skipped as intermediates: a friend with more than `max_fanout` friends contributes no candidates. The model measures the trade on a random graph of 4,000 users and 24,000 random edges plus one account that is friends with everyone. For 400 sampled users, the guard (cap 100) cuts the total visits from about 1.67 million to about 67 thousand, 25 times fewer, and the check asserts a reduction of more than 20 times. **The top-10 lists do not change, and that is an artefact of how the graph was built:** an account that is friends with everyone adds exactly one common neighbour to every candidate, a constant that cannot reorder anyone, so skipping it loses nothing here. It has one side effect the average hides: it also makes every non-friend a candidate with a count of at least 1, so for a user with fewer than 10 genuine candidates the unguarded top 10 is padded with arbitrary non-friends in id order and the guarded list is shorter (the check shows this on a sparse user). In this graph (about 12 friends per user) it rarely matters, which is why the overlap is 1.0. On a real graph, where a large account is friends with some people and not others, the lists would change; the method (run both, compare the lists, choose the cap from the loss you accept) transfers and the zero loss does not. Real graphs also have community structure that this random one lacks.
 
 Three things the model does not do: sampling a hub's friends instead of skipping it; weighting by recency or interaction; and capping the number of candidates stored per user. The honest claim is only that the guard removes the quadratic blow-up and that its cost in suggestion quality must be measured on your own graph.
 
 ---
 
-## 6. Deep Dive 2: Sharding and the Fan-Out
+## 7. Deep Dive 2: Sharding and the Fan-Out
 
 A graph sharded by user id stores each person's friend list on one shard, so expanding your friends' friend lists means one request per friend, routed to wherever that friend lives. With friends placed independently and uniformly, the number of distinct shards is `S x (1 - (1 - 1/S)^d)`. The check confirms the formula by simulation. For S = 100: a user with 10 friends touches 9.6 shards, one with 200 touches 86.6, one with 1,000 touches all 100. **The fan-out saturates:** past a few hundred friends, adding friends adds work but not new shards, so latency is the slowest shard and a retry storm is a real risk (see Overload, Load Shedding and Cascading Failures). Two remedies, both partial: batch the per-shard requests so each shard gets one call with many ids (the shard count, not the friend count, bounds the calls), and precompute, which turns the whole path into a read.
 
@@ -146,7 +164,7 @@ Placement that keeps friends together (by community or by locality) cuts the fan
 
 ---
 
-## 7. Deep Dive 3: Batch, Online and the Stale List
+## 8. Deep Dive 3: Batch, Online and the Stale List
 
 | Choice | Behaviour | Cost |
 |---|---|---|
@@ -158,7 +176,7 @@ The stale list has one dangerous failure and several cosmetic ones. **Cosmetic:*
 
 ---
 
-## 8. Failure Modes and What You Must Not Reveal
+## 9. Failure Modes and What You Must Not Reveal
 
 | Failure | What goes wrong | Mitigation |
 |---|---|---|
@@ -172,13 +190,13 @@ The stale list has one dangerous failure and several cosmetic ones. **Cosmetic:*
 
 ---
 
-## 9. What Real Systems Did
+## 10. What Real Systems Did
 
 No engineering article or paper from a social network was read for this lesson. The single source consulted is the link-prediction paper above, which studied co-authorship networks and says nothing about how a platform builds or serves its suggestions. Everything about sharding, batching, hub handling and privacy here is the lesson's own general design, labelled as such.
 
 ---
 
-## 10. Pitfalls Checklist
+## 11. Pitfalls Checklist
 
 1. **Counting all friends' friends without a degree guard.** One account can be a fifth of the job.
 2. **Running the traversal online.** 320 KB and most of the shards for one page view.
@@ -217,7 +235,7 @@ No engineering article or paper from a social network was read for this lesson. 
 
 All read on 27 November 2026.
 
-- David Liben-Nowell and Jon Kleinberg, *The Link Prediction Problem for Social Networks* (cs.cornell.edu/home/kleinber/link-pred.pdf, the January 2004 version, read in part as extracted text: the definitions of common neighbours and of the Adamic/Adar measure, the random-predictor baseline, and the abstract's statement that several proximity measures outperform chance by factors of 40 to 50 on the arXiv co-authorship networks studied; the result tables were extracted in scrambled form and no table figures are quoted).
+- David Liben-Nowell and Jon Kleinberg, *The Link Prediction Problem for Social Networks* (cs.cornell.edu/home/kleinber/link-pred.pdf, the January 2004 version, read in part as extracted text: the definitions of common neighbours and of the Adamic/Adar measure, the random-predictor baseline, and the introduction's statement that several proximity measures outperform chance by factors of 40 to 50 on the arXiv co-authorship networks studied; the result tables were extracted in scrambled form and no table figures are quoted).
 - Not read: Adamic and Adar's original paper, any social network's engineering writing on suggestion systems, any paper on graph partitioning or community-aware placement, and any privacy guidance.
 
 ## Further reading (not consulted)

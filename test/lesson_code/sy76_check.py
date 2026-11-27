@@ -98,4 +98,12 @@ for u in users:
 assert plain > 20 * guarded, (plain, guarded)                                # the hub dominated the work: about 25 times fewer visits
 assert sum(overlaps) / len(overlaps) > 0.98                                  # and, by construction, no ranking changed: a friend of everyone adds the same +1 to every candidate
 print("hub work", plain, "->", guarded, "top-10 overlap", round(sum(overlaps) / len(overlaps), 3))
+# the side effect of a friend-of-everyone account: for a sparse user the plain top 10 is padded with arbitrary non-friends
+gs = build_graph([(0, v) for v in range(1, 60)] + [(1, 2), (2, 3), (1, 3), (4, 5)])
+c_full, _, _ = candidates(gs, 1)
+c_guard, _, _ = candidates(gs, 1, max_fanout=10)
+t_full = [v for v, _ in top_k(gs, 1, 10, 'common')]
+t_guard = [v for v, _ in sorted(c_guard.items(), key=lambda p: (-p[1], p[0]))[:10]]
+assert len(t_full) == 10 and len(t_guard) < 10 and t_full != t_guard          # padded by the hub, not by real evidence
+assert all(c_full[v] == 1 for v in t_full[len(t_guard):])                     # the padding has count 1, from the hub alone
 print("sy76 code checks passed")
