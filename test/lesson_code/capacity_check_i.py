@@ -75,7 +75,22 @@ def sy71(src):
     return 'sy71'
 
 
-SECTIONS = {'sy70': sy70, 'sy71': sy71}
+def sy72(src):
+    games, secs, moves = 100_000, 600, 80
+    assert games * 2 == 200_000 and games * moves / secs == 13_333.333333333334
+    mps = games * moves / secs
+    assert round(mps * 3) == 40_000
+    starts = games / secs
+    assert round(starts) == 167 and round(starts * 86400 / 1e6, 1) == 14.4
+    assert round(starts * 2) == 333 and round(1000 / 3 * 10) == 3333
+    assert games * 1.5 / 1000 == 150.0                                        # KB per game 1.5 -> MB total
+    assert moves * 32 == 2560 and round(starts * 86400 * 2560 / 1e9, 1) == 36.9
+    need(src, '100,000', '13,333', '40,000 messages per second', '167', '14.4 million', '333', '3,333', '150 MB', '2,560 bytes', '36.9 GB')
+    forbid(src, 'Lichess uses Glicko-2 for', 'chess.com uses', 'Lichess pairs players by')
+    return 'sy72'
+
+
+SECTIONS = {'sy70': sy70, 'sy71': sy71, 'sy72': sy72}
 done = []
 for path in sys.argv[1:]:
     key = os.path.basename(path)[:4]
