@@ -51,7 +51,7 @@ A phone or watch records a position every second; an hour of running is about 3,
 | Points per activity | 1 hour at 1 point per second (assumed) | 3,600 |
 | Raw size per activity | 16 bytes per point (assumed: time, latitude, longitude, altitude, heart rate) | 57,600 bytes |
 | Raw size per day | 5 million x 57,600 bytes | 288 GB |
-| Same track as an encoded polyline | synthetic 3 m/s winding track, one point per second | 7,208 bytes, 8.0 times smaller |
+| Same track as an encoded polyline | synthetic 3 m/s winding track, one point per second; compared with latitude and longitude alone at 8 bytes per point (28,800 bytes) | 7,208 bytes, 4.0 times smaller |
 | After Douglas-Peucker at 5 m, then encoded | same track | 64 of 3,600 points, 252 bytes |
 | Jobs in flight at the peak | 579 per second x an assumed 2 seconds of processing | about 1,157 |
 | Segment tests, scan everything | 3,600 points x an assumed 20 million segments | 72 billion per activity |
@@ -123,7 +123,7 @@ def moving_time(ts, ds, v_min):
 
 **Distance.** Sum the haversine distance of consecutive points. The check pins the one-degree value: 111,194.93 metres of latitude (`2 pi R / 360` with R = 6,371,000 m), the same for a degree of longitude on the equator, about half that at 60 degrees north, and correct across the antimeridian.
 
-**Climb.** Summing every positive altitude step counts noise. On a perfectly flat track with 1 Hz altitude noise of up to 2 metres either way, 3,600 samples (seed 71) add up to 2,401 metres of invented climbing; `elevation_gain` with a 5 m threshold reports 0. The rule: keep a reference level, count the climb only when the level has moved at least the threshold from it, and move the reference on a drop of at least the threshold. On a true 300 m ramp with the same noise the check requires the result within 12 m of 300 over 50 runs. That 12 m is what the check observed on these ramps, not a theorem. The threshold also hides real climbs smaller than itself, so a rolling course of 3-metre bumps reports zero. The check pins the edges: a climb of exactly the threshold counts, one hair below does not, and descending first then climbing follows the drop. Strava's upload documentation says elevation gain is read from the file header when the device has a barometric altimeter and otherwise computed from the elevation data, so the two can differ.
+**Climb.** Summing every positive altitude step counts noise. On a perfectly flat track with 1 Hz altitude noise of up to 2 metres either way, 3,600 samples (seed 71) add up to 2,401 metres of invented climbing; `elevation_gain` with a 5 m threshold reports 0. The rule: keep a reference level, count the climb only when the level has moved at least the threshold from it, and move the reference on a drop of at least the threshold. On a true 300 m ramp with the same noise the check requires the result within 12 m of 300 over 50 runs. That 12 m is what the check observed on these ramps, not a theorem. The threshold also hides real climbs smaller than itself (a rolling course of 3-metre bumps reports zero) and it loses up to the threshold from every climb it does count: a 7 m climb in 1 m steps with a 5 m threshold reports 5 m, so a course of 7 m hills under-reports by about 30 percent. Choose it against the sensor, not once for everything. The check pins the edges: a climb of exactly the threshold counts, one hair below does not, a drop of exactly the threshold moves the reference, and descending first then climbing follows the drop. Strava's upload documentation says elevation gain is read from the file header when the device has a barometric altimeter and otherwise computed from the elevation data, so the two can differ.
 
 **Moving time.** Elapsed time is end minus start; moving time counts only intervals at or above a speed floor. The check shows a stop removed, a speed exactly at the floor counted, a slow interval below the floor not counted, and a long standing gap not counted. Strava's activity objects carry both `moving_time` and `elapsed_time`. The floor is a choice: too high drops slow climbs, too low counts GPS jitter at a standstill as walking.
 
@@ -149,7 +149,7 @@ def _enc(v):
 def encode_polyline(points):
     out, plat, plon = '', 0, 0
     for lat, lon in points:
-        la, lo = round(lat * 1e5), round(lon * 1e5)
+        la, lo = math.floor(lat * 1e5 + 0.5), math.floor(lon * 1e5 + 0.5)    # half rounds up
         out += _enc(la - plat) + _enc(lo - plon)    # only the change from the previous point is stored
         plat, plon = la, lo
     return out
@@ -210,13 +210,13 @@ def rdp(pts, eps):
     return [p for p, k in zip(pts, keep) if k]
 ```
 
-The check pins the format against Google's page: the three points (38.5, -120.2), (40.7, -120.95), (43.252, -126.453) encode to `_p~iF~ps|U_ulLnnqC_mqNvxq`@`, and the single longitude -179.9832104 encodes to the chunks 33, 63, 48, 42, 34, 1 (before the 63 offset), as in the page's worked steps. Round trips of 300 random point lists at 5 decimal places, large jumps that need several chunks, and the empty list all pass. The format is lossy because of the rounding, about a metre.
+The check pins the format against Google's page: the three points (38.5, -120.2), (40.7, -120.95), (43.252, -126.453) encode to `_p~iF~ps|U_ulLnnqC_mqNvxq`@`, and the single longitude -179.9832104 encodes to the chunks 33, 63, 48, 42, 34, 1 (before the 63 offset), as in the page's worked steps. Round trips of 300 random point lists at 5 decimal places, large jumps that need several chunks, and the empty list all pass. The format is lossy because of the rounding: a step is 1e-5 degrees (about 1.1 m), so a coordinate moves by at most about 0.56 m, and the check requires a point to move by less than 0.8 m over 200 random unrounded points. Python's `round` breaks exact ties to even, so the lesson rounds half up with `floor(x + 0.5)`; Google's page says only "rounding the result", so an encoder that ties differently can disagree by one unit at an exact half.
 
-Douglas-Peucker is checked against a recursive reference on 400 random lattices (small integer coordinates, so distances equal to `eps` occur and the strict comparison matters) and for the property that matters: every dropped point lies within `eps` of the segment between the kept points on either side of it. That guarantee holds because `seg_dist` measures distance to the *segment*; measuring to the infinite line, as many textbook versions do, can drop a point that is far from the actual path. The iterative form avoids Python's recursion limit on a 5,000-point track.
+Douglas-Peucker is checked against a recursive reference on 400 random lattices (small integer coordinates, so distances equal to `eps` occur and the strict comparison matters) and for the property that matters: every dropped point lies within `eps` of the segment between the kept points on either side of it. That guarantee holds because `seg_dist` measures distance to the *segment*; measuring to the infinite line through the endpoints can drop a point that is far from the actual path. The iterative form avoids Python's recursion limit on a 5,000-point track.
 
 Two measured facts, both on this lesson's synthetic tracks:
 
-- On a smooth 3,600-point hour the encoded polyline alone is 7,208 bytes (8.0 times smaller than the assumed 16-byte raw points); adding Douglas-Peucker at 5 m keeps 64 points and 252 bytes. On a 5,000-point sine-like track with 1 m noise the check requires fewer than a quarter of the points to survive at `eps` 3.
+- On a smooth 3,600-point hour the encoded polyline alone is 7,208 bytes, 4.0 times smaller than the same two fields at the assumed 8 bytes per point (28,800 bytes; the polyline holds neither time, altitude nor heart rate, so against the full 57,600-byte record the saving would look like 8.0 times, which credits it for dropping three fields); adding Douglas-Peucker at 5 m keeps 64 points and 252 bytes. On a 5,000-point sine-like track with 1 m noise the check requires fewer than a quarter of the points to survive at `eps` 3.
 - **The worst case is quadratic.** A zig-zag that alternates between two levels leaves nothing to drop, and the farthest-point search splits off one point at a time. The check keeps all 500 points of such a track (500 rather than 5,000 because the cost is quadratic). If an adversarial upload can do that, cap the point count or time-box the simplification.
 
 Keep the raw stream for analysis and store the simplified polyline as the summary field; Strava's API reference shows an activity map with both a full `polyline` and a `summary_polyline`.
@@ -258,16 +258,20 @@ class SegmentIndex:
 
 def match_efforts(track, index):
     """track: [(t, x, y)]. Returns {segment id: (elapsed, start index, end index)}, the best effort per segment.
-    An effort starts near the segment start, stays within tol of the segment's line, and ends near its end."""
+    An effort starts near the segment start, stays within tol of the segment's line, passes near each intermediate
+    vertex in order, and ends near its end."""
     tol, best = index.tol, {}
     for i, (t0, x, y) in enumerate(track):
         for sid in index.near_start((x, y)):
             poly = index.segs[sid]
-            for j in range(i + 1, len(track)):
+            m, k = len(poly) - 1, 1                     # vertices 1 .. m-1 are the intermediate ones; k is the next to visit
+            for j in range(i, len(track)):
                 p = track[j][1:]
                 if pdist(p, poly) > tol:
                     break                               # left the segment: no effort from this start
-                if math.dist(p, poly[-1]) <= tol:
+                while k < m and math.dist(p, poly[k]) <= tol:
+                    k += 1
+                if j > i and k == m and math.dist(p, poly[-1]) <= tol:
                     cand = (track[j][0] - t0, i, j)
                     if sid not in best or cand < best[sid]:
                         best[sid] = cand
@@ -302,10 +306,10 @@ The rules, in the order the matcher applies them:
 
 1. **Index lookup.** Segment starts sit in a grid whose cells are at least as wide as the tolerance, so a start within `tol` of a point is always in the point's cell or one of the eight around it. The constructor refuses a cell narrower than the tolerance, and the check puts a start at x = 99 and a track point at x = 101, across a cell border.
 2. **Stay on the line.** From a start index, walk forward while every point is within `tol` of the segment polyline; a point farther away ends the attempt. That rejects a shortcut (start and end near, middle far): the check's straight cut across an L-shaped segment is not an effort, and neither is riding the segment backwards.
-3. **End near the end.** The first point near the segment end completes the effort; its time is the difference of the two timestamps.
-4. **Best effort.** Several candidate starts (every point within tolerance) and several laps give several efforts; keep the smallest elapsed time, ties to the earlier start. The check's two-lap track keeps the second lap (6 s against 9 s).
+3. **Visit the vertices in order, then end near the end.** The effort must pass within `tol` of each intermediate vertex of the segment in order, and the first point after that which is near the segment end completes it; its time is the difference of the two timestamps. Without the vertex rule a loop, a lap or an out-and-back (whose end is within `tol` of its start) would "finish" one sample after it started, and every rider would hold the record. The same rule makes a track visit the tip of a spur. Its limit: vertices only constrain the track where the segment has them, so a segment with long straight edges can still be cut short between two vertices inside the tolerance; a minimum distance travelled along the segment is the usual extra guard.
+4. **Best effort.** Several candidate starts (every point within tolerance) and several laps give several efforts; keep the smallest elapsed time (two starts of one effort cannot tie unless two samples share a timestamp, so no tie-break is needed). The check's two-lap track keeps the second lap (6 s against 9 s).
 
-The check compares this matcher with an exhaustive one over 60 random cases of 12 segments each (8 cut from the track with noise, about a third of those ridden reversed, and 4 random lines), over tracks that either do or do not follow them, and the efforts agree in every case, with more than 50 efforts across the run so the comparison is not vacuous. The exhaustive version tries every start and end pair and requires every point between to be near the line.
+The check compares this matcher with an exhaustive one over 60 random cases of 12 segments each (8 cut from the track with noise, about a third of those ridden reversed, 3 random lines and a loop cut from the track), over tracks that either do or do not follow them, and the efforts agree in every case, with more than 50 efforts across the run so the comparison is not vacuous. The exhaustive version is written as a specification, not as a copy of the matcher: it tries every start and end pair and requires every point between to be near the line and the intermediate vertices to be matched by a chain of points in order (a set-based search, not the matcher's walk). Hand cases cover a loop sat on at its start (no effort), a loop ridden in full (8 s), a loop with a corner cut (none), an out-and-back ridden in full and one turned around halfway (none), a spur ridden past and ridden to its tip.
 
 **Resolution.** Times come from sample timestamps, not interpolation, so an effort has the sampling resolution of the recording (one second at 1 Hz), and a tolerance of 25 m can start the clock a few seconds before the true line. Leaderboard fairness depends on that choice; interpolating the crossing time is the usual refinement and is left to the homework.
 
@@ -353,7 +357,7 @@ The only Strava material read for this lesson is its public developer documentat
 2. Using distance to the infinite line in Douglas-Peucker and calling the result "within eps of the path".
 3. Recursion in Douglas-Peucker on thousands of points.
 4. A grid cell narrower than the matching tolerance, so starts across a border are missed.
-5. Matching only start and end, which accepts shortcuts.
+5. Matching only start and end, which accepts shortcuts and finishes a loop in one sample.
 6. Appending effort rows on every attempt instead of keying them.
 7. Marking the activity done before its effort rows are written.
 8. Calling a hash dedupe a solution to "uploaded from two devices".

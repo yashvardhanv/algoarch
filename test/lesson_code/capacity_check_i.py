@@ -68,15 +68,17 @@ def sy71(src):
         lat += 3 * math.cos(h) / 111195
         lon += 3 * math.sin(h) / (111195 * math.cos(math.radians(40)))
     enc = ns['encode_polyline'](ll)
-    assert len(enc) == 7208 and round(raw / len(enc), 1) == 8.0
+    assert len(enc) == 7208 and round(raw / len(enc), 1) == 8.0              # NOT like for like: the raw record has five fields
+    latlon = pts * 8
+    assert latlon == 28_800 and round(latlon / len(enc), 1) == 4.0
     xy = [((b + 75) * 111195 * math.cos(math.radians(40)), (a - 40) * 111195) for a, b in ll]
     kept = ns['rdp'](xy, 5)
     assert len(kept) == 64
     keptll = [ll[xy.index(q)] for q in kept]
     assert len(ns['encode_polyline'](keptll)) == 252
-    need(src, '58 per second', '579 per second', '57,600 bytes', '288 GB', '7,208 bytes', '8.0 times', '64 of 3,600 points', '252 bytes',
+    need(src, '58 per second', '579 per second', '57,600 bytes', '288 GB', '7,208 bytes', '4.0 times smaller', '28,800 bytes', 'credits it for dropping three fields', '64 of 3,600 points', '252 bytes',
          '1,157', '72 billion', '162,000', '444,444')
-    forbid(src, 'Strava uses ', 'Strava stores each', 'Strava runs ')
+    forbid(src, 'Strava uses ', 'Strava stores each', 'Strava runs ', '7,208 bytes (8.0 times smaller', '7,208 bytes, 8.0 times smaller')
     return 'sy71'
 
 
