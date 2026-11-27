@@ -90,7 +90,31 @@ def sy72(src):
     return 'sy72'
 
 
-SECTIONS = {'sy70': sy70, 'sy71': sy71, 'sy72': sy72}
+def sy73(src):
+    products, budget_day = 20_000_000, 100_000_000
+    assert round(budget_day / 86400) == 1157 and round(products / budget_day * 24, 1) == 4.8
+    lo, hi = 0.25, 24
+    per_hour = budget_day / 24
+    assert products / hi <= per_hour <= products / lo
+    assert round(products / hi * 24) == 20_000_000 and round(products / lo * 24) == 1_920_000_000
+    changes = products * 0.03
+    assert changes == 600_000 and round(changes / 86400, 1) == 6.9
+    assert budget_day * 16 == 1_600_000_000 and changes * 16 == 9_600_000 and round(budget_day / changes) == 167
+    assert products * 3 == 60_000_000
+    notes = changes * 3 * 0.10
+    assert round(notes) == 180_000 and round(notes / 86400, 1) == 2.1
+    # hot product: targets spread evenly over [50%, 100%] of the old price, a 5 percent drop
+    watchers = 200_000
+    assert round(watchers * 0.05 / 0.50) == 20_000
+    # a day cannot hold more fetches per second than the budget says, and changes cannot exceed products
+    assert changes < products
+    need(src, '20 million', '100 million fetches per day', '1,157 per second', '4.8 hours', '1.92 billion', '600,000 per day', '6.9 per second',
+         '1.6 GB per day', '9.6 MB per day', '167 times smaller', '60 million', '180,000 per day', '2.1 per second', '20,000 alerts crossed', '200,000')
+    forbid(src, 'CamelCamelCamel uses', 'Keepa uses', 'Amazon blocks', 'Google Shopping uses')
+    return 'sy73'
+
+
+SECTIONS = {'sy70': sy70, 'sy71': sy71, 'sy72': sy72, 'sy73': sy73}
 done = []
 for path in sys.argv[1:]:
     key = os.path.basename(path)[:4]
