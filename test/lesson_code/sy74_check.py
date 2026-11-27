@@ -103,10 +103,31 @@ def run(max_edits, threshold, seeds=6):
             assert seen == set(members), "a story must be connected by verified pairs"
     return found, total
 found, total = run(max_edits=1, threshold=0.8)                            # light rewrites at the default threshold
-assert total > 20 and found / total > 0.99, (found, total)
+assert total > 20 and found == total, (found, total)            # every true pair lands in one story
 found2, total2 = run(max_edits=6, threshold=0.5)                          # heavy rewrites near the curve's shoulder
-assert total2 > 100 and 0.7 < found2 / total2 < 0.9, (found2, total2)     # the S-curve at work: about four pairs in five
+assert (found2, total2) == (101, 125), (found2, total2)                   # the S-curve at work (seeded corpora): about four pairs in five
 print("recall light/heavy", found, total, found2, total2)
+# bridging: A and C share nothing, B overlaps both. Whatever the order, one story (a broken union-find relinks and loses a merge)
+P_, Q_ = ' '.join(f"p{i}" for i in range(30)), ' '.join(f"q{i}" for i in range(30))
+A_, B_, C_ = P_ + ' ' + ' '.join(f"x{i}" for i in range(30)), P_ + ' ' + Q_, ' '.join(f"y{i}" for i in range(30)) + ' ' + Q_
+assert jaccard(shingles(A_), shingles(C_)) == 0.0
+assert jaccard(shingles(A_), shingles(B_)) >= 0.3 and jaccard(shingles(B_), shingles(C_)) >= 0.3 and jaccard(shingles(A_), shingles(B_)) < 0.5
+for order in itertools.permutations((A_, B_, C_)):
+    dd = Dedup(threshold=0.3, bands=100, rows=1)
+    ids = [dd.add(t) for t in order]
+    assert len({dd._find(i) for i in range(3)}) == 1, order
+    assert len({dd.add(t) for t in order}) == 1                          # re-adding the same texts joins the same story
+# a decoy candidate first: the true match must still be found when it is not the first candidate
+base_ = [f"d{i}" for i in range(40)]
+decoy = ' '.join(base_[:8] + [f"z{i}" for i in range(32)])                # shares a few shingles, far below the threshold
+dd = Dedup(threshold=0.8, bands=100, rows=1)
+i0, i1 = dd.add(decoy), dd.add(' '.join(base_))
+assert i0 != i1
+j = dd.add(' '.join(base_))
+assert j == dd._find(1) == i1 and dd._find(0) == 0
+sh_d = band_keys(minhash(shingles(decoy), 100), 100, 1)
+sh_t = band_keys(minhash(shingles(' '.join(base_)), 100), 100, 1)
+assert set(sh_d) & set(sh_t)                                             # the decoy really is a candidate (it is checked first)
 # a pair exactly at the threshold is merged (>=): 'a b c d e' and 'a b c d x' share 2 of 4 shingles. Use many bands of one row so the pair is surely a candidate.
 dd = Dedup(threshold=0.5, bands=100, rows=1)
 assert jaccard(shingles('a b c d e'), shingles('a b c d x')) == 0.5
@@ -135,11 +156,17 @@ assert next_interval([600, 600, 600], 60, 3600) == 300
 assert next_interval([10, 10, 10], 60, 3600) == 60 and next_interval([100000], 60, 3600) == 3600
 assert next_interval([100, 900, 300, 50000], 60, 3600) == 300           # even count: the median is the mean of the middle two (600), halved
 assert next_interval([100, 300, 500], 60, 3600) == 150                   # the median gap, halved
+# a new entry waits half an interval on average (a quarter of the typical gap), and at most half a gap
+gap = 600
+iv = next_interval([gap] * 5)
+waits = [iv - (t % iv) for t in range(0, 6000)]                           # an entry arriving at second t waits for the next poll
+assert abs(sum(waits) / len(waits) - gap / 4) < 1 and max(waits) <= gap / 2
 
 # ---- ranking ----------------------------------------------------------------------------------------------------------------
 assert abs(story_score(1, 0) - 1.0) < 1e-12
 assert abs(story_score(1, 6, half_life_hours=6) - 0.5) < 1e-12 and abs(story_score(1, 12, half_life_hours=6) - 0.25) < 1e-12
 assert story_score(4, 0) > story_score(2, 0) > story_score(1, 0) and abs(story_score(4, 0) - 3.0) < 1e-12
+assert abs(story_score(2, 0) - 2.0) < 1e-12 and abs(story_score(4, 0) / story_score(2, 0) - 1.5) < 1e-12   # 1.5 times, not double
 assert story_score(1, 0, source_weight=2.0) == 2.0
 assert story_score(8, 24, half_life_hours=6) < story_score(1, 0)          # a day-old big story loses to a fresh single report
 assert story_score(1, 0.0) > story_score(1, 0.0001) > story_score(1, 5)

@@ -28,8 +28,8 @@ An aggregator pulls thousands of feeds, finds that forty of them are reporting t
 
 | If the prompt says... | Reach for |
 |---|---|
-| "don't show the same story twice" | shingles, MinHash, banding, exact check; cluster by union-find (section 4) |
-| "pull 100,000 feeds without hammering them" | conditional requests and an adaptive per-feed interval (section 5; the crawler lesson for politeness) |
+| "don't show the same story twice" | shingles, MinHash, banding, exact check; cluster by union-find (section 5) |
+| "pull 100,000 feeds without hammering them" | conditional requests and an adaptive per-feed interval (section 6; the crawler lesson for politeness) |
 | "the same article arrives from several feeds" | entry identity by the feed's own id plus content similarity across feeds |
 | "an article was edited" | same id, newer updated time: a revision, not a new item |
 | "rank by freshness and importance" | exponential decay with a half-life, times a log of the number of sources |
@@ -53,6 +53,7 @@ An aggregator pulls thousands of feeds, finds that forty of them are reporting t
 | full feed response | 50 KB *(assumed)*; unchanged response 300 B *(assumed)*; 15% of polls find something new *(assumed)* |
 | items kept for de-duplication | 7 days *(assumed)* |
 | signature | 100 minima of 8 bytes *(as the model below stores them)* |
+| band table entry | one key and one 8-byte item id per band *(assumed: nearly every band key of a non-duplicate item is unique, so nearly every entry carries its own key)* |
 | banding | 20 bands of 5 rows |
 
 | Result | Arithmetic | Value |
@@ -63,7 +64,9 @@ An aggregator pulls thousands of feeds, finds that forty of them are reporting t
 | bandwidth with conditional requests | 111 x (0.15 x 50 KB + 0.85 x 300 B) | 0.86 MB/s: 6.4 times less |
 | items kept | 5,000,000 x 7 | 35 million |
 | signature storage | 35 million x 800 B | 28 GB (14 GB if each minimum is cut to 4 bytes) |
-| band table | 35 million x 20 bands x 8 B | 5.6 GB |
+| band table, if each band key is hashed to 8 bytes | 35 million x 20 bands x (8 B key + 8 B item id) | 11.2 GB |
+| band table, if the 5-minimum key is stored as the model stores it | 35 million x 20 bands x (40 B key + 8 B item id) | 33.6 GB |
+| band entries | 35 million x 20 | 700 million |
 | table lookups for new items | 58 x 20 | 1,157 per second |
 
 | Similarity of a pair | Chance the pair becomes a candidate: `1 - (1 - s^5)^20` |
@@ -74,11 +77,32 @@ An aggregator pulls thousands of feeds, finds that forty of them are reporting t
 | 0.8 | 99.96% |
 | 0.9 | 100.0% (99.999998%) |
 
-Three conclusions. **Conditional polling is a six-fold saving on bandwidth,** not a hundred-fold, because 15% of polls do bring data. **The archive is cheap and the lookups are fewer than the polls:** 1,157 lookups a second against hundreds of millions of kept items, which is the whole point of banding. **The S-curve is the design:** with 20 bands of 5 rows, near-duplicates at 0.8 are found 99.96% of the time while pairs at 0.5 are candidates 47% of the time, so the exact check after the lookup earns its keep. Move the curve with the number of bands and rows, not with a bigger signature alone.
+Three conclusions. **Conditional polling is a six-fold saving on bandwidth,** not a hundred-fold, because 15% of polls do bring data. **The archive is large and the lookups are few:** 1,157 lookups a second (about ten times the 111 polls a second) against 35 million kept items and 700 million band entries, which is the whole point of banding: the work per new item does not grow with the archive. The band table is the biggest single structure, at least 11.2 GB once keys are counted, and 33.6 GB if the model's keys are stored whole. **The S-curve is the design:** with 20 bands of 5 rows, near-duplicates at 0.8 are found 99.96% of the time while pairs at 0.5 are candidates 47% of the time, so the exact check after the lookup earns its keep. Move the curve with the number of bands and rows, not with a bigger signature alone.
 
 ---
 
-## 4. The Model: Shingles, MinHash, Banding and Clusters
+## 4. API and Data Model
+
+This is the lesson's own design, not any product's. One `FeedStore` per feed, so an entry id is scoped to its feed.
+
+```
+poll(feed)      -> conditional GET (ETag, If-None-Match); 304 means nothing changed; interval = next_interval(gaps)
+ingest(feed, entries[(id, updated, text)]) -> fresh entries (new, or newer than seen)     FeedStore.ingest
+add(text)       -> story id (the union-find root)                                         Dedup.add
+GET /stories?limit=50 -> [{story, score, n_sources, newest_age_hours}]                     story_score, section 7
+
+feed       {feed_id, url, etag, recent_gaps, next_poll}
+entry      {feed_id, entry_id, updated, text, item}        key (feed_id, entry_id); a newer `updated` replaces the row
+signature  {item, 100 minima}
+band table {(band, tuple of 5 minima) -> [item]}          key as the model builds it; hashing it to 8 bytes is the sizing choice in section 3
+story      {root, members, distinct sources, newest entry time}
+```
+
+Entries are keyed by identity, signatures by item, stories by union-find root: a merge changes only roots, so a story id is not stable across merges (the model says so in `Dedup`'s docstring). The model does not re-cluster a revised entry; that is left to the reader. Sizes of these rows are those in section 3 and nothing more.
+
+---
+
+## 5. The Model: Shingles, MinHash, Banding and Clusters
 
 ```python
 import hashlib, math, random, re
@@ -153,18 +177,18 @@ class Dedup:
         return self._find(i)
 ```
 
-The identity `P(minima agree) = Jaccard` is derived here, not read from a source: the smallest hash over the union of two sets belongs to exactly one element, and the minima agree exactly when that element is in both. It holds for a family where every element is equally likely to be smallest; the model uses a simple multiply-and-add family, so the check measures the bias instead of assuming it. The banding formula `1 - (1 - s^r)^b` is the lesson's derivation too, assuming the rows of a band agree independently; the check tests that assumption by simulation. Shingles, Jaccard similarity and the exact verification step are standard techniques; no paper on them was consulted for this lesson (the Pretraining Data and Scaling Laws lesson uses MinHash for a different job and has its own sources).
+The Pretraining Data and Scaling Laws lesson already teaches shingles, MinHash, the identity `P(minima agree) = Jaccard`, the banding formula `1 - (1 - s^r)^b` with its S-curve, and the verify step, there for removing near-duplicate documents from a training corpus. It is the same technique for the same purpose (finding near-duplicate documents without comparing all pairs), so read it first; it is not re-derived here. What is new in this lesson: the model's hash family is multiply-and-add, which is pairwise independent but not min-wise independent, so the identity is only approximate and the check measures the bias instead of assuming it; the band independence assumption is tested by simulation; documents are grouped into stories with union-find instead of one survivor per cluster; and the threshold and recall trade-off is measured on rewrites. No paper on these techniques was consulted for this lesson.
 
 What the check proves:
 
 - **Shingles and Jaccard match their definitions,** including case, punctuation, short documents and the rule that two empty documents score 0.
-- **MinHash is an unbiased estimator.** For pairs built to have Jaccard similarity 0.2, 0.5, 0.8 and 0.95, the mean of 200 estimates from 100-minimum signatures is within four standard errors of the truth.
+- **No bias is detectable at this sample size.** For pairs built to have Jaccard similarity 0.2, 0.5, 0.8 and 0.95, the mean of 200 estimates from 100-minimum signatures is within four standard errors of the truth (about 0.014 at 0.5; the same 100 coefficients are reused across trials, and a smaller bias than that would not show).
 - **The S-curve is real.** For five similarities (0.5 to 0.9) and 1,500 pairs each, the fraction of pairs sharing a band matches `1 - (1 - s^5)^20` within four binomial standard errors, so the independence assumption holds for this family.
-- **Clusters are connected by verified pairs, and recall follows the curve.** On six random corpora of rewritten stories plus unrelated one-offs, every story is a set whose members are linked by chains of true pairs at or above the threshold, so no two unrelated articles are merged. For light rewrites (at most one edited word in sixty) at the default threshold of 0.8, all 156 true pairs end up in one story. For heavy rewrites (up to six edited words) at a threshold of 0.5, only 101 of 125 true pairs (81%) do, which is the S-curve's shoulder showing: pairs near the threshold are found only some of the time, and the check asserts that the figure lies between 70% and 90%. Empty documents never merge, and the same text added twice joins one story.
+- **Clusters are connected by verified pairs, and recall follows the curve.** On six random corpora of rewritten stories plus unrelated one-offs, every story is a set whose members are linked by chains of true pairs at or above the threshold, so no two unrelated articles are merged. For light rewrites (at most one edited word in sixty) at the default threshold of 0.8, all 156 true pairs end up in one story (the check asserts equality). For heavy rewrites (up to six edited words) at a threshold of 0.5, only 101 of 125 true pairs (81%) do, which is the S-curve's shoulder showing: pairs near the threshold are found only some of the time (the corpora are seeded, so the check pins 101 of 125). A bridging case pins the union-find: A and C share nothing, B overlaps both, and added in any order the three form one story. A decoy case pins candidate handling: when the first candidate is not a true match, the second one is still checked. Empty documents never merge, and the same text added twice joins one story.
 
 ---
 
-## 5. Ingest: Identity, Revisions and Polling
+## 6. Ingest: Identity, Revisions and Polling
 
 ```python
 import statistics
@@ -192,11 +216,11 @@ def next_interval(gaps, lo=60, hi=3600):
 
 The Atom standard (RFC 4287) defines the entry id as a permanent, universally unique identifier that does not change when an entry is relocated, republished or syndicated, and defines `updated` as the most recent time the entry was modified in a way the publisher considers significant, adding that not every modification changes it. That is why identity is the id and a revision is a newer `updated`: a feed that edits a typo without touching `updated` is invisible here by the publisher's own definition. Many feeds are not Atom and are less careful; this model does not read RSS and makes no claim about it.
 
-The check pins the semantics: the same entry twice yields nothing; a newer `updated` yields a revision under the same id; an older copy arriving late is ignored; duplicates inside one batch collapse. `next_interval` is this lesson's design: poll about twice per typical gap, so a new entry waits half a gap on average, and clamp between a minute and an hour to protect the feed and bound the staleness. Polling uses the conditional request described in RFC 9110 for stored responses (see Feature Flags and Config Service); the crawler lesson covers politeness.
+The check pins the semantics: the same entry twice yields nothing; a newer `updated` yields a revision under the same id; an older copy arriving late is ignored; duplicates inside one batch collapse. `next_interval` is this lesson's design: poll about twice per typical gap (an interval of half the median gap), so a new entry waits half an interval, a quarter of a typical gap, on average and at worst half a gap (the check simulates arrivals against the poll grid), and clamp between a minute and an hour to protect the feed and bound the staleness. Polling uses a conditional request (`If-None-Match`; the Feature Flags and Config Service lesson cites the HTTP standard for it, and this lesson did not read it); the crawler lesson covers politeness.
 
 ---
 
-## 6. Ranking
+## 7. Ranking
 
 ```python
 def story_score(n_sources, newest_age_hours, source_weight=1.0, half_life_hours=6):
@@ -204,13 +228,13 @@ def story_score(n_sources, newest_age_hours, source_weight=1.0, half_life_hours=
     return source_weight * (1 + math.log2(n_sources)) * 0.5 ** (newest_age_hours / half_life_hours)
 ```
 
-Every constant here (the log, the six-hour half-life, the source weight) is a tuning choice with no source behind it. The check pins the shape: a story's score halves after one half-life and quarters after two; four sources score 3, double what two sources score; a day-old story reported by eight sources scores below a fresh single report at a six-hour half-life (`4.0 x 0.0625 = 0.25` against 1). The point to make in an interview is that this is a dial, set by looking at what readers click, not a theorem.
+Every constant here (the log, the six-hour half-life, the source weight) is a tuning choice with no source behind it. The check pins the shape, including that 1.5 ratio: a story's score halves after one half-life and quarters after two; four sources score 3 against 2 for two sources (1.5 times, not double: the log grows slowly); a day-old story reported by eight sources scores below a fresh single report at a six-hour half-life (`4.0 x 0.0625 = 0.25` against 1). The point to make in an interview is that this is a dial, set by looking at what readers click, not a theorem.
 
 **Counting sources honestly.** `n_sources` should count distinct publishers, not copies: forty syndicated reprints of one agency story are one source, not forty. The model leaves that to the caller.
 
 ---
 
-## 7. Failure Modes
+## 8. Failure Modes
 
 | Failure | What goes wrong | What the design does |
 |---|---|---|
@@ -225,13 +249,13 @@ Every constant here (the log, the six-hour half-life, the source weight) is a tu
 
 ---
 
-## 8. What Real Systems Did
+## 9. What Real Systems Did
 
 No engineering article or paper from a news aggregator or search engine was read for this lesson. The one standard it uses is the Atom format (entry identity and the meaning of `updated`). Shingling, MinHash banding and clustering are described here as general techniques and derived from first principles, and every number is this lesson's assumption.
 
 ---
 
-## 9. Pitfalls Checklist
+## 10. Pitfalls Checklist
 
 1. **Treating an edited entry as a new article.** The id is the identity; use `updated` for order.
 2. **Comparing every new article with every stored one.** 35 million comparisons per item; use banding.

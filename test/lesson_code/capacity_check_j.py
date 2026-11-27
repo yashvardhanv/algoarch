@@ -107,17 +107,23 @@ if text74 is not None:
     cond_bw = polls * (CHANGED * FULL + (1 - CHANGED) * SHORT) / 1e6
     assert round(full_bw, 1) == 5.6 and round(cond_bw, 2) == 0.86 and round(full_bw / cond_bw, 1) == 6.4
     kept = ITEMS * DAYS
-    assert kept == 35_000_000 and kept * 800 / 1e9 == 28.0 and kept * 400 / 1e9 == 14.0 and kept * 20 * 8 / 1e9 == 5.6
+    assert kept == 35_000_000 and kept * 800 / 1e9 == 28.0 and kept * 400 / 1e9 == 14.0 
+    KEY_H, KEY_FULL, ID_B = 8, 5 * 8, 8                      # hashed key, the model's 5-minimum key, the item id
+    assert kept * 20 * (KEY_H + ID_B) / 1e9 == 11.2 and kept * 20 * (KEY_FULL + ID_B) / 1e9 == 33.6 and kept * 20 == 700_000_000
+    assert kept * 20 * ID_B / 1e9 == 5.6                    # the old figure counted the id only: a table entry needs its key too
+    assert round(ITEMS / 86400 * 20 / polls, 1) == 10.4     # lookups are about ten times the polls, not fewer
     assert round(ITEMS / 86400 * 20) == 1157
     curve = {s: 1 - (1 - s ** 5) ** 20 for s in (0.5, 0.6, 0.7, 0.8, 0.9)}
     assert [round(100 * curve[s], 1) for s in (0.5, 0.6, 0.7)] == [47.0, 80.2, 97.5]
     assert round(100 * curve[0.8], 2) == 99.96 and round(100 * curve[0.9], 6) == 99.999998
-    assert round(0.5 ** (12 / 6) * (1 + 4), 2) == 1.25 and 4.0 * 0.0625 == 0.25      # the ranking examples in the lesson
+    import math
+    score = lambda n, age, hl=6: (1 + math.log2(n)) * 0.5 ** (age / hl)
+    assert round(score(16, 12), 2) == 1.25 and score(8, 24) == 0.25 and score(4, 0) / score(2, 0) == 1.5   # the ranking examples in the lesson
     for must in ('111 per second', '58 per second', '5.6 MB/s', '0.86 MB/s: 6.4 times less', '35 million', '28 GB (14 GB if each minimum is cut to 4 bytes)',
-                 '5.6 GB', '1,157 per second', '| 0.5 | 47.0% |', '| 0.6 | 80.2% |', '| 0.7 | 97.5% |', '| 0.8 | 99.96% |', '99.999998%',
+                 '11.2 GB', '33.6 GB', '700 million', '1,157 per second', '1.5 times, not double', 'a quarter of a typical gap', '| 0.5 | 47.0% |', '| 0.6 | 80.2% |', '| 0.7 | 97.5% |', '| 0.8 | 99.96% |', '99.999998%',
                  '101 of 125 true pairs (81%)', 'all 156 true pairs', '`4.0 x 0.0625 = 0.25`'):
         assert must in text74, must
-    for must_not in ('99.99998%', 'more than 99% of the true pairs', 'capacity_check_k'):
+    for must_not in ('99.99998%', 'more than 99% of the true pairs', 'capacity_check_k', '5.6 GB', 'fewer than the polls', 'hundreds of millions of kept', 'a different job', 'double what two', 'unbiased'):
         assert must_not not in text74, must_not
     for company in ('Google News', 'Apple News', 'Flipboard', 'Feedly', 'SmartNews', 'Reddit', 'Twitter', 'Facebook'):
         assert company not in text74, company
