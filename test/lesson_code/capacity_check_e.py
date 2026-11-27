@@ -51,7 +51,33 @@ def sy57(src):
     return 'sy57'
 
 
-SECTIONS = {'sy57': sy57}
+def sy58(src):
+    # ---- assumptions (every input is the lesson's own; no company figures were read) ----
+    searches, look_to_book, nights = 50_000, 500, 3
+    listings, days = 5_000_000, 365
+    hotels, room_types, row_bytes = 500_000, 6, 16
+    hot_rooms, hot_attempts_per_min, ttl_s = 40, 2_000, 600
+    # ---- results ----
+    bookings = searches / look_to_book
+    assert bookings == 100
+    assert bookings * nights == 300 and bookings * 2 == 200                 # row updates; reserve and confirm transactions
+    assert round(100 * bookings / searches, 1) == 0.2
+    bitmap_bytes = listings * days / 8
+    assert round(bitmap_bytes / 1e6) == 228
+    rows = hotels * room_types * days
+    assert rows == 1_095_000_000 and round(rows * row_bytes / 1e9, 1) == 17.5
+    held = bookings * ttl_s
+    assert held == 60_000 and held * nights == 180_000
+    assert round(100 * held * nights / rows, 3) == 0.016
+    per_s = hot_attempts_per_min / 60
+    assert round(per_s, 1) == 33.3 and round(hot_rooms / per_s, 1) == 1.2
+    need(src, '100 bookings per second', '300 row updates per second', '228 MB', '1,095,000,000 rows', '17.5 GB', '60,000 reservations',
+         '180,000 room-nights', '0.016%', '33.3 attempts per second', '1.2 seconds', '0.2% of the request rate', '50,000 searches')
+    forbid(src, 'Airbnb stores', 'Booking.com uses', 'Airbnb uses')
+    return 'sy58'
+
+
+SECTIONS = {'sy57': sy57, 'sy58': sy58}
 done = []
 for path in sys.argv[1:]:
     key = os.path.basename(path)[:4]
