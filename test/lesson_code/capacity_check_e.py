@@ -1,6 +1,6 @@
 """Reproduces every capacity and sizing number in the wave 3 case studies sy57 to sy59 and checks that each lesson states
 the same figures. Usage: capacity_check_e.py <lesson.md> [...]; each file is matched to its section by id prefix."""
-import sys, os
+import sys, os, re
 
 
 def need(src, *phrases):
@@ -11,6 +11,13 @@ def need(src, *phrases):
 def forbid(src, *phrases):
     for p in phrases:
         assert p not in src, 'lesson text still contains stale wording: %r' % p
+
+
+def forbid_claims(src, subject, verbs):
+    """no un-negated sentence may have the company as subject with one of the claim verbs"""
+    for sentence in re.split(r"(?<=[.!?])\s+|\n", src.split('## Further reading')[0]):
+        if re.search(subject, sentence) and re.search(verbs, sentence) and not re.search(r"\b(not|no|nor|never|without|neither|none)\b|n't", sentence, re.I):
+            raise AssertionError('unsourced claim about a company: %r' % sentence[:160])
 
 
 def sy57(src):
@@ -47,7 +54,7 @@ def sy57(src):
     need(src, '9,326,696', '2,195,080', '110 microseconds', '19,955 times', '50,000 route requests per second',
          '109,754 cores', '10.5 cores', '90.5 cores', '200,000 pings per second', '12,000,000', '28.2%', '28.6 GB', '86 MB',
          '333 times', '370 ms', '0.38 GiB', '60,283', '0.62%', 'about nine times', '3.14 GiB')
-    forbid(src, 'Google uses contraction hierarchies', 'Google Maps uses contraction')
+    forbid_claims(src, r'Google', r'\b(uses|use|runs|routes with|implements)\b')
     return 'sy57'
 
 
@@ -73,7 +80,7 @@ def sy58(src):
     assert round(per_s, 1) == 33.3 and round(hot_rooms / per_s, 1) == 1.2
     need(src, '100 bookings per second', '300 row updates per second', '228 MB', '1,095,000,000 rows', '17.5 GB', '60,000 reservations',
          '180,000 room-nights', '0.016%', '33.3 attempts per second', '1.2 seconds', '0.2% of the request rate', '50,000 searches')
-    forbid(src, 'Airbnb stores', 'Booking.com uses', 'Airbnb uses')
+    forbid_claims(src, r'Booking\.com|Expedia|Airbnb stores|Airbnb keeps|Airbnb allocates|Airbnb sets', r'\b(stores|keeps|uses|allocates|sets|overbooks|runs)\b')
     return 'sy58'
 
 
@@ -90,9 +97,15 @@ def sy59(src):
     assert round(bids_per_day * busiest_share / 3600) == 417
     assert bids_per_day * row_bytes == 1_000_000_000 and round(bids_per_day * row_bytes * 365 / 1e9) == 365
     rate = hot_bids / hot_seconds
-    assert rate == 300 and round(1000 / rate, 1) == 3.3
-    assert rate * watchers == 15_000_000
-    assert watchers * 1 == 50_000 and rate * watchers / (watchers * 1) == 300
+    assert rate == 300 and round(1000 / rate, 1) == 3.3                       # attempts per second on one row
+    changes_per_s = 5                                                         # assumed public price changes per second on the hot item
+    assert changes_per_s * watchers == 250_000                                # one push per price change
+    assert watchers * 1 == 50_000 and (changes_per_s * watchers) // (watchers * 1) == 5
+    # what accepted bids could physically do: every accepted bid raises the price by at least the increment at that price
+    p = 100
+    for _ in range(hot_bids):
+        p += inc(p)
+    assert p == 26_490_000                                                    # $264,900 after 3,000 accepted bids from $1.00
     price, steps, by_bracket = 100, 0, {}
     while price < 10_000:                                                       # climb from $1.00 to $100.00 one increment at a time
         by_bracket[inc(price)] = by_bracket.get(inc(price), 0) + 1
@@ -100,8 +113,9 @@ def sy59(src):
     assert steps == 131 and by_bracket == {25: 16, 50: 40, 100: 75}
     assert soft_cap == 300
     need(src, '116 bids per second', '417 bids per second', '1.0 GB per day, 365 GB per year', '300 bids per second on one row', '3.3 ms',
-         '15,000,000 messages per second', '50,000 messages per second', '300 times fewer', '131 raises (16 + 40 + 75)', '300 seconds')
-    forbid(src, 'eBay uses a soft close', 'eBay uses a hard close', 'eBay orders bids')
+         '$264,900', '250,000 messages per second', '50,000 messages per second', '5 times fewer', '131 raises (16 + 40 + 75)', '300 seconds')
+    forbid(src, '15,000,000', '300 times fewer', 'not buildable')
+    forbid_claims(src, r'eBay', r'\b(extends|extend|uses|closes|orders|breaks ties|rejects|runs)\b')
     return 'sy59'
 
 

@@ -21,6 +21,13 @@ def need(*phrases):
         assert p in src, 'lesson text is missing the checked figure: %r' % p
 
 
+def forbid_claims(subject, verbs):
+    """no un-negated sentence may have the company as subject with one of the claim verbs"""
+    for sentence in re.split(r"(?<=[.!?])\s+|\n", src.split('## Further reading')[0]):
+        if re.search(subject, sentence) and re.search(verbs, sentence) and not re.search(r"\b(not|no|nor|never|without|neither|none)\b|n't", sentence, re.I):
+            raise AssertionError('unsourced claim about a company: %r' % sentence[:160])
+
+
 def forbid(*phrases):
     for p in phrases:
         assert p not in src, 'lesson text still contains stale wording: %r' % p
@@ -313,6 +320,18 @@ assert extended_end(new_auction(1, 100.0, 200.0), 89.9, 10, 10) == 100.0
 assert extended_end(new_auction(1, 100.0, 105.0), 95.0, 10, 10) == 105.0                                   # cap
 assert extended_end(new_auction(1, 100.0, 100.0), 99.0, 10, 10) == 100.0                                   # no room: hard_end == end_at
 
+# review M6: a bid stamped BEFORE the end by a lagging server, arriving after close, is refused by the state guard alone
+conn = new_db(); open_auction(conn, 'i', 100, 500.0)
+assert place_bid(conn, 'i', 'A', 1000, 100.0) == 'LEADING'
+assert close(conn, 'i', 500.0) == ('A', 100)
+assert place_bid(conn, 'i', 'B', 90000, 499.0) == 'CLOSED'
+assert conn.execute('SELECT leader, price, state FROM auctions').fetchone() == ('A', 100, 'SOLD')
+# review M7: a leader raising their own hidden maximum inside the window is accepted and extends the soft close
+conn = new_db(); open_auction(conn, 'i', 100, 100.0, hard_end=200.0)
+assert place_bid(conn, 'i', 'A', 1000, 10.0, window=10, extend=10) == 'LEADING'
+assert place_bid(conn, 'i', 'A', 2000, 95.0, window=10, extend=10) == 'RAISED'
+assert conn.execute('SELECT end_at FROM auctions').fetchone()[0] == 105.0
+
 # ---- 4. late bids under a hard close and a soft close (illustrative simulation, figures printed in the lesson) -----------------------
 def run(rule, n_auctions, seed):
     r = random.Random(seed)
@@ -348,7 +367,8 @@ print('late bids: hard close top-value bidder wins %.1f%%, %.1f%% of bids reject
 assert abs(HARD[0] - 87.5) < 2.0, 'the hard-close loss should be close to 0.5 x 0.25 = 12.5%'     # half snipe, a quarter of those arrive after the end
 assert SOFT[0] > HARD[0] + 1 and SOFT[1] < HARD[1]
 
-need('48,619', '48,119', '12.4%', '%.1f%%' % HARD[0], '%.1f%%' % HARD[1], '%.1f%%' % SOFT[0], '%.1f%%' % SOFT[1], '2,500 random bid sequences', 'every cent up to $6,000',
+need('$264,900', '250,000 messages per second', '5 times fewer', 'exactly 3 seconds before the end', 'this lesson\'s reading', '48,619', '48,119', '12.4%', '%.1f%%' % HARD[0], '%.1f%%' % HARD[1], '%.1f%%' % SOFT[0], '%.1f%%' % SOFT[1], '2,500 random bid sequences', 'every cent up to $6,000',
      'Twelve threads', '360 attempts')
-forbid('eBay uses a soft close', 'eBay uses a hard close', 'eBay orders bids')
+forbid('15,000,000', '300 times fewer', 'not buildable')
+forbid_claims(r'eBay', r'\b(extends|extend|uses|closes|orders|breaks ties|rejects|runs)\b')
 print('sy59 code checks passed (%d proxy bids checked, %d ledger rows replayed)' % (seqs, 360))
