@@ -58,9 +58,9 @@ A CDN is thousands of caches placed close to users, plus the machinery that send
 | servers for the peak | 20 Tbps / (40 Gbps x 50%) | 1,000 |
 | requests per second | 20 Tbps / (500 KB x 8) | 5 million, 5,000 per server |
 | Bloom filter for 40 million objects | m = -n ln p / (ln 2)^2 | 575.1 million bits, 68.6 MB, 10 hash functions |
-| time to move load off a cluster | recompute + DNS time-to-live | up to 30 s + 20 s = 50 s before new lookups stop arriving |
+| time to move load off a cluster, worst case | recompute interval + DNS time-to-live | up to 30 s + 20 s = 50 s before new lookups stop arriving |
 
-Five conclusions. **The origin sees the miss rate:** 1 Tbps at 95% hits, so one point of hit ratio at this scale is 0.2 Tbps. **A tier above the edge is the cheapest cut:** 0.2 Tbps. **The filter is tiny:** 68.6 MB against the disk it protects. **Steering is slow by design:** the 50 seconds are a floor for DNS-based traffic shifting under these assumptions, and some resolvers hold answers longer (unmeasured here). **Per-server request rate is modest;** the constraint is bandwidth and disk writes, not requests.
+Five conclusions. **The origin sees the miss rate:** 1 Tbps at 95% hits, so one point of hit ratio at this scale is 0.2 Tbps. **A tier above the edge is the cheapest cut:** 0.2 Tbps. **The filter is tiny:** 68.6 MB against the disk it protects. **Steering is slow by design:** 50 seconds is the worst case for DNS-based traffic shifting under these assumptions, for resolvers that honour the lifetime; some hold answers longer (unmeasured here). **Per-server request rate is modest;** the constraint is bandwidth and disk writes, not requests.
 
 ---
 
@@ -122,7 +122,7 @@ def ring_servers(obj, servers, k):
     return [ring[(start + j) % len(ring)] for j in range(min(k, len(ring)))]
 ```
 
-The check asserts, over 400 objects and four removed servers, that with a server removed every object's list changes only if it contained that server, and then only by that server being replaced by the next in its order; adding a server only ever adds that server. For overlap it uses 40 evenly spaced servers and two popular objects with k = 8 servers each: on the shared ring, the probability that they share at least half their servers (4 or more) is exactly 9 of 40, **22.5%** (their start positions must be within 4); with independent per-object orders the exact (hypergeometric) probability is **3.65%**, and a simulation of 6,000 object pairs agrees with both within sampling error. Both have the same mean overlap, 1.6 servers (k squared over n), as the paper states: the difference is in the tail, not the average. The ideal evenly spaced ring is an assumption; a real ring with random positions is lumpier.
+The check asserts, over 400 objects and four removed servers, that with a server removed every object's list changes only if it contained that server, and then only by that server being replaced by the next in its order; adding a server only ever adds that server. For overlap it uses 40 evenly spaced servers and two popular objects with k = 8 servers each: on the shared ring, the probability that they share at least half their servers (4 or more) is exactly 9 of 40, **22.5%** (their start positions must be within 4; the paper states this probability only as of order k over n, about 20% here, and its exact value depends on the evenly spaced ring assumed); with independent per-object orders the exact (hypergeometric) probability is **3.65%**, and a simulation of 6,000 object pairs agrees with both within sampling error. Both have the same mean overlap, 1.6 servers (k squared over n), as the paper states: the difference is in the tail, not the average. The ideal evenly spaced ring is an assumption; a real ring with random positions is lumpier.
 
 **Grouping by customer.** The paper groups all of a customer's objects under one serial number and hashes the serial number, not each object, so that one browser connection serves a page's many objects from one server (opening a connection and ramping it up is paid once). The trade is coarser load spreading, which the popular-object mapping then relieves.
 
@@ -172,7 +172,7 @@ def bloom_size(n, p):
 
 class Bloom:
     def __init__(self, m, k): self.m, self.k, self.bits = m, k, bytearray((m + 7) // 8)
-    def _idx(self, key):                       # double hashing from one MD5 (this lesson's choice, not the paper's)
+    def _idx(self, key):                       # double hashing from one MD5 (this lesson's choice; the paper splits one MD5 hash into k parts)
         d = hashlib.md5(key.encode()).digest()
         a, b = int.from_bytes(d[:8], 'big'), int.from_bytes(d[8:], 'big') | 1
         return [(a + i * b) % self.m for i in range(self.k)]

@@ -98,7 +98,7 @@ def sy67(src):
     need(src, '| 1 Tbps |', '| 0.2 Tbps |', '2 Tbps: twice as much', '| 1,000 |', '5 million, 5,000 per server',
          '575.1 million bits, 68.6 MB, 10 hash functions', 'up to 30 s + 20 s = 50 s', '10,209', '5,738', '44%',
          '400 million distinct objects', '74%')
-    forbid(src, 'a purge reaches every cache automatically', 'the CDN always serves fresh content')
+    forbid(src, 'a purge reaches every cache automatically', 'the CDN always serves fresh content', 'are a floor for')
     return 'sy67'
 
 
