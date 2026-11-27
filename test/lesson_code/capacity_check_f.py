@@ -73,7 +73,40 @@ def sy61(src):
     return 'sy61'
 
 
-SECTIONS = {'sy60': sy60, 'sy61': sy61}
+def sy62(src):
+    tracks = 8_000_000                              # paper, 2010
+    kbps, track_s = 160, 240                        # paper's q5 average; 4-minute track assumed
+    mix = {'server': 8.8, 'peers': 35.8, 'cache': 55.4}   # paper
+    assert round(sum(mix.values()), 1) == 100.0
+    mb = kbps * 1000 / 8 * track_s / 1e6
+    assert round(mb, 1) == 4.8
+    lib_tb = tracks * mb / 1e6
+    assert round(lib_tb, 1) == 38.4
+    three = lib_tb * (96 + 160 + 320) / 160
+    assert round(three, 2) == 138.24
+    head = 0.12 * tracks
+    assert head == 960_000 and round(head * mb / 1e6, 3) == 4.608
+    assert int(5000 / mb) == 1041                    # a 5 GB cache; the paper says about 1,000 tracks
+    listeners = 1_000_000
+    gbps = listeners * kbps / 1e6
+    assert gbps == 160
+    srv = gbps * mix['server'] / 100
+    assert round(srv, 2) == 14.08
+    nop2p = gbps * (mix['server'] + mix['peers']) / 100
+    assert round(nop2p, 2) == 71.36 and round(nop2p / srv, 2) == 5.07
+    assert round(listeners / track_s) == 4167
+    assert round((390 - 265) / 265 * 100) == 47 and round((1.8 - 1.0) / 1.0 * 100) == 80
+    # origin load with a CDN: egress x (1 - hit ratio)
+    assert round(gbps * (1 - 0.90), 1) == 16.0 and round(gbps * (1 - 0.99), 1) == 1.6
+    # sanity: the head cannot be larger than the library and 12% of 8M tracks fits what 960,000 x 4.8 MB says
+    assert head < tracks and head * mb < lib_tb * 1e6
+    need(src, '4.8 MB', '38.4 TB', '138.24 TB', '4.608 TB', '1,041 tracks', '160 Gbps', '14.08 Gbps', '71.36 Gbps', '5.07 times', '4,167 plays per second',
+         '47% slower median start; 80% more stutter', '16 Gbps at the origin', '1.6 Gbps')
+    forbid(src, 'Spotify uses peer-to-peer today', 'Spotify still uses')
+    return 'sy62'
+
+
+SECTIONS = {'sy60': sy60, 'sy61': sy61, 'sy62': sy62}
 done = []
 for path in sys.argv[1:]:
     key = os.path.basename(path)[:4]

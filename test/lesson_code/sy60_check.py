@@ -121,10 +121,10 @@ assert killed == '' and len(out) == 1000                                        
 killed, code, out, wall = run_case([py, '-c', 'import sys;sys.stdout.write("y"*1001)'], b'', 10, 1000)
 assert killed == 'output' and len(out) == 1000
 # a grandchild that keeps our stdout open must not hold the judge: the runner waits for its child, not for end-of-file
-gc = 'import subprocess,sys;subprocess.Popen([sys.executable,"-c","import time;time.sleep(3)"]);print("hi")'
+gc = 'import subprocess,sys;subprocess.Popen([sys.executable,"-c","import time;time.sleep(6)"]);print("hi")'
 t0 = time.monotonic()
 killed, code, out, wall = run_case([py, '-c', gc], b'', 10, 1000)
-assert killed == '' and out.strip() == b'hi' and time.monotonic() - t0 < 2.5, (killed, out, time.monotonic() - t0)
+assert killed == '' and out.strip() == b'hi' and time.monotonic() - t0 < 4.5, (killed, out, time.monotonic() - t0)
 
 # ---- 4. re-measuring a reading that is over the limit ------------------------------------------------------------------------
 def trial(true_t, n, k, seed, mean=0.1):
