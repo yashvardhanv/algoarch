@@ -3,6 +3,7 @@ capacity number in the lesson and fails if stale wording or a wrong figure appea
 import sys, re
 text = open(sys.argv[1], encoding='utf-8').read()
 text75 = open(sys.argv[2], encoding='utf-8').read() if len(sys.argv) > 2 else None
+text76 = open(sys.argv[3], encoding='utf-8').read() if len(sys.argv) > 3 else None
 
 # ---- sy77: DNS at scale ---------------------------------------------------------------------------------------------
 N, TOTAL, TTL = 1_000_000, 20_000, 60
@@ -67,3 +68,30 @@ if text75 is not None:
     for vendor in ('LaunchDarkly', 'Unleash', 'Split.io', 'Optimizely', 'Flagsmith', 'Statsig', 'GrowthBook', 'Netflix', 'Facebook'):
         assert vendor not in text75, vendor
     print("capacity_check_j (sy75) passed")
+
+
+# ---- sy76: social graph and people you may know ------------------------------------------------------------------------
+if text76 is not None:
+    USERS, FRIENDS, ID, HUB, SHARDS, KEPT = 100_000_000, 200, 8, 1_000_000, 100, 100
+    entries = USERS * FRIENDS
+    assert entries == 20_000_000_000 and entries * ID / 1e9 == 160.0
+    one = FRIENDS * FRIENDS
+    assert one == 40_000 and one * ID == 320_000
+    assert one * ID / (KEPT * ID) == 400.0
+    base = USERS * FRIENDS * FRIENDS
+    hub = HUB * HUB
+    assert base == 4 * 10**12 and hub == 10**12 and hub / base == 0.25 and round(100 * hub / (base + hub)) == 20
+    touched = lambda S, d: S * (1 - (1 - 1 / S) ** d)
+    assert round(touched(SHARDS, 200), 1) == 86.6 and round(touched(SHARDS, 10), 1) == 9.6
+    assert round(touched(SHARDS, 1000), 1) == 100.0 and abs(touched(SHARDS, 1000) - 99.996) < 5e-4
+    assert USERS * KEPT * ID / 1e9 == 80.0
+    assert base / (20_000_000 * 1000) == 200.0
+    for must in ('20 billion, 160 GB at 8 bytes', '320 KB, against 800 B for a stored list: 400 times more', '4 x 10^12',
+                 '20% of the new total of 5 x 10^12', '86.6 of 100', '100.0 of 100 (99.996)', '80 GB', '200 seconds',
+                 'a fifth of the job', '9.6 shards', 'factors of 40 to 50', '25 times fewer', '`1/log 2 = 1.44` against `1/log 22 = 0.32`'):
+        assert must in text76, must
+    for must_not in ('capacity_check_k', 'under a third of the unguarded work'):
+        assert must_not not in text76, must_not
+    for company in ('Facebook', 'LinkedIn', 'Instagram', 'Twitter', 'TikTok', 'Meta', 'Pinterest', 'Snapchat'):
+        assert company not in text76, company
+    print("capacity_check_j (sy76) passed")
