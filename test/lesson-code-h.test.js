@@ -26,9 +26,18 @@ test('sy66 lesson code matches scan references, retention bounds, merge closed f
 });
 // wave3 task5 sy66 end
 
+// wave3 task5 sy67 begin
+test('sy67 lesson code matches RFC 9111 arithmetic, an exact second-hit reference, brute-force stable assignment and tiered origin load', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [check('sy67_check.py'), lesson('sy67-content-delivery-network.md')], { encoding: 'utf8', timeout: 300000 });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /sy67 code checks passed/);
+});
+// wave3 task5 sy67 end
+
 const CAPACITY_LESSONS_H = [
   // wave3 task5 capacity begin
   'sy66-log-aggregation-search.md',
+  'sy67-content-delivery-network.md',
   // wave3 task5 capacity end
 ];
 
