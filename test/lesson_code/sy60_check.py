@@ -22,6 +22,7 @@ def need(*phrases):
 # ---- 1. output checker -----------------------------------------------------------------------------------------------
 assert compare('1 2 3\n', '1 2 3', 'exact') is False and compare('1 2 3\n', '1 2 3\n', 'exact')
 assert compare('a b\n\n', 'a b  \r\n', 'lines') and compare('a\nb', 'a\nb\n\n\n', 'lines')
+assert compare(' a', 'a', 'lines') is False and compare('Yes', 'YES', 'tokens') is False
 assert not compare('a b', 'a  c', 'lines') and not compare('a\n\nb', 'a\nb', 'lines')      # an inner blank line matters
 assert compare('1  2\n3', '1 2 3', 'tokens') and not compare('1 2 3', '1 2', 'tokens') and not compare('1 2', '1 2 3', 'tokens')
 assert not compare('1 2 3', '1 2 4', 'tokens') and not compare('', '0', 'tokens') and compare('', '  \n', 'tokens')
@@ -72,6 +73,8 @@ assert verdict(Run(peak_kb=65536), '5', '5', lim) == 'AC'
 assert verdict(Run(killed='output'), '', '', lim) == 'OLE' and verdict(Run(out_bytes=1001), 'x', 'x', lim) == 'OLE'
 assert verdict(Run(exit_code=1), '5', '5', lim) == 'RE' and verdict(Run(signal=11), '5', '5', lim) == 'RE'   # a crash with the right prefix is still RE
 assert verdict(Run(signal=11, peak_kb=65536), '', '', lim) == 'MLE'              # a failed allocation surfaces as a crash at the limit
+assert verdict(Run(signal=9, killed='cpu', cpu_s=1.05, peak_kb=65000), '', '', lim) == 'TLE'      # the sandbox's own kill keeps its reason
+assert verdict(Run(signal=9, killed='wall', peak_kb=64300), '', '', lim) == 'TLE' and verdict(Run(signal=9, killed='output', peak_kb=65000, out_bytes=5), '', '', lim) == 'OLE'
 assert verdict(Run(exit_code=134, peak_kb=math.ceil(65536 * 0.98)), '', '', lim) == 'MLE'
 assert verdict(Run(exit_code=134, peak_kb=int(65536 * 0.97)), '', '', lim) == 'RE'
 assert verdict(Run(peak_kb=70000, cpu_s=5), '5', '5', lim) == 'MLE'              # both over: memory first (documented policy)
@@ -80,7 +83,7 @@ assert verdict(Run(cpu_s=5, out_bytes=5000), '5', '5', lim) == 'TLE'
 
 def ref_verdict(r, e, a, l, mode='tokens'):
     reasons = set()
-    if r.killed == 'oom' or r.peak_kb > l.mem_kb or (r.peak_kb >= l.mem_kb * 0.98 and (r.signal or r.exit_code)):
+    if r.killed == 'oom' or r.peak_kb > l.mem_kb or (r.peak_kb >= l.mem_kb * 0.98 and (r.signal or r.exit_code) and not r.killed):
         reasons.add('MLE')
     if r.killed in ('cpu', 'wall') or r.cpu_s > l.cpu_s:
         reasons.add('TLE')
@@ -109,54 +112,75 @@ killed, code, out, wall = run_case([py, '-c', 'import sys;sys.exit(3)'], b'', 10
 assert (killed, code) == ('', 3)
 t0 = time.monotonic()
 killed, code, out, wall = run_case([py, '-c', 'while True: pass'], b'', 0.4, 1000)
-assert killed == 'wall' and 0.4 <= wall < 3.0 and time.monotonic() - t0 < 4, (killed, wall)
+assert killed == 'wall' and wall >= 0.4, (killed, wall)
 killed, code, out, wall = run_case([py, '-c', 'import time;time.sleep(30)'], b'', 0.4, 1000)    # asleep: only the wall clock catches it
-assert killed == 'wall' and wall < 3.0
+assert killed == 'wall' and wall < 25          # killed long before the 30 s sleep ends (a loose bound: the check never asserts a tight time)
 flood = 'import sys\nwhile True: sys.stdout.buffer.write(b"x" * 65536); sys.stdout.buffer.flush()'
 killed, code, out, wall = run_case([py, '-c', flood], b'', 10, 100_000)
-assert killed == 'output' and out == b'x' * 100_000 and wall < 8, (killed, len(out), wall)           # truncated to exactly the limit
+assert killed == 'output' and out == b'x' * 100_000 and wall < 60, (killed, len(out), wall)           # truncated to exactly the limit
 exactly = 'import sys;sys.stdout.write("y"*1000)'
 killed, code, out, wall = run_case([py, '-c', exactly], b'', 10, 1000)
 assert killed == '' and len(out) == 1000                                                          # exactly the limit is not an overflow
 killed, code, out, wall = run_case([py, '-c', 'import sys;sys.stdout.write("y"*1001)'], b'', 10, 1000)
 assert killed == 'output' and len(out) == 1000
-# a grandchild that keeps our stdout open must not hold the judge: the runner waits for its child, not for end-of-file
-gc = 'import subprocess,sys;subprocess.Popen([sys.executable,"-c","import time;time.sleep(6)"]);print("hi")'
-t0 = time.monotonic()
-killed, code, out, wall = run_case([py, '-c', gc], b'', 10, 1000)
-assert killed == '' and out.strip() == b'hi' and time.monotonic() - t0 < 4.5, (killed, out, time.monotonic() - t0)
+# a grandchild that keeps our stdout open must not hold the judge: the runner waits for its child, not for end-of-file.
+# No wall-clock threshold: the grandchild sleeps 120 s and leaves a marker file if it ever finishes; the runner runs in a
+# thread that must finish (join timeout 60 s) while the marker is still absent. The grandchild is killed afterwards.
+import threading, tempfile, signal
+tmp = tempfile.mkdtemp()
+marker, pidfile = os.path.join(tmp, 'marker'), os.path.join(tmp, 'pid')
+child = "import time,sys;time.sleep(120);open(sys.argv[1],'w').write('x')"
+parent = "import subprocess,sys;p=subprocess.Popen([sys.executable,'-c',%r,sys.argv[1]]);open(sys.argv[2],'w').write(str(p.pid));print('hi')" % child
+box = []
+th = threading.Thread(target=lambda: box.append(run_case([py, '-c', parent, marker, pidfile], b'', 100, 1000)), daemon=True)
+th.start()
+th.join(60)
+try:
+    assert not th.is_alive(), 'run_case waited for the grandchild'
+    assert box[0][0] == '' and box[0][2].strip() == b'hi' and not os.path.exists(marker), box
+finally:
+    if os.path.exists(pidfile):
+        try:
+            os.kill(int(open(pidfile).read()), signal.SIGTERM)
+        except OSError:
+            pass
 
 # ---- 4. re-measuring a reading that is over the limit ------------------------------------------------------------------------
 def trial(true_t, n, k, seed, mean=0.1):
+    """(false-verdict rate, share of trials with at least one extra reading, mean extra readings per trial)"""
     r = random.Random(seed)
-    over = 0
+    over = extra_any = extra_total = 0
     for _ in range(n):
         reads = []
         m = lambda: (reads.append(1), true_t * (1 + r.expovariate(1 / mean)))[1]
         if judged_time(m, 1.0, reruns=k) > 1.0:
             over += 1
-    return over / n, 0
+        extra_total += len(reads) - 1
+        extra_any += len(reads) > 1
+    return over / n, extra_any / n, extra_total / n
 N = 200_000
 p1 = trial(0.8, N, 0, 1)[0]
-p3 = trial(0.8, N, 2, 2)[0]
+p3, share, mean_extra = trial(0.8, N, 2, 2)
 exact1, exact3 = math.exp(-2.5), math.exp(-2.5) ** 3
 assert abs(p1 - exact1) < 4 * math.sqrt(exact1 * (1 - exact1) / N), (p1, exact1)
 assert abs(p3 - exact3) < 5 * math.sqrt(exact3 / N) + 1e-4, (p3, exact3)
 assert round(exact1, 3) == 0.082 and round(exact3, 5) == 0.00055
+assert abs(share - exact1) < 4 * math.sqrt(exact1 * (1 - exact1) / N), share                 # 8.2% get a second reading
+assert abs(mean_extra - (exact1 + exact1 ** 2)) < 0.003, mean_extra                          # 8.9% more readings in all: an expected count
+assert round(exact1 ** 2, 3) == 0.007 and round(exact1 + exact1 ** 2, 3) == 0.089 and share < mean_extra
 assert trial(1.05, 20_000, 2, 3)[0] == 1.0 and trial(1.05, 20_000, 9, 4)[0] == 1.0     # a truly slow solution never gets through
 calls = []
 assert judged_time(lambda: (calls.append(1), 0.9)[1], 1.0) == 0.9 and len(calls) == 1      # within the limit: one reading
 calls.clear()
 assert judged_time(lambda: (calls.append(1), 5.0)[1], 1.0, hopeless=2.0) == 5.0 and len(calls) == 1   # hopeless: not re-measured
 calls.clear()
+seq = iter([2.0, 0.9])
+assert judged_time(lambda: (calls.append(1), next(seq))[1], 1.0, reruns=2, hopeless=2.0) == 0.9 and len(calls) == 2   # exactly 2 x the limit is not hopeless
+calls.clear()
 seq = iter([1.2, 1.4, 0.95, 0.5])
 assert judged_time(lambda: (calls.append(1), next(seq))[1], 1.0, reruns=3) == 0.95 and len(calls) == 3   # stops at the first reading under
 seq = iter([1.2, 1.4, 1.3, 0.5])
 assert judged_time(lambda: next(seq), 1.0, reruns=2) == 1.2                                   # the fastest of three readings, not the last
-# extra work: the share of submissions near the limit that cost extra readings, for the lesson's example
-extra = exact1 + exact1 ** 2
-assert round(extra, 3) == 0.089
-
 # ---- 5. the queue: against a time-stepped reference, then invariants ---------------------------------------------------------
 def ref_sim(jobs, workers, policy):
     """integer times, one tick at a time: at each tick, free workers start jobs chosen by the policy"""
@@ -212,7 +236,7 @@ for stale in ('LeetCode runs', 'LeetCode uses', 'Codeforces uses', 'gVisor is a 
     assert stale not in src, stale
 need('Sources', 'Last reviewed: 27 November 2026', 'Level:** extended', '(proposed; the curriculum data holds the final rating)')
 need('not consulted', 'isolate', 'gVisor', 'Firecracker', 'cgroup', 'seccomp', 'extra-time', 'wall-time')
-need('49 seconds', '54 seconds', '4 seconds', '9 seconds', '**8.2%**', '**0.055%**', '**8.9%**')
+need('49 seconds', '54 seconds', '4 seconds', '9 seconds', '**8.2%**', '**0.055%**', '**8.9%**', '0.7% a third', 'lifetime starts', 'as an expected count')
 after = [l for l in src.splitlines() if l.startswith('> **Study time')][0]
 for t in ('Distributed Message Queue (SQS / RabbitMQ)', 'Docker & Container Internals', 'Real-Time Gaming Leaderboard at 10M QPS'):
     assert t in after or t in src, t

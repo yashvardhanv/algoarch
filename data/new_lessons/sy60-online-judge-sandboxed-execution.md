@@ -8,7 +8,7 @@
 
 An online judge takes source code from people you do not trust, runs it on your machines against hidden tests, and returns a verdict a contestant will dispute at the second decimal of a running time. The sandbox is only one of four hard parts: the others are a verdict that is defensible (what counts as the right output, which limit fired first), a time measurement that is stable on shared hardware, and a queue that stays fair when ten thousand people submit in the last ten minutes. The code here is checked in `test/lesson_code/sy60_check.py`; capacity numbers come from `capacity_check_f.py`. Queues, workers and leases are not re-taught (see Distributed Message Queue (SQS / RabbitMQ) and Distributed Task Scheduler), nor the container basics (see Docker & Container Internals); rankings are the subject of Real-Time Gaming Leaderboard at 10M QPS.
 
-**What was and was not read.** The sandbox facts come from the manuals and papers listed in Sources: the `isolate` manual (a sandbox its own text says is meant for programming contests), the gVisor documentation, the Firecracker paper and the Linux manual pages for seccomp, namespaces and cgroups. **No engineering post, paper or documentation from LeetCode, Codeforces or any other judge operator was read**, so nothing below says how any of them is built; the design is the general approach, and every figure marked *assumed* is this lesson's own.
+**What was and was not read.** The sandbox facts come from the manuals and papers listed in Sources: the `isolate` manual (a sandbox whose manual gives running contestants' programs in a programming contest as an example use), the gVisor documentation, the Firecracker paper and the Linux manual pages for seccomp, namespaces and cgroups. **No engineering post, paper or documentation from LeetCode, Codeforces or any other judge operator was read**, so nothing below says how any of them is built; the design is the general approach, and every figure marked *assumed* is this lesson's own.
 
 ---
 
@@ -180,7 +180,7 @@ def verdict(run: Run, expected: str, actual: str, limits: Limits, mode: str = "t
     crashed = run.signal != 0 or run.exit_code != 0
     if run.killed == "oom" or run.peak_kb > limits.mem_kb:
         return "MLE"
-    if crashed and run.peak_kb >= limits.mem_kb * 0.98:   # a failed allocation shows up as a crash at the limit
+    if crashed and not run.killed and run.peak_kb >= limits.mem_kb * 0.98:   # a failed allocation shows up as a crash at the limit
         return "MLE"
     if run.killed in ("cpu", "wall") or run.cpu_s > limits.cpu_s:
         return "TLE"
@@ -191,7 +191,7 @@ def verdict(run: Run, expected: str, actual: str, limits: Limits, mode: str = "t
     return "AC" if compare(expected, actual, mode) else "WA"
 ```
 
-Four decisions are this lesson's own policy, not a standard: memory is tested before time because an out-of-memory kill is deterministic while a time reading is noisy; a run that finished with the right answer at 1.0001 s against a 1.0 s limit is TLE (the limit is the limit); a crash within 2% of the memory limit is called MLE, because with an address-space limit the allocation fails (`isolate`'s `--mem`: "further memory allocations fail") and the program usually dies with a signal or a non-zero exit, which would otherwise read as a runtime error; the 2% tolerance is an assumption. The check compares `verdict` to a ranking reference on 3,000 random runs and pins the boundaries (exactly the limit is accepted).
+Four decisions are this lesson's own policy, not a standard: memory is tested before time because an out-of-memory kill is deterministic while a time reading is noisy; a run that finished with the right answer at 1.0001 s against a 1.0 s limit is TLE (the limit is the limit); a crash within 2% of the memory limit is called MLE (only when the program died on its own: a run the sandbox killed for CPU, wall time or output keeps that reason, since the kill is a SIGKILL that is not a crash of the program), because with an address-space limit the allocation fails (`isolate`'s `--mem`: "further memory allocations fail") and the program usually dies with a signal or a non-zero exit, which would otherwise read as a runtime error; the 2% tolerance is an assumption. The check compares `verdict` to a ranking reference on 3,000 random runs and pins the boundaries (exactly the limit is accepted).
 
 ### 6.3 Running it
 
@@ -255,7 +255,7 @@ def judged_time(measure, limit: float, reruns: int = 2, hopeless: float = 2.0) -
     return best
 ```
 
-It rests on one assumption, labelled: noise only adds time. For the example (a solution whose true time is 0.8 of the limit, readings inflated by a factor 1 + an exponential with mean 0.1; both *assumed*), a single reading gives a false time-limit verdict with probability e^-2.5 = **8.2%**; with up to two re-measurements that falls to the cube, **0.055%**; and the cost is that submissions near the limit are run extra times, 8.2% + 8.2%^2 = **8.9%** of such submissions get at least one more reading. The check simulates 200,000 trials of each and compares with the closed forms, and shows a solution truly 5% over the limit never passes however many re-measurements it gets. The limit of the trick: it hides noise, not a solution that is honestly at the edge. A problem setter should leave a margin (a reference solution well inside the limit), and slow-but-correct languages need a multiplier, which is a product decision.
+It rests on one assumption, labelled: noise only adds time. For the example (a solution whose true time is 0.8 of the limit, readings inflated by a factor 1 + an exponential with mean 0.1; both *assumed*), a single reading gives a false time-limit verdict with probability e^-2.5 = **8.2%**; with up to two re-measurements that falls to the cube, **0.055%**; and the cost is extra readings: **8.2%** of such submissions get a second reading and 0.7% a third (8.2%^2), so **8.9%** more readings in all, per submission near the limit, as an expected count, not a share of submissions. The check simulates 200,000 trials of each and compares the false-verdict rates, the share with a second reading and the mean number of extra readings with the closed forms, and shows a solution truly 5% over the limit never passes however many re-measurements it gets. The limit of the trick: it hides noise, not a solution that is honestly at the edge. A problem setter should leave a margin (a reference solution well inside the limit), and slow-but-correct languages need a multiplier, which is a product decision.
 
 ---
 
@@ -298,7 +298,7 @@ The check compares both policies with a time-stepped reference on 300 random sma
 
 **The example** (illustrative): 4 workers, 5 seconds per job; one user submits 40 jobs at time 0; eight other users submit one job each at time 1. FIFO starts four of the eight at 50 and four at 55, so they wait **49 seconds** and **54 seconds**. Fair sharing starts four of them at 5 and four at 10, so they wait **4 seconds** and **9 seconds**. The heavy user's own last job ends at 60 instead of 50, and **the makespan is 60 either way**: fair sharing reorders work, it creates no capacity. This is why the fleet must still be sized for the peak (section 3) and why the next defences are admission: a per-user limit on queued submissions, a minimum gap between submissions, and shedding (see Overload, Load Shedding and Cascading Failures).
 
-**Known holes.** Fair sharing per user is defeated by many accounts, so the fairness key is sometimes IP or contest team. Shortest-job-first lowers average waits further but starves heavy jobs, which here means starving long-running problems. A contest wants the oldest first inside a user and fair across users, with practice submissions at lower priority, so a practice flood never delays a contest.
+**Known holes.** Fair sharing per user is defeated by many accounts, so the fairness key is sometimes IP or contest team. Shortest-job-first lowers average waits further but starves heavy jobs, which here means starving long-running problems. A contest wants the oldest first inside a user and fair across users, with practice submissions at lower priority, so a practice flood never delays a contest. The count in `simulate` is lifetime starts, so a user who submitted heavily an hour ago stays behind every newcomer for the rest of the run; count starts within a recent window if that matters.
 
 ---
 
@@ -334,7 +334,7 @@ Workers are cattle: pinned to a core count, stateless except for the tests cache
 
 The sources read here are infrastructure documentation, not judge operators.
 
-- **isolate** (manual read 2026-11-27): a sandbox for "programs written by contestants", built on namespaces, control groups and rlimits, with the meta-file and limit set used in this lesson. The manual says nothing about which sites use it, and neither does this lesson.
+- **isolate** (manual read 2026-11-27): a sandbox for running untrusted programs, with a programming contest as the manual's example, built on namespaces, control groups and rlimits, with the meta-file and limit set used in this lesson. The manual says nothing about which sites use it, and neither does this lesson.
 - **gVisor** (documentation read 2026-11-27): the application-kernel approach, with the structural-versus-implementation cost split. **Firecracker** (Agache et al., NSDI 2020, read 2026-11-27): the AWS micro-VM manager behind Lambda and Fargate; the paper's use is serverless functions, not judging.
 - **LeetCode, Codeforces and others:** no source read. The sizing and queue designs above are the general approach.
 
