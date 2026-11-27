@@ -2,11 +2,11 @@
 
 > **Priority:** ★★☆☆☆ (proposed; the curriculum data holds the final rating) — a recurring prompt in a gaming-flavoured loop, and a clean test of whether you can separate rating maths, queue design and a real-time server that must survive retries, lag and crashes.
 >
-> **Study time:** 70 minutes. **Do this after:** Real-Time Gaming Leaderboard; Scaling Patterns II: Large Blobs, Long-Running Tasks and Real-Time Updates; Caching and Consistent Hashing; Time, Clocks and Ordering.
+> **Study time:** 70 minutes. **Do this after:** Real-Time Gaming Leaderboard; Scaling Patterns II: Large Blobs, Long-Running Tasks and Real-Time Updates; Caching Patterns and Consistent Hashing; Time, Clocks and Ordering; Distributed Lock Service (Chubby / ZooKeeper).
 >
 > **Level:** extended.
 
-Two strangers click "play". The system must pick opponents of similar strength without making anyone wait forever, run the game with a clock neither can cheat, tolerate a dropped connection or a retried move without corrupting the game, and update ratings afterwards. The code is checked in `test/lesson_code/sy72_check.py`: the rating update reproduces the worked examples in Glickman's paper, the queue is compared with a brute-force matcher, and the game server is tested with duplicated, late and early moves. Capacity figures come from `capacity_check_i.py`. Leaderboards are not re-taught (see Real-Time Gaming Leaderboard), nor is routing by hash (see Caching and Consistent Hashing).
+Two strangers click "play". The system must pick opponents of similar strength without making anyone wait forever, run the game with a clock neither can cheat, tolerate a dropped connection or a retried move without corrupting the game, and update ratings afterwards. The code is checked in `test/lesson_code/sy72_check.py`: the rating update reproduces the worked examples in Glickman's paper, the queue is compared with a brute-force matcher, and the game server is tested with duplicated, late and early moves. Capacity figures come from `capacity_check_i.py`. Leaderboards are not re-taught (see Real-Time Gaming Leaderboard), nor is routing by hash (see Caching Patterns and Consistent Hashing).
 
 ---
 
@@ -32,7 +32,7 @@ Two strangers click "play". The system must pick opponents of similar strength w
 | "a client has lag" | server-side clock; credit a capped amount of measured lag (section 7) |
 | "flag a player who disappears" | a server timer, not a client message (section 7) |
 | "server crashes mid-game" | append-only move log; rebuild by replay |
-| "millions of spectators" | fan out from the game owner through a separate gateway tier; see Scaling Patterns II |
+| "many spectators" | fan out from the game owner through a separate gateway tier; see Scaling Patterns II |
 | "leaderboard" | see Real-Time Gaming Leaderboard |
 
 ---
@@ -47,17 +47,18 @@ Two strangers click "play". The system must pick opponents of similar strength w
 
 | Quantity | Assumption or derivation | Result |
 |---|---|---|
-| Concurrent games | assumed | 100,000 (so at least 200,000 connected players: a game has two) |
+| Concurrent games at peak | assumed | 100,000 (so at least 200,000 connected players: a game has two) |
+| Connections | 200,000 players plus an assumed 100,000 spectators | about 300,000 |
 | Game length | assumed 10 minutes, 40 moves per side | 600 seconds, 80 moves |
 | Moves per second | 100,000 games x 80 moves / 600 s | about 13,333 |
 | Messages per move | assumed: ack to the mover, push to the opponent, one spectator on average | 3, so about 40,000 messages per second |
-| Games started per second | 100,000 games / 600 s | about 167 (about 14.4 million per day if the load were constant, an upper bound) |
+| Games started per second | 100,000 games / 600 s | about 167 (about 14.4 million per day if the peak load lasted all day, so an upper bound) |
 | Seeks per second | two players per game | about 333 |
 | Players waiting | Little's law with an assumed 10 s mean wait | about 3,333 |
 | Live state per game | assumed 1.5 KB | 150 MB for all games, small enough to keep in memory |
 | Move log per game | 80 moves x 32 bytes (assumed) | 2,560 bytes, so about 36.9 GB per day at the constant-load upper bound |
 
-The point of the table is what is small. The whole live state fits in the memory of one machine and the whole queue is a few thousand rows. What does not fit on one machine is the set of connections and the message rate, which is why the work is routed by game id and the connection tier is separate (section 8).
+The point of the table is what is small. The whole live state fits in the memory of one machine and the whole queue is a few thousand rows. The state is small; the load is the 300,000 connections and about 40,000 messages per second. Whether one machine could carry that depends on the machine and is not measured here, so treat splitting connections from games as a design choice for independent scaling and failure (section 8), not as a limit the table proves. Work is routed by game id.
 
 ---
 
@@ -83,7 +84,7 @@ GET  /games/{id}                                       -> moves, result, clocks 
 
 ## 5. Deep Dive 1: Ratings With an Error Bar
 
-Elo's system gives each player a number; the expected score against an opponent is a logistic function of the rating difference, and the number moves by a fixed multiple of (score minus expected). Glickman's 1995 paper, which this section implements, starts from one weakness: two players both rated 1700 are treated alike even if one has not played for years. He adds a **ratings deviation** (RD), a standard deviation that measures how uncertain the rating is. Time away raises it; each game lowers it; a new player starts at rating 1500 with RD 350. He notes that Elo is a special case of his system and that, in his, rating changes are not balanced between the two players: an uncertain player moves a lot, a well-known one barely.
+Elo's system gives each player a number; the expected score against an opponent is a logistic function of the rating difference, and the number moves by a fixed multiple of (score minus expected). Glickman's paper *The Glicko system* (he says he created the system in 1995), which this section implements, starts from one weakness: two players both rated 1700 are treated alike even if one has not played for years. He adds a **ratings deviation** (RD), a standard deviation that measures how uncertain the rating is. Time away raises it; each game lowers it; a new player starts at rating 1500 with RD 350. He notes that Elo is a special case of his system and that, in his, rating changes are not balanced between the two players: an uncertain player moves a lot, a well-known one barely.
 
 ```python
 import math
@@ -233,7 +234,7 @@ Design choices the check pins:
 
 **Does it stay live?** A simulation (seed 3, illustrative: three arrivals per second on average for 900 seconds, ratings from a normal distribution with mean 1500 and standard deviation 250, one tick per second) paired 1,385 couples with a largest rating gap of 187. Players within one standard deviation of the mean had a median wait of 0 seconds and a 95th-percentile wait of 5; players more than two standard deviations out (129 of them) had a median wait of 6 seconds and a 95th percentile of 43, and none was still waiting at the end. That is one invented load with a dense pool; a sparse pool (a rare time control, an odd hour) behaves differently. A player at 2,900 may wait the full 70 seconds for the window to reach 400 and then be paired with nobody, which is why products add a bot, a wider cap or a "no opponent found" outcome. Measure the tail wait, not the average.
 
-**Scaling the queue.** One tick over a few thousand players is cheap (the sizing table gives about 3,333 waiting). Shard by time control and rating band if needed; a pair across a band boundary needs the neighbouring shard, so keep bands overlapping by the maximum window.
+**Scaling the queue.** One tick over a few thousand players is cheap; shard by time control (and rating band with overlapping bands if needed).
 
 ---
 
@@ -255,7 +256,7 @@ def winner(board):
 class Game:
     """Server-authoritative tic-tac-toe standing in for chess. Times are integer milliseconds on the SERVER's clock."""
     def __init__(self, clock_ms=60_000, inc_ms=0, lag_cap_ms=100, start_ms=0):
-        self.board, self.moves, self.turn, self.result = [None] * 9, [], 'X', None
+        self.board, self.moves, self.log, self.turn, self.result = [None] * 9, [], [], 'X', None
         self.left = {'X': clock_ms, 'O': clock_ms}
         self.inc, self.cap, self.t0 = inc_ms, lag_cap_ms, start_ms
 
@@ -269,7 +270,8 @@ class Game:
             return 'future'                                         # a gap: the earlier move has not arrived yet
         if side != self.turn:
             return 'not_your_turn'
-        charge = max(0, now - self.t0 - min(lag, self.cap))         # credit at most `cap` ms of network delay
+        credit = min(lag, self.cap)                                 # credit at most `cap` ms of network delay
+        charge = max(0, now - self.t0 - credit)
         if charge > self.left[side]:
             self.result = ('O' if side == 'X' else 'X', 'timeout')
             return 'flagged'
@@ -278,7 +280,8 @@ class Game:
         self.left[side] += self.inc - charge
         self.t0 = now
         self.board[cell] = side
-        self.moves.append((side, cell, now, lag))
+        self.moves.append((side, cell, now, credit))                # the log records the credit actually used
+        self.log.append(self.moves[-1])
         w = winner(self.board)
         if w:
             self.result = (w, 'win')
@@ -298,12 +301,22 @@ class Game:
             return True
         return False
 
+    def resume(self, now):
+        """A new owner takes over. The outage is charged to nobody: the turn clock restarts at the new owner's time."""
+        if self.result is None:
+            self.t0 = now
+        self.log.append(('resume', now))
+
     @classmethod
     def replay(cls, log, **config):
-        """Rebuild a game from its accepted moves: (side, cell, now, lag) in order."""
+        """Rebuild a game from its log: accepted moves (side, cell, now, credit) and ('resume', now) markers, in order."""
         game = cls(**config)
-        for ply, (side, cell, now, lag) in enumerate(log):
-            assert game.submit(side, ply, cell, now, lag) == 'ok', 'the log holds a move that is not valid'
+        for entry in log:
+            if entry[0] == 'resume':
+                game.resume(entry[1])
+                continue
+            side, cell, now, credit = entry
+            assert game.submit(side, len(game.moves), cell, now, credit) == 'ok', 'the log holds a move that is not valid'
         return game
 ```
 
@@ -327,7 +340,9 @@ The check plays 300 random games in which each move is sometimes preceded by the
 
 **Flagging without a message.** A player who has disconnected sends nothing, so the server needs a timer: `flag_deadline` is the turn start plus the remaining time plus the lag allowance, and `flag_check` ends the game after it. The grace period is the same cap, so a player with legitimate lag is never flagged by the timer before a move that would have been accepted. The lesson chose these semantics; they are not a description of any service.
 
-**Recovery by replay.** The log stores `(side, cell, server time, lag credited)` for each accepted move. `Game.replay` feeds it back through `submit`; the check requires the rebuilt game to equal the original in board, moves, clocks, turn, result and turn start for all 300 fuzz games, and refuses a log containing a move that would not have been accepted. That is why the server logs what it accepted, with the time it used, and not what it received.
+**Recovery by replay.** The log stores `(side, cell, server time, lag credited)` for each accepted move, where the lag is the credit actually used (already capped), so a replay under a different configured cap still reproduces the same clocks (the check replays under caps of 50 and 500). `Game.replay` feeds the log back through `submit`; the check requires the rebuilt game to equal the original in board, moves, clocks, turn, result and turn start for all 300 fuzz games, and refuses a log containing a move that would not have been accepted. That is why the server logs what it accepted, with the time it used, and not what it received.
+
+**Failover must not cost anyone time.** A naive replay restores the turn clock as of the last move, and the new owner then counts the whole outage against the player on move. The check shows it: with 10 seconds on the clock and X's move at 1.0 s, a new owner replaying at 31.5 s flags O, who lost on time because a server died. `resume(now)` restarts the turn clock at the new owner's time, so the thinking time already spent before the crash is given back (generous by a few seconds at most; periodic clock checkpoints in the log would be the stricter alternative) and nobody is charged for the outage. It also keeps the clocks of different machines apart: a move's charge is always a difference of two times from the same owner, because a `('resume', now)` marker in the log re-bases the clock, and a second failover replays that marker too. The check changes the time base after random resumes (offsets of up to 5 seconds either way) and replays to the same state. This is the Time, Clocks and Ordering lesson applied: use durations on one clock, never absolute times across machines.
 
 Visual (planned): a timeline of one move with the client send time, the server receive time, the lag credit and the clock charge.
 
@@ -335,10 +350,9 @@ Visual (planned): a timeline of one move with the client send time, the server r
 
 ## 8. Scale: Routing, Connections and Spectators
 
-- **One owner per game.** All traffic for a game goes to the process that owns it, found by hashing the game id over live servers (see Caching and Consistent Hashing). Ordering, clocks and the validity of a move need a single writer; with two owners a duplicated move or a double flag becomes possible.
-- **Separate the connection tier.** Keeping millions of WebSocket connections open is a different resource problem from running games. The Lichess repository's README (read on 27 November 2026) says its WebSocket connections are handled by a separate server that communicates with the main application over Redis; the lesson takes from that only that this split exists in one open-source chess server, and designs its own the same way. Real-time updates and fan-out are covered in Scaling Patterns II.
-- **Spectators** fetch the move list once and then follow pushes through the gateway.
-- **Failover.** When an owner dies, a new owner is chosen, rebuilds each live game by replay and tells clients, who reconnect and re-send any unacknowledged move with the same `ply`. A retried move is `dup` if it was logged and `ok` if it was not.
+- **One owner per game.** All traffic for a game goes to the process that owns it, found by hashing the game id over live servers (see Caching Patterns and Consistent Hashing). Ordering, clocks and the validity of a move need a single writer; with two owners a duplicated move or a double flag becomes possible. Failover does not make that automatic: a partitioned old owner can keep appending moves while the new one runs the game. Make the log append conditional (put-if-absent on `(game id, ply)`) or carry a fencing token from the election, so the stale owner's writes are refused; Distributed Lock Service (Chubby / ZooKeeper) covers the token and is not re-taught here.
+- **Separate the connection tier.** Keeping hundreds of thousands of WebSocket connections open (the table's 300,000) is a different resource problem from running games. The Lichess repository's README (read on 27 November 2026) says its WebSocket connections are handled by a separate server that communicates with the main application over Redis; the lesson takes from that only that this split exists in one open-source chess server, and designs its own the same way. Real-time updates and fan-out are covered in Scaling Patterns II.
+- **Failover.** When an owner dies, a new owner is chosen, rebuilds each live game by replay, calls `resume` so the outage is not charged, and tells clients, who reconnect and re-send any unacknowledged move with the same `ply`. A retried move is `dup` if it was logged and `ok` if it was not.
 - **The log is the bottleneck to watch.** At about 13,333 moves per second the log must be appended before the acknowledgement for the guarantees above to hold; if you acknowledge first and log asynchronously, a crash can lose an acknowledged move.
 
 ---
@@ -348,13 +362,11 @@ Visual (planned): a timeline of one move with the client send time, the server r
 | What breaks | What happens | Mitigation |
 |---|---|---|
 | Client retries a move | double apply | `ply` numbering; `dup` acknowledgement |
-| Two sockets from one player | conflicting moves | single owner; `ply` and turn checks |
 | Client lies about lag | free time | server-side measurement; capped credit |
 | Player disconnects | clock never ends | server flag timer |
-| Owner process crashes | games lost | log before ack; replay on a new owner |
-| Replica lag in ratings | stale rating for pairing | read ratings at seek time, accept slight staleness |
+| Owner process crashes | games lost, or the player on move flagged for the outage | log before ack; replay on a new owner, then `resume` (tested) |
+| Old owner partitioned, still appending | two writers | conditional append or fencing token (section 8) |
 | Sparse rating region | very long waits | cap the window, offer a bot or an explicit outcome |
-| Rating pool abuse | inflated or deflated ratings | outside this lesson: detection and policy |
 | Rating update uses post-game values | asymmetric, wrong ratings | both updates from pre-game values (tested) |
 
 ---
@@ -363,7 +375,7 @@ Visual (planned): a timeline of one move with the client send time, the server r
 
 - **Glicko.** Glickman's paper (read on 27 November 2026) says the system was implemented on the Free Internet Chess Server with game-by-game updates, and that variations have been adopted by other online game organisations. It is the source of the formulas and worked examples above.
 - **Lichess.** Its source repository is public. Read: the README and `Glicko.scala`, as described in sections 5 and 8. Not read: the matchmaking and game-server code, its architecture diagram image or any engineering post, so nothing here describes how Lichess pairs players or runs clocks.
-- **Chess.com, commercial matchmaking, TrueSkill.** Not read. The TrueSkill paper was fetched but its text could not be extracted, so no statement is made about it.
+- **Not read:** Chess.com, commercial matchmaking, TrueSkill (the paper was fetched but its text could not be extracted).
 
 ---
 
@@ -379,6 +391,7 @@ Visual (planned): a timeline of one move with the client send time, the server r
 8. Charging the clock for an illegal move, or not charging for time before a legal one.
 9. Having no server timer, so a disconnected player never flags.
 10. Acknowledging a move before it is in the log.
+11. Replaying a game after failover without restarting the turn clock: the outage is charged to the player on move.
 
 ---
 
@@ -398,9 +411,7 @@ Visual (planned): a timeline of one move with the client send time, the server r
 ## Homework
 
 1. Add a rating-period update that takes several games for one player at once and reproduce the paper's three-game example through `rate_game` calls versus one `update` call. Explain any difference.
-2. Change `compatible` to use the larger of the two windows and rerun `simulate_queue`. What changes in the gap distribution? (Look at the largest gap and the tail wait.)
-3. Add a draw offer to `Game` with its own `ply`-like sequence number so that a repeated offer is harmless; test it with duplicates.
-4. Write a server-side lag estimator (median of the last five ping round trips divided by two) and use it instead of the client-reported `lag`. What happens to the lag-lying test?
+2. Write a server-side lag estimator (median of the last five ping round trips divided by two) and use it instead of the client-reported `lag`. What happens to the lag-lying test?
 
 ---
 
