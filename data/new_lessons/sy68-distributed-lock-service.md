@@ -2,7 +2,7 @@
 
 > **Priority:** ★★★☆☆ (proposed; the curriculum data holds the final rating) — "only one instance may do this" is the core of leader election, schedulers and failover, and most answers stop at an expiring key and never ask what the old holder does next.
 >
-> **Study time:** 80 minutes. **Do this after:** Time, Clocks and Ordering; Distributed Consensus & Raft; Overload, Load Shedding and Cascading Failures.
+> **Study time:** 80 minutes. **Do this after:** Time, Clocks and Ordering; Distributed Consensus & Raft; Overload, Load Shedding and Cascading Failures; Flash Sale & Ticket Reservation (Ticketmaster); Scaling Patterns II: Large Blobs, Long-Running Tasks and Real-Time Updates.
 >
 > **Level:** extended.
 
@@ -30,7 +30,7 @@ A distributed lock sounds like a mutex with a network in the middle. It is not: 
 | "a distributed lock to protect a shared resource" | lock plus fencing token checked by the resource; if it cannot check, say so and name weaker options (section 8) |
 | "what if the holder crashes, or is only slow (GC pause, stalled VM)" | a crash frees the lock between two thirds of the timeout and all of it later (section 6); a stall looks the same to the service and not to the client: fencing |
 | "thousands of clients wait for one lock" | each waiter watches the entry just below its own, so a release wakes one client |
-| "a lock per request, 50,000 a second" | not a lock-service workload (section 3): give each key one owner, or use conditional writes on the store |
+| "a lock per request, 100,000 a second" | not a lock-service workload (section 3): give each key one owner, or use conditional writes on the store |
 | "why not an expiring key in a cache?" | the same lease and pause problem, and no token unless you build one (no such product's documentation was read) |
 
 ---
@@ -39,14 +39,14 @@ A distributed lock sounds like a mutex with a network in the middle. It is not: 
 
 **Functional.** Sessions kept alive by heartbeat; exclusive locks by name with a queue of waiters; small files with change notification; ephemeral nodes that vanish with their session; a token with every grant. **Out of scope:** shared locks, access control, cross-cell mirroring, the consensus protocol.
 
-**Non-functional.** Availability and clear semantics over speed (the Chubby paper's emphasis). Never two *recorded* holders. A bounded time to notice a dead holder. A leader failure must not drop held locks.
+**Non-functional.** Availability and clear semantics over speed (the Chubby paper's emphasis); never two *recorded* holders; a bounded time to notice a dead holder.
 
 **Capacity estimate.** Inputs marked *assumed* are this lesson's, not any company's. Inputs marked *paper* are figures the cited papers print, used as inputs. Every result is reproduced by `capacity_check_d.py`.
 
 | Input | Value |
 |---|---|
 | client processes in one cell | 50,000 *(assumed; below the 90,000 the Chubby paper says one master served)* |
-| lease extension per KeepAlive | 12 s default, about 60 s under heavy load *(paper)* |
+| lease and KeepAlive cadence | lease 12 s by default, about 60 s under heavy load; KeepAlives exchanged every 7 s at the 12 s lease *(paper)*; cadence scaling with the lease at 7/12 *(assumed)* |
 | ZooKeeper-style session timeout | 10 s *(assumed)*; clients ping after s/3 idle *(paper)* |
 | coarse-grained locks | 5,000 locks, each held 6 hours on average *(assumed)* |
 | fine-grained comparison | one lock cycle per request, 100,000 requests per second *(assumed)* |
@@ -56,19 +56,17 @@ A distributed lock sounds like a mutex with a network in the middle. It is not: 
 
 | Result | Arithmetic | Value |
 |---|---|---|
-| KeepAlives, 12 s lease | 50,000 / 12 | 4,167 KeepAlives per second |
-| KeepAlives, 60 s lease | 50,000 / 60 | 833 per second, five times fewer |
-| cross-check with the snapshot | 22,000 / 12 | 1,833 per second, inside the 930 to 1,860 that 93% of 1,000 to 2,000 implies |
+| KeepAlives at the paper's 7 s cadence | 50,000 / 7 | 7,143 KeepAlives per second (4,167 if one per 12 s lease) |
+| KeepAlives, 60 s lease, cadence 35 s | 50,000 / 35 | 1,429 per second, five times fewer |
+| the paper's snapshot | 22,000 / 7, against 93% of 1,000 to 2,000 = 930 to 1,860 | 3,143 per second: does not reconcile |
 | coarse-grained acquisitions | 5,000 / (6 x 3,600) | 0.23 acquisitions per second, 0.46 writes per second |
 | fine-grained lock cycles | 100,000 x 2 | 200,000 writes per second |
 | against the write ceiling | 200,000 / 21,000 and / 8,000 | 9.5 times and 25 times too many |
 | dead holder keeps the lock | between 2s/3 and s, s = 10 | 6.67 to 10 seconds |
 | herd, 1,000 waiters drain | names listed: chain, against all watching the holder | 499,500 against 332,833,500: 666 times |
-| sequence counter, signed 32-bit | 2,147,483,647 / creates per second | 24.9 days at 1,000 per second, 248.6 days at 100, 6.8 years at 10, 294 years at 0.23 |
+| sequence counter, signed 32-bit | 2,147,483,647 / creates per second | 24.9 days at 1,000 per second under one parent, 248.6 days at 100, 6.8 years at 10; 294 years if all 5,000 locks shared one parent at 0.23, 1.47 million years for one lock acquired every 6 hours |
 
-Five conclusions. **KeepAlives are the load, not locks:** 4,167 per second against 0.46 writes, the same shape as the paper's snapshot. A longer lease cuts that five-fold (load shedding, as in Overload, Load Shedding and Cascading Failures) but, since the master promises not to end a session before its lease runs out, it also lengthens how long a dead holder keeps its lock (an inference from the paper's definition of the lease, not a number it prints). **Fine-grained locking does not fit:** 200,000 writes per second is 9.5 to 25 times the paper's saturated benchmark, and even 10,500 lock cycles per second, half its best 21,000 writes, is a ceiling that ignores the recipe's reads. **Detection is a window:** a client pinging every s/3 is noticed between 2s/3 and s after it dies. **The herd is quadratic:** building a queue of N costs N(N+1)/2 names even with the good recipe. **An election must fit inside the grace period:** the longest the Chubby paper reports is 30 s, the default grace 45 s.
-
-Visual (planned): lock nodes 1 to 5, each waiter pointing at the node below it.
+Five conclusions. **KeepAlives are the load, not locks:** 7,143 per second (4,167 if renewals were once per lease) against 0.46 writes. The paper's snapshot does not reconcile with this model (22,000 clients at 7 s is 3,143 per second against the 930 to 1,860 KeepAlives that 93% of 1,000 to 2,000 RPCs implies; the paper does not give that cell's lease), so it shows only the same shape: KeepAlive dominant, Acquire 31 per million. A longer lease cuts the rate five-fold (load shedding, as in Overload, Load Shedding and Cascading Failures) but, since the master promises not to end a session before its lease runs out, it also lengthens how long a dead holder keeps its lock (an inference from the paper's definition, not a printed number). **Fine-grained locking does not fit:** 200,000 writes per second is 9.5 to 25 times the paper's saturated benchmark, and even 10,500 lock cycles per second, half its best 21,000 writes, is a ceiling that ignores the recipe's reads. **Detection is a window:** a client pinging every s/3 is noticed between 2s/3 and s after it dies. **The herd is worse than the queue:** building a queue of N costs N(N+1)/2 names and the good recipe drains in quadratic time; everyone watching the holder drains in cubic time. **An election must fit inside the grace period:** the longest the paper reports is 30 s, the default grace 45 s (45 s against 30 s).
 
 ---
 
@@ -81,7 +79,7 @@ children(lock) -> [seq]                  exists_watch(node) -> bool (one-shot)  
 session {id, last_heard, ttl}    node {lock, seq, session, guid}    token = seq (this lesson's choice, section 8)
 ```
 
-Chubby makes the lock a first-class object (`Acquire`, `Release`, `GetSequencer`, `CheckSequencer`); a node's metadata has a lock generation number that increases when the lock goes from free to held. ZooKeeper's paper says it is not a lock service and has no lock operations: locks are a client-side recipe over ephemeral and sequential znodes, versioned writes and watches. Both keep the database in memory: small coordination data only.
+Chubby makes the lock a first-class object (`Acquire`, `Release`, `GetSequencer`, `CheckSequencer`); a node's metadata has a lock generation number that increases when the lock goes from free to held. ZooKeeper's paper says it is not a lock service and has no lock operations: locks are a client-side recipe over ephemeral and sequential znodes, versioned writes and watches. ZooKeeper keeps its database in memory (its paper) and Chubby's paper says its data fits in RAM: small coordination data only.
 
 ---
 
@@ -89,28 +87,28 @@ Chubby makes the lock a first-class object (`Acquire`, `Release`, `GetSequencer`
 
 Chubby (paper): the master wins a majority vote and promises no other master for a few seconds; typically five replicas, three up; the master alone serves reads while its master lease holds; session state is recorded in the database, or rebuilt by a new master that then waits out the worst-case lease. ZooKeeper (paper): Zab, an atomic broadcast, makes writes linearizable; a majority is needed (2f + 1 servers tolerate f failures); any server answers reads from its local copy, so a read can be stale unless preceded by `sync`.
 
-Why a lock service rather than a consensus library? The Chubby paper: a lock changes little of an existing system's shape (elect a master with a lock, send the acquisition count with each write, reject lower counts); results can be advertised in a small file; programmers know locks; clients progress with fewer servers of their own. It adds that programmers who think they know how to use locks are usually wrong in a distributed system. The rest of this lesson is about that.
+Why a lock service rather than a consensus library? The Chubby paper: a lock changes little of an existing system's shape (elect a master with a lock, send the acquisition count with each write, reject lower counts); results can be advertised in a small file; clients progress with fewer servers of their own. It adds that programmers who think they know how to use locks are usually wrong in a distributed system.
 
 ---
 
 ## 6. Deep Dive 1: Leases, Sessions and KeepAlive
 
-**Chubby.** The master blocks a KeepAlive until the client's lease is nearly over, then returns it with a later end (12 s by default) and the client sends the next at once, so one call is nearly always parked at the master. The reply also carries events and cache invalidations, so a client cannot keep its session without acknowledging them. The client keeps a **local lease**, shorter than the master's: it assumes the reply spent a long time in flight and that the master's clock runs a bounded factor fast. When it runs out the session is **in jeopardy**: the cache is emptied, the application is told, and the client waits a **grace period** (45 s by default) for a KeepAlive to get through; if one does, the session is safe again, otherwise it has expired.
+**Chubby.** The master blocks a KeepAlive until the client's lease is nearly over, then returns it with a later end (12 s by default; the paper says KeepAlives are exchanged every 7 s) and the client sends the next at once, so one call is nearly always parked at the master. The reply also carries events and cache invalidations, so a client cannot keep its session without acknowledging them. The client keeps a **local lease**, shorter than the master's: it must assume the reply spent a long time in flight and that the master's clock runs a bounded factor fast. When it runs out the session is **in jeopardy**: the cache is emptied, the application is told, and the client waits a **grace period** (45 s by default) for a KeepAlive to get through; if one does, the session is safe again, otherwise it has expired. The paper gives no formula; the one below is this lesson's.
 
 ```python
-def local_deadline(sent_at, lease, drift):
-    """Chubby-style local lease end: count from when the KeepAlive was SENT, and assume the server's clock may run
-    up to (1 + drift) times faster than ours."""
-    return sent_at + lease / (1 + drift)
+def local_deadline(received_at, lease, drift, max_flight):
+    """This lesson's own safe bound (the paper gives no formula). The master grants `lease` from the moment it SENDS the
+    reply; the reply was in flight for at most max_flight, and the master's clock may run (1 + drift) times faster."""
+    return received_at - max_flight + lease / (1 + drift)
 ```
 
-The check draws 3,000 combinations of lease, send time, delay and server clock rate inside the drift bound, asserts the local deadline never passes the server's real expiry, and asserts the extreme case is tight. The other conservative rule is the caller's: pass the time the request *left*, not the time the reply arrived.
+The obvious rule, counting from when the request was *sent*, is safe but useless here: a parked call returns about 7 s after it was sent, so that lease is nearly spent on arrival. The check simulates the 7 s cadence: that rule leaves the client in jeopardy about 30% of the time, the bound above 0%. It also draws 3,000 combinations of lease, flight time and server clock rate inside the bounds, asserts the deadline never passes the server's real expiry, and asserts the extreme case is tight. The cost is an assumption you must own: a bound on how long a reply can be in flight.
 
-**ZooKeeper.** The client asks for a timeout and the server answers with one it can give (the documentation: between 2 and 20 ticks). The client pings after s/3 idle and tries another server after 2s/3 of silence. The cluster expires the session when it hears nothing for **more than** the timeout, deletes its ephemeral nodes and notifies watchers. The documentation adds the sentence this lesson turns on: the client of an expired session is still disconnected, and **will not be told until it reconnects**.
+**ZooKeeper.** The client asks for a timeout and the server answers with one it can give (the documentation: between 2 and 20 ticks). The client pings after s/3 idle and tries another server after 2s/3 of silence. The cluster expires the session when it hears nothing for **more than** the timeout, deletes its ephemeral nodes and notifies watchers. The documentation adds the point this lesson turns on (paraphrased): the client of an expired session is still disconnected, and **is told only when it reconnects**.
 
 **How long does a dead holder keep the lock?** The last ping came 0 to s/3 before the crash and the session ends s after that ping, so the lock frees between 2s/3 and s after the crash: 6.67 to 10 seconds at s = 10. The check crashes a client at 400 phases of one ping period and asserts both ends (the lesson's arithmetic on the paper's ping rule; it assumes exact pings until death).
 
-**The timeout is a trade:** short detects a crash fast and also expires a client that was only stalled; long rides out pauses and keeps a dead holder's lock longer. Neither removes the pause problem.
+**The timeout is a trade:** short detects a crash fast and also expires a stalled client; long rides out pauses and keeps a dead holder's lock longer.
 
 ---
 
@@ -135,7 +133,7 @@ class LockService:
         for sid, t in sorted(self.last_heard.items(), key=lambda kv: kv[1]):
             if now - t > self.ttl:                           # "more than the timeout": exactly ttl is still alive
                 for seq in [s for s, (owner, _) in self.nodes.items() if owner == sid]:
-                    if seq == min(self.nodes):               # the holder was lost: start the lock-delay
+                    if seq == min(self.nodes) and t + self.ttl >= self.free_after:   # a granted holder was lost: start the lock-delay
                         self.free_after = max(self.free_after, t + self.ttl + self.lock_delay)
                     self._delete(seq)
                 for waiting in self.watches.values():        # watches die with their session
@@ -242,23 +240,25 @@ class LockClient:
         return ok
 ```
 
+Order by the numeric sequence suffix, never by the full node name: the name starts with the guid, so sorting names orders by guid, and comparing sequence numbers as strings puts 10 below 9. The checks keep more than ten nodes alive for this reason.
+
 Four behaviours, each of which a plausible implementation gets wrong, and each pinned by the check.
 
-**1. Grants are first in, first out, and match a naive reference.** 300 random sequences of operations (time jumping by up to 9) run against a dumb reference: a list in arrival order and a table of last-touch times, aliveness recomputed each time. Holder, children and every return value must agree. Boundaries too: silence of exactly one timeout is alive, a hair more is expired for good; sequence numbers are never reused.
+**1. Grants are first in, first out, and match a naive reference.** 300 random operation sequences run against a dumb reference (a list in arrival order and a table of last-touch times); holder, children and every return value must agree. Silence of exactly one timeout is alive, a hair more is expired for good; sequence numbers are never reused.
 
-**2. A watch on a node already gone must send the client back to look.** Between "list" and "watch" the holder can release; a client that waits anyway sleeps forever. The check builds that interleaving, and 200 random schedules assert no live client ends stuck.
+**2. A watch on a node already gone must send the client back to look.** Between "list" and "watch" the holder can release; a client that waits anyway sleeps forever. The check builds that interleaving; 200 random schedules assert no live client ends stuck.
 
-**3. A waiter in the middle dies.** Only its successor wakes (every deletion in every run woke at most one client), lists again, finds it is *not* lowest, and watches the holder. Waking is not winning.
+**3. A waiter in the middle dies.** Only its successor wakes (every deletion in every run woke at most one client), lists again, finds it is *not* lowest, and watches the holder.
 
-**4. A lost create reply must not queue a client behind itself.** The recipes page warns that `create` can succeed while the reply is lost. A blind retry leaves two nodes: the first holds the lock, and the client waits on it, though only its own session can delete it. The guid in the name lets the retry find its node; the check asserts one node after retries and builds the failure without it.
+**4. A lost create reply must not queue a client behind itself.** `create` can succeed while the reply is lost (the recipes page warns of it); a blind retry leaves two nodes, and the client waits on the first, which only its own session can delete. The guid in the name lets the retry find its node.
 
-**The herd.** ZooKeeper's paper shows a lock where every waiter watches the lock node, then one where each watches its predecessor. The check runs both on one service, counting clients woken and names listed while N waiters drain: chain, one woken per release and `N(N-1)/2` names; everyone watching the holder, `N-1` woken, then `N-2`, and so on, and `(N-1)N(2N-1)/6` names. Both match the simulation for N of 2, 5 and 50 (1,225 names against 40,425 names at 50); at 1,000 waiters it is 499,500 against 332,833,500. Building the queue is quadratic either way (500,500 names), so the recipe suits a handful of contenders for a coarse lock.
+**The herd.** ZooKeeper's paper shows a simple lock where every waiter watches one lock znode, then one where each watches its predecessor; the recipes page describes the same herd for elections built on sequential nodes, when everyone watches the smallest. The check runs that last variant against the chain on one service, counting clients woken and names listed while N waiters drain: chain, one woken per release and `N(N-1)/2` names; everyone watching the holder, `N-1` woken, then `N-2`, and so on, and `(N-1)N(2N-1)/6` names. Both match the simulation for N of 2, 5 and 50 (1,225 names against 40,425 names at 50); at 1,000 waiters it is 499,500 against 332,833,500. Building the queue is quadratic either way (500,500 names), and the chain's drain is quadratic where the herd's is cubic, so the recipe suits a handful of contenders for a coarse lock.
 
 ---
 
 ## 8. Deep Dive 3: The Pause, and What Fencing Fixes
 
-So far the record is correct. Now the belief. One trace, session timeout 10:
+The fencing idea is taught in Flash Sale & Ticket Reservation (Ticketmaster) and Scaling Patterns II: Large Blobs, Long-Running Tasks and Real-Time Updates (a lease plus an attempt number); this section does not repeat it, it measures where it fails. So far the record is correct. Now the belief. One trace, session timeout 10:
 
 | Time | What happens |
 |---|---|
@@ -273,12 +273,12 @@ So far the record is correct. Now the belief. One trace, session timeout 10:
 class Store:
     """The protected resource. With fenced=True it remembers the highest token seen and refuses lower ones."""
     def __init__(self, fenced):
-        self.fenced, self.max_token, self.value, self.accepted = fenced, 0, 0, []
+        self.fenced, self.max_token, self.value, self.accepted = fenced, None, 0, []
 
     def _admit(self, token):
-        if self.fenced and token < self.max_token:
+        if self.fenced and self.max_token is not None and token < self.max_token:
             return False
-        self.max_token = max(self.max_token, token)
+        self.max_token = token if self.max_token is None else max(self.max_token, token)
         return True
 
     def claim(self, token):       # a new holder announces itself before it reads anything
@@ -341,9 +341,9 @@ def counter_trace(order, ttl=10):
     return store.value, a_ok
 ```
 
-A store that ignores tokens ends with `a2`: the stale write is accepted though A's lease check had passed (`('a2', True, True)`). A store that remembers the highest token and refuses lower ones ends with `b1` (`('b1', False, True)`). The recipes page says that at any snapshot "no two clients think they hold the same lock". Read as a statement about the znodes, that is the service's record; the page mentions neither pauses nor tokens (it was searched for both), so this trace is the case it leaves out. The Chubby paper states the failure generally (a request from a process that held the lock arrives after another has acquired it and acted) and gives the remedy: a **sequencer** with the lock name, mode and generation number, passed with each request, which the receiving server checks against Chubby or against the most recent one it has seen. The second form is `Store`.
+A store that ignores tokens ends with `a2`: the stale write is accepted though A's lease check had passed (`('a2', True, True)`). A store that remembers the highest token and refuses lower ones ends with `b1` (`('b1', False, True)`). The recipes page says that at any snapshot "no two clients think they hold the same lock". Read as a statement about the znodes, that is the service's record; the page mentions neither pauses nor tokens (it was searched for both), so this trace is the case it leaves out. The Chubby paper's remedy is a **sequencer** (lock name, mode, generation number) passed with each request and checked by the server against Chubby or against the most recent one it has seen; the latter is `Store`.
 
-**The token is this lesson's choice.** The model uses the lock node's sequence number: holders get the lock in increasing sequence order, and every simulated run asserts the service-side holder never goes backwards. Chubby uses a lock generation number. The ZooKeeper programmer's guide gives the limit: the sequence counter is a signed 32-bit integer kept by the parent node and wraps negative after 2,147,483,647 creates: 24.9 days at 1,000 creates per second under one parent, 248.6 days at 100, 6.8 years at 10, 294 years at the coarse-grained 0.23. A wrapped token goes backwards; rotate to a new lock directory long before, or use a wider number such as the creation transaction id the guide describes (untested here).
+**The token is this lesson's choice.** The model uses the lock node's sequence number: holders get the lock in increasing sequence order, and every simulated run asserts the service-side holder never goes backwards. Chubby uses a lock generation number. The ZooKeeper programmer's guide gives the limit: the counter is a signed 32-bit integer kept by the parent node and wraps negative after 2,147,483,647 creates: 24.9 days at 1,000 creates per second under one parent, 248.6 days at 100, 6.8 years at 10. Each lock has its own parent: the coarse-grained cell creates 0.23 per second across 5,000 locks, so one lock acquired every 6 hours lasts 1.47 million years (294 years only if all 5,000 shared a parent). A wrapped token goes backwards, and **a bare rotation to a new lock directory does not fix it:** the counter restarts at 1 and the store, having seen 2,000,000,000, refuses every write (the check shows it). Make the token a pair (directory epoch, sequence), compared in that order, which `Store` accepts, or keep a 64-bit counter in the service (homework 3).
 
 **Fencing has a hole, measured.** The store learns of token 2 only when B first speaks. If A's late write lands between B's acquisition and that first contact, it is accepted. Whether it costs anything depends on what B does first (A and B each add 1 to a counter that starts at 5):
 
@@ -355,7 +355,7 @@ A store that ignores tokens ends with `a2`: the stale write is accepted though A
 
 The rule is **claim before you read**: a new holder's first act is to present its token to the resource, and only then does it read state it will build on. The check runs all three orders.
 
-**At scale.** 200 seeded schedules of five clients: each takes the lock once, reads a counter, may stall up to three timeouts, may freeze at random or die, then writes value plus one. A run is wrong if the counter differs from the number of acknowledged increments. Illustrative of this model, not of any production system:
+**At scale.** 200 seeded schedules of five clients: each takes the lock once, reads a counter, may stall up to three timeouts, freeze or die, then writes value plus one. A run is wrong if the counter differs from the number of acknowledged increments. Illustrative of this model only:
 
 | Store and discipline | Runs with a lost update |
 |---|---|
@@ -363,17 +363,19 @@ The rule is **claim before you read**: a new holder's first act is to present it
 | checks tokens, claims after reading | in 15 of 200 runs |
 | checks tokens, claims before reading | in 0 of 200 runs |
 
-In 91 of 200 runs at least two clients believed they held the lock at once while the service had one holder; the same run asserts that a client whose session is alive and believes it holds the lock *is* that holder. "0 of 200" means the discipline survived these schedules, not every schedule.
+In 88 of 200 runs at least two clients that had not crashed believed they held the lock at once (one of them stale); the service never recorded two holders, and the same run asserts that a client whose session is alive and believes it holds the lock *is* that holder. "0 of 200" means the discipline survived these schedules, not every schedule.
 
-**Lock-delay** is the Chubby paper's imperfect option for servers that cannot check tokens. When a lock frees because its holder failed, the service withholds it for a stated delay (up to a minute in the paper); a clean release is not delayed. The idea is to let requests already in flight land first. A packet sent at 9 crawls through the network after A dies; B polls every half second. With no delay, B starts at 10.5: a packet that took 1 s has landed, one that took 2 s lands after B has read. With a 60 s delay B starts at 70: a 30 s packet is safe and a 100 s packet still wins. The check asserts all four cases.
+**Lock-delay** is the Chubby paper's imperfect option for servers that cannot check tokens: when a lock frees because its holder *failed* (not on a clean release, and not when a waiter that never held it dies), the service withholds it for a stated delay (up to a minute in the paper), so requests already in flight can land first. A pings at 3 and 6, sends a last write at 9 that crawls through the network, and dies; its session ends at 16, inside the window of section 6. B polls every half second. With no delay B starts at 16.5: a packet that took 7 s has landed, one that took 8 s lands after B has read. With a 60 s delay B starts at 76: a 30 s packet is safe and a 100 s packet still wins. The check asserts these and two more cases.
 
 ```python
 def delayed_packet_trace(lock_delay, packet_delay, ttl=10.0, poll=0.5):
-    """A's last write leaves at t=9 and crawls through the network; A then dies. B polls every half second and starts
-    (reads the store) when the service grants it the lock. Returns (when B started, whether A's packet had landed)."""
+    """A pings at 3 and 6, sends its last write at 9 (it crawls through the network) and dies. B polls every half second
+    and starts (reads the store) when the service grants it the lock. Returns (when B started, whether A's packet landed)."""
     svc = LockService(ttl, lock_delay)
     a = svc.open_session(0.0)
     svc.enqueue(a, 0.0, 'a')
+    svc.heartbeat(a, 3.0)
+    svc.heartbeat(a, 6.0)
     b = svc.open_session(0.0)
     tb = svc.enqueue(b, 0.0, 'b')
     t = 0.0
@@ -385,15 +387,15 @@ def delayed_packet_trace(lock_delay, packet_delay, ttl=10.0, poll=0.5):
 
 Nothing bounds packet delay on an asynchronous network, which is why the paper calls it imperfect.
 
-**If the resource cannot check a token:** put the check in a proxy in front of it; or make the resource do a compare-and-swap on a version (Chubby's `SetContents` takes a content generation number for this, ZooKeeper's `setData` an expected version), which fences with no lock at all when the lock protects that same state; or use lock-delay and say the risk remains. Never say the lock alone makes it safe.
+**If the resource cannot check a token:** put the check in a proxy in front of it; or make the resource compare-and-swap on a version (Chubby's `SetContents` takes a content generation number, ZooKeeper's `setData` an expected version), which fences with no lock when the lock protects that same state; or use lock-delay and say the risk remains. Never say the lock alone makes it safe.
 
 ---
 
 ## 9. Deep Dive 4: Notification and Caching
 
-Chubby's paper says its most popular use turned out to be as a name server, which is reads and watching, not locking. **Chubby caches consistently and invalidates.** Clients cache data, metadata and the absence of files. On a change the master blocks the write while it sends invalidations (carried on KeepAlive replies) and proceeds when every client has acknowledged or its lease has lapsed, so one slow client can delay a write by up to its lease. **ZooKeeper's reads are local and watches one-shot:** a watch fires once, carries no data, and the client re-reads and re-sets it; two changes before the re-read give one event, which is harmless. The ZooKeeper authors: leases only bound the effect of a slow client, watches avoid it, at the price of reads that can be stale without `sync`.
+**Chubby caches consistently and invalidates.** Clients cache data, metadata and the absence of files. On a change the master blocks the write while it sends invalidations (carried on KeepAlive replies) and proceeds when every client has acknowledged or its lease has lapsed, so one slow client can delay a write by up to its lease. **ZooKeeper's reads are local and watches one-shot:** a watch fires once, carries no data, and the client re-reads and re-sets it; two changes before the re-read give one event, which is harmless. The ZooKeeper authors: leases only bound the effect of a slow client, watches avoid it, at the price of reads that can be stale without `sync`.
 
-**Why invalidation beat time-to-live, in the paper's arithmetic.** 3,000 processes that each look up every other make 9,000,000 lookups; at a 60 s time-to-live that is 150,000 lookups per second, against the 50,000 per second the paper gives for one DNS server. An invalidated cache costs a fixed KeepAlive per client. Even so, starting such a job brought the master to its knees until entries were grouped about 100 to a lookup, which by this lesson's arithmetic is 90,000 lookups.
+The Chubby paper's DNS comparison shows why it chose invalidation: 3,000 processes that each look up every other need 9,000,000 lookups, 150,000 lookups per second at a 60 s time-to-live against 50,000 per second for one DNS server.
 
 ---
 
@@ -405,8 +407,8 @@ Chubby's paper says its most popular use turned out to be as a name server, whic
 | local lease timer on a clock that jumps or drifts | the client thinks its lease is valid after it ended | deadline from the send time with a drift bound, on a monotonic clock (the lesson's advice) |
 | partition from the service | the client cannot renew and is expired | stop acting after the local lease; granting needs a majority |
 | master or leader failover | sessions in jeopardy, clients blocked for seconds | grace longer than the longest election (45 s against 30 s); do not crash on the event |
-| keep-alive overload | sessions drop above about 90,000 clients (paper) | longer leases under load |
-| split brain | the service side: two masters; the client side: two clients acting as holder (91 of 200 simulated runs) | a majority vote plus a master lease, so no second master exists while the first lease holds (Chubby paper); tokens for the client side |
+| keep-alive overload | the paper reports one master handling 90,000 clients; overload shows as KeepAlives not processed in time | longer leases under load |
+| split brain | the service side: two masters; the client side: two clients acting as holder (88 of 200 runs, section 8) | a majority vote plus a master lease, so no second master exists while the first lease holds (Chubby paper); tokens for the client side |
 | herd on release | every waiter wakes and lists the queue | watch the predecessor |
 | lock-delay too short | a delayed packet lands after the new holder starts | tokens; the delay only narrows the window |
 
@@ -414,24 +416,13 @@ Chubby's paper says its most popular use turned out to be as a name server, whic
 
 ## 11. What Real Systems Did
 
-- **Chubby** (Burrows, OSDI 2006, read 2026-11-27): a lock service for coarse-grained locking and small files; GFS appoints its master with it, and Bigtable elects a master, finds its servers and lets clients find the master. Its snapshot figures, used above, are from 2006 and "typical of cells in Google" in its words.
-- **ZooKeeper** (Hunt et al., USENIX ATC 2010, read 2026-11-27): a coordination kernel at Yahoo!. Its applications are Katta (shard assignment, master failover), the Fetching Service of the Yahoo! crawler and Yahoo! Message Broker. Its stated trade: wait-free operations, FIFO client order, linearizable writes, local reads that may be stale.
-- No engineering write-up from any other company on building a lock or leader-election service was read. The model, the token choice, the claim-before-read rule and the simulation are this lesson's own, not what Google or Yahoo! ran.
+- **Chubby** (Burrows, OSDI 2006, read 2026-11-27): GFS appoints its master with it, and Bigtable elects a master, finds its servers and lets clients find the master. Its snapshot figures, used above, are from 2006 and "typical of cells in Google" in its words.
 
 ---
 
 ## 12. Pitfalls Checklist
 
 1. **Believing the lock proves exclusion.** The service proves a record; a token checked at the resource proves the write is current.
-2. **Checking the lease, then acting later.** A stall fits between them.
-3. **Reading before presenting the token.** Claim first (claiming after reading lost updates in 15 of 200 runs).
-4. **A token from a clock or a per-client counter.** It must grow with every grant.
-5. **Every waiter watching the holder.** One release wakes all and each lists the queue.
-6. **A watch without handling "already gone".** The wake-up is lost.
-7. **Retrying `create` with no idempotency key.** You queue behind yourself.
-8. **Reading "my node is lowest" as "I know I lead".** Acknowledge the role visibly, and still fence.
-9. **A lock per request.** The write ceiling is tens of thousands per second.
-10. **Crashing on a failover or disconnect event.** Quiesce and wait.
 
 ---
 
@@ -443,13 +434,14 @@ Chubby's paper says its most popular use turned out to be as a name server, whic
 4. A client creates its lock node, the reply is lost, and it retries. What goes wrong without a guid, and what do other clients see?
 5. The protected resource is a database you cannot change. Give three options and the residual risk of each.
 6. In the counter table, why does "B reads, then claims" lose an acknowledged update while "A's write lands, then B claims, then B reads" does not?
-7. A team wants a lock per request at 50,000 requests per second. Answer with the write-ceiling arithmetic and propose an alternative.
+7. A team wants a lock per request at 100,000 requests per second. Answer with the write-ceiling arithmetic and propose an alternative.
+8. You rotate to a new lock directory because the sequence counter is nearly full. Why does the fenced store start refusing every holder, and what two designs fix it?
 
 ---
 
 ## Homework
 
-1. Run `python test/lesson_code/sy68_check.py data/new_lessons/sy68-distributed-lock-service.md`. Make `Store._admit` refuse equal tokens and find the first failing assertion; then remove the `max_token` update and repeat.
+1. Run `sy68_check.py` on this file. Make `Store._admit` refuse equal tokens and find the first failing assertion; then compare tokens as strings and find which fails.
 2. Make lock-delay part of `LockClient` (the client asks the service for the grant) and measure the change in `delayed_packet_trace`.
 3. Replace the sequence number with a 64-bit counter kept by the service, and check that a wrapped 32-bit token breaks the store while the wider one does not.
 4. Add shared (read) locks following the recipes page, with a brute-force check of read and write ordering.
@@ -460,10 +452,7 @@ Chubby's paper says its most popular use turned out to be as a name server, whic
 
 All read 2026-11-27. The model, the figures marked *assumed* and the simulation are this lesson's own.
 
-- Mike Burrows, *The Chubby lock service for loosely-coupled distributed systems*, OSDI 2006, usenix.org/legacy/event/osdi06/tech/full_papers/burrows/burrows.pdf. Read from abstract to conclusion, references skimmed. The extraction scrambled Figure 2 and the section 4.1 table, so the table values used (22,000 direct clients, 1,000 to 2,000 RPCs per second, KeepAlive 93%, Acquire 31 per million) were taken in reading order and checked against the prose, as were the leases, grace period, elections and 90,000 clients. The proxy and partitioning sections were read, not used.
-- Hunt, Konar, Junqueira, Reed, *ZooKeeper: Wait-free coordination for Internet-scale systems*, USENIX ATC 2010, usenix.org/legacy/event/atc10/tech/full_papers/Hunt.pdf. Sections 1 to 7 read, including Table 1 and the lock recipes; graphs and references not examined.
-- Apache ZooKeeper 3.9 documentation, *Recipes and Solutions*, zookeeper.apache.org/doc/r3.9.3/recipes.html. Read in full (the unversioned `/doc/current/` address returned a not-found page).
-- Apache ZooKeeper 3.9 documentation, *Programmer's Guide*, zookeeper.apache.org/doc/r3.9.3/zookeeperProgrammers.html. Read the parts on ephemeral and sequence nodes, zxid, sessions, watches and consistency guarantees; the rest was skimmed or not read.
+- Mike Burrows, *The Chubby lock service for loosely-coupled distributed systems*, OSDI 2006, usenix.org/legacy/event/osdi06/tech/full_papers/burrows/burrows.pdf. Read from abstract to conclusion, references skimmed. The extraction scrambled the section 4.1 table, so its values (22,000 direct clients, 1,000 to 2,000 RPCs per second, KeepAlive 93%, Acquire 31 per million) were taken in reading order and checked against the prose.
 
 ## Further reading (not consulted)
 

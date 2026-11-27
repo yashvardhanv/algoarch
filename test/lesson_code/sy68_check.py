@@ -68,6 +68,20 @@ nh, nw = svc.enqueue(h, 0, 'h'), svc.enqueue(w, 0, 'w')
 svc.release(h, nh, 1)
 assert svc.holder(1) == nw                                              # clean release: immediately available
 
+# lock-delay must not be extended by a waiter that never held the lock (review M2): H holds and expires (delay until 15),
+# W dies at 11.01 while the lock is still withheld, X keeps heartbeating and must get the lock at 15, not 16
+svc = LockService(10, lock_delay=5)
+h, w, x = svc.open_session(0), svc.open_session(1), svc.open_session(0)
+nh, nw, nx = svc.enqueue(h, 0, 'h'), svc.enqueue(w, 1, 'w'), svc.enqueue(x, 0, 'x')
+svc.heartbeat(x, 5); svc.heartbeat(x, 10)
+svc.holder(10.5)
+assert svc.free_after == 15
+svc.heartbeat(x, 11.5)
+svc.holder(11.5)
+assert nw not in svc.nodes and svc.free_after == 15, svc.free_after
+svc.heartbeat(x, 14)
+assert svc.holder(14.9) is None and svc.holder(15) == nx
+
 # ---- 2. against an independent naive reference ---------------------------------------------------------------------
 class Ref:
     """Naive reference: a FIFO list and a table of last-touch times; aliveness recomputed from scratch on every question."""
@@ -127,6 +141,32 @@ for seed in range(300):
                 assert got is None
         assert svc.holder(now) == ref.holder(now), (seed, now)
 
+# more than ten live nodes: grants and listings follow the numeric sequence, never the string order (review I6)
+svc = LockService(1000)
+ids = [svc.open_session(0) for _ in range(14)]
+seqs = [svc.enqueue(i, 0, 'g') for i in ids]
+for k in range(8):
+    assert svc.release(ids[k], seqs[k], 1)
+assert svc.holder(1) == 9
+assert svc.release(ids[8], seqs[8], 1) and svc.holder(1) == 10
+assert svc.children(ids[13], 1) == [10, 11, 12, 13, 14]
+for seed in range(100):                                  # reference runs that keep dozens of nodes alive at once
+    r = random.Random(1000 + seed)
+    svc, ref, now, sids = LockService(1000), Ref(1000), 0.0, []
+    for _ in range(70):
+        now += r.choice([0, 0.5, 1])
+        if not sids or r.random() < 0.15:
+            a, b = svc.open_session(now), ref.open(now); assert a == b; sids.append(a); continue
+        sid = r.choice(sids)
+        if r.random() < 0.7:
+            g = 'g%d' % r.randint(0, 40)
+            assert svc.enqueue(sid, now, g) == ref.enq(sid, now, g)
+        else:
+            seq = r.randint(1, max(1, ref.seq))
+            assert svc.release(sid, seq, now) == ref.rel(sid, seq, now)
+        assert svc.holder(now) == ref.holder(now), (seed, now)
+        assert svc.children(sid, now) == (ref.kids(now) if ref.alive(sid, now) else None) or not ref.alive(sid, now)
+
 # ---- 3. the recipe's client: interleavings, lost wakeups, a dead middle waiter ----------------------------------------
 svc = LockService(1000)
 ids = [svc.open_session(0) for _ in range(3)]
@@ -173,8 +213,9 @@ assert cl[0].release(11) and cl[2].state == 'list'
 cl[2].step(11)
 assert cl[2].state == 'held'
 
-# an operator breaks the lock by deleting the holder's node (the recipes page says contention can be seen and locks broken):
-# the client, whose session is still alive, must notice that its node is gone and never treat itself as the holder
+# an operator breaks the lock by deleting the holder's node (the recipes page says locks can be broken): a client that LISTS again
+# finds its node gone and never treats itself as the holder. (A client already in 'held' has no watch on its own node and does
+# not learn; the model does not give it one.)
 svc = LockService(1000)
 sid = svc.open_session(0)
 c = LockClient(svc, sid, 'g')
@@ -245,7 +286,8 @@ def fuzz(seed, mode, n=5, T=150.0, ttl=6.0, dt=0.5, client_cls=LockClient):
             if rng.random() < 0.02 and a.phase != 'done':
                 a.frozen_until = max(a.frozen_until, t + rng.uniform(0, 2 * ttl))
         h = svc.holder(t)
-        believers = [a for a in acts if a.c is not None and a.c.state == 'held' and a.phase != 'done']
+        believers = [a for a in acts if a.c is not None and a.c.state == 'held' and a.phase != 'done'
+                     and not (a.crash is not None and t >= a.crash)]        # a crashed client believes nothing
         live = [a for a in believers if a.c.sid in svc.last_heard]
         assert len(live) <= 1 and (not live or live[0].c.seq == h), (seed, t)      # a live session believing it holds IS the holder
         overlap = overlap or len(believers) >= 2
@@ -272,8 +314,15 @@ for seed in range(N_SEEDS):
             overlap_runs += overlap
 assert viol['first'] == 0, 'fenced store with a claim before the read must never lose an acknowledged update'
 assert viol['naive'] > 0 and viol['late'] > 0 and overlap_runs > 0, (viol, overlap_runs)
+big = {'naive': 0, 'late': 0, 'first': 0}
+for seed in range(60):
+    for mode in ('naive', 'late', 'first'):
+        value, acked, _ = fuzz(5000 + seed, mode, n=14, T=260.0)
+        big[mode] += value != acked
+assert big['first'] == 0 and big['naive'] > 0, big       # fourteen clients: tokens above 9 take part
 print('fuzz', N_SEEDS, 'seeds:', viol, 'runs with two clients believing they hold the lock:', overlap_runs)
 need(*['%d of %d runs' % (x, N_SEEDS) for x in (viol['naive'], viol['late'], viol['first'], overlap_runs)])
+assert src.count('%d of %d runs' % (overlap_runs, N_SEEDS)) >= 2, 'the belief-overlap figure appears in the text and in the failure table'
 need('claim before you read')
 
 # ---- 4. herd cost against closed forms -----------------------------------------------------------------------------------
@@ -330,25 +379,53 @@ for order in ('read_then_claim', 'slip_then_claim', 'claim_then_read'):
     consistent = value == 5 + acknowledged
     assert consistent == (order != 'read_then_claim'), order        # only the read-before-claim order loses an acknowledged update
 
-# ---- 6. lock-delay: it narrows the window for a delayed packet, it cannot close it ----------------------------------------
-assert delayed_packet_trace(0, 1.0) == (10.5, True)      # B starts at 10.5; the packet (sent at 9, 1 s in flight) landed at 10
-assert delayed_packet_trace(0, 2.0) == (10.5, False)     # a packet that lands at 11 arrives after B has read: stale write wins
-assert delayed_packet_trace(60, 30.0) == (70.0, True)    # lock-delay 60: B waits until 70, the packet landed at 39
-assert delayed_packet_trace(60, 100.0) == (70.0, False)  # a packet delayed longer than the delay still gets through
-assert delayed_packet_trace(5, 5.0) == (15.0, True) and delayed_packet_trace(5, 6.0)[1] is False
+st = Store(True)
+assert st.claim(9) and st.claim(10) and not st.write(9, 'stale') and st.write(10, 'ok') and st.value == 'ok'   # numeric, not string, order
+assert st.claim(100) and not st.claim(99) and not st.write(20, 'x')
+st = Store(True)                                       # a rotated lock directory restarts the sequence: pair it with an epoch
+assert st.claim((1, 2_000_000_000)) and st.claim((2, 1)) and not st.write((1, 5), 'stale') and st.write((2, 1), 'new')
+assert st.value == 'new' and not st.claim((1, 2_000_000_000))
+bare = Store(True)
+assert bare.claim(2_000_000_000) and not bare.claim(1)  # a bare restart at 1 is refused for ever: why rotation needs an epoch
 
-# ---- 7. the client's conservative local lease -----------------------------------------------------------------------------
+# ---- 6. lock-delay: it narrows the window for a delayed packet, it cannot close it ----------------------------------------
+# A pings at 3 and 6, sends its last write at 9 and dies: expiry at 16 (7 s after death, inside the 6.67 to 10 window)
+assert delayed_packet_trace(0, 7.0) == (16.5, True)      # B starts at 16.5; the packet landed at 16
+assert delayed_packet_trace(0, 8.0) == (16.5, False)     # a packet that lands at 17 arrives after B has read: stale write wins
+assert delayed_packet_trace(60, 30.0) == (76.0, True)    # lock-delay 60: B waits until 76, the packet landed at 39
+assert delayed_packet_trace(60, 100.0) == (76.0, False)  # a packet delayed longer than the delay still gets through
+assert delayed_packet_trace(5, 11.0) == (21.0, True) and delayed_packet_trace(5, 13.0)[1] is False
+
+# ---- 7. the client's local lease: safe, and also usable under a parked KeepAlive -----------------------------------------
 for seed in range(3000):
     r = random.Random(seed)
     drift = r.choice([0.0, 0.001, 0.01, 0.1])
-    lease, sent = r.uniform(1, 20), r.uniform(0, 100)
-    out_delay = r.uniform(0, 3)                          # request in flight; the reply's flight time does not matter
+    lease, flight_bound = r.uniform(1, 20), r.choice([0.0, 0.2, 1.0, 3.0])
+    reply_sent = r.uniform(0, 100)                       # when the master sends the reply that grants `lease` (client time)
+    flight = r.uniform(0, flight_bound)                  # how long the reply was in flight
     k = r.uniform(1 / (1 + drift), 1 + drift)            # server seconds per client second
-    server_expiry_in_client_time = sent + out_delay + lease / k
-    assert local_deadline(sent, lease, drift) <= server_expiry_in_client_time + 1e-9, seed
-assert abs(local_deadline(10.0, 12.0, 0.2) - (10.0 + 12.0 / 1.2)) < 1e-12 and local_deadline(0, 12, 0) == 12
-# the extreme case is tight: zero request delay and the fastest allowed server clock land exactly on the bound
-assert abs((0 + 0 + 12 / (1 + 0.1)) - local_deadline(0, 12, 0.1)) < 1e-12
+    expiry = reply_sent + lease / k
+    assert local_deadline(reply_sent + flight, lease, drift, flight_bound) <= expiry + 1e-9, seed
+assert abs(local_deadline(10.0, 12.0, 0.1, 0.5) - (10.0 - 0.5 + 12.0 / 1.1)) < 1e-12
+assert abs(local_deadline(10.0, 12.0, 0.1, 0.5) - (10.0 - 0.5 + 12.0 / 1.1)) < 1e-12 and local_deadline(0, 12, 0, 0) == 12
+# the extreme case is tight: the longest flight and the fastest allowed server clock land exactly on the bound
+assert abs((0.5 + 0.0 - 0.5 + 12 / (1 + 0.1)) - local_deadline(0.5, 12, 0.1, 0.5)) < 1e-12
+
+
+def jeopardy_share(rule, lease=12.0, cadence=7.0, flight=0.5, drift=0.01, rounds=200):
+    """The master parks each KeepAlive and replies every `cadence` seconds (the Chubby paper's 7 s with a 12 s lease); the client
+    sends the next request on receiving a reply. Share of time the client's local lease has run out before the next reply."""
+    recv = [cadence * i + flight for i in range(rounds + 2)]
+    bad = 0.0
+    for i in range(1, rounds + 1):
+        bad += max(0.0, recv[i + 1] - rule(recv[i], recv[i - 1], lease, drift, flight))
+    return bad / (recv[rounds] - recv[1])
+
+new_rule = lambda received, sent, lease, drift, flight: local_deadline(received, lease, drift, flight)
+send_time_rule = lambda received, sent, lease, drift, flight: sent + lease / (1 + drift)      # counted from the send time
+assert jeopardy_share(new_rule) == 0.0, jeopardy_share(new_rule)
+assert jeopardy_share(send_time_rule) > 0.25, jeopardy_share(send_time_rule)         # about 30%: safe but useless with parked calls
+assert jeopardy_share(new_rule, flight=6.0) > 0                                      # a flight bound near the cadence also starves it
 
 # ---- 8. how long a dead holder keeps the lock: between 2/3 of the timeout and the whole timeout -----------------------------
 ttl = 12.0
@@ -366,8 +443,13 @@ for step in range(0, 400):
 assert 2 * ttl / 3 < lo < 2 * ttl / 3 + 0.05 and ttl - 0.05 < hi <= ttl, (lo, hi)      # freed between 2s/3 (exclusive) and s after the crash
 
 # ---- 9. wording the lesson must keep, and stale wordings it must not --------------------------------------------------------
-for stale in ('safe without a fencing token', 'no two clients can ever', 'Redlock is safe', 'ZooKeeper is a lock service'):
+for stale in ('safe without a fencing token', 'no two clients can ever', 'Redlock is safe', 'ZooKeeper is a lock service',
+              'Chubby-style local lease', '294 years at the coarse-grained 0.23', 'sessions drop above', 'rotate to a new lock directory long before',
+              'The herd is quadratic', '294 years for one lock', 'inside the 930 to 1,860 that', 'checks against Chubby or against the most recent one it has seen. The second form is `Store`'):
     assert stale not in src, stale
 need('Sources', 'Last reviewed: 27 November 2026', 'Level:** extended', '(proposed; the curriculum data holds the final rating)')
-need('not consulted')
+need('not consulted', '45 s against 30 s', 'Flash Sale & Ticket Reservation (Ticketmaster)', 'Scaling Patterns II: Large Blobs, Long-Running Tasks and Real-Time Updates')
+need('numeric sequence', 'epoch')
+after = [l for l in src.splitlines() if l.startswith('> **Study time')][0]
+assert 'Flash Sale & Ticket Reservation (Ticketmaster)' in after and 'Scaling Patterns II' in after, 'link the lessons that teach fencing'
 print('sy68 code checks passed')
