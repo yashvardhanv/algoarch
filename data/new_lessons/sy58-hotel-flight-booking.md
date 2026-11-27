@@ -61,7 +61,7 @@ A hotel room is not a seat. A seat is one row; a stay is a run of nights that mu
 | night rows touched | 100 x 3 | 300 row updates per second (200 short transactions: reserve and confirm) |
 | single-unit availability bitmaps | 5,000,000 x 365 / 8 bytes | 228 MB |
 | hotel inventory rows | 500,000 x 6 x 365 | 1,095,000,000 rows, 17.5 GB |
-| reservations held at once, worst case | 100 per second x 600 s, every attempt holding the full time | 60,000 reservations, 180,000 room-nights: 0.016% of the rows |
+| reservations held at once, if the 100 per second all held for the full time (a lower bound: attempts, including abandoned ones, run higher) | 100 per second x 600 s | 60,000 reservations, 180,000 room-nights: 0.016% of the rows |
 | a hot hotel | 2,000 per minute | 33.3 attempts per second; the 40 rooms are all held after 1.2 seconds |
 
 The write path is 0.2% of the request rate (100 bookings per second against 50,000 searches), so a booking database is not the bottleneck and search is. Reservations held at once are a rounding error across the whole inventory, **but not for one hot hotel**: the last 40 rooms are all held within about a second, then every other guest sees "sold out" while most holders abandon. That is the Flash Sale & Ticket Reservation (Ticketmaster) hold problem again, handled with a short time to live and a visible countdown, not with a bigger database.
@@ -90,7 +90,7 @@ The quote carried from search to booking is a price the user saw; the booking pa
 
 ## 5. Deep Dive 1: Inventory by Night, All or Nothing
 
-One `UPDATE` adds the rooms to `sold` on every night of the stay, and only on nights where the room still fits. If the number of rows changed is not the number of nights, some night was full or missing, and the whole thing is undone (a savepoint here, so that expired reservations reclaimed a moment earlier stay reclaimed). A zero-night stay would change zero rows and "succeed", so the function refuses it first. Expiry works as in Flash Sale & Ticket Reservation (Ticketmaster): a pending reservation past its time is released the next time anyone reserves.
+One `UPDATE` adds the rooms to `sold` on every night of the stay, and only on nights where the room still fits. If the number of rows changed is not the number of nights, some night was full or missing, and the whole thing is undone (a savepoint here, so that expired reservations reclaimed a moment earlier stay reclaimed). A zero-night stay would change zero rows and "succeed", so the function refuses it first. Expiry differs from Flash Sale & Ticket Reservation (Ticketmaster), where it is a predicate in the `WHERE` clause and nothing has to run. Counters cannot be a predicate, so a pending reservation past its time is released explicitly, by the next `reserve` (a lazy reclaim) or by `expire`; this is the one new mechanism here.
 
 ```python
 import sqlite3
@@ -170,6 +170,15 @@ def cancel(conn, bid):
         conn.execute("UPDATE bookings SET state = 'CANCELLED' WHERE id = ?", (bid,))
         return True
 
+def expire(conn, bid, now):
+    """Give a reservation up: only if it is still pending and past its time, in one conditional statement."""
+    with txn(conn):
+        cur = conn.execute("UPDATE bookings SET state = 'EXPIRED' WHERE id = ? AND state = 'PENDING' AND expires <= ?", (bid, now))
+        if cur.rowcount != 1:
+            return False
+        _release(conn, *conn.execute("SELECT rtype, d_in, d_out, rooms FROM bookings WHERE id = ?", (bid,)).fetchone())
+        return True
+
 def rooms_left(conn, rtype, d_in, d_out):
     """What a search page may show: the tightest night. A read, so it can be stale by the time you click."""
     low, nights = conn.execute("SELECT MIN(total - sold), COUNT(*) FROM inv WHERE rtype = ? AND night >= ? AND night < ?",
@@ -177,7 +186,7 @@ def rooms_left(conn, rtype, d_in, d_out):
     return low if nights == d_out - d_in else 0
 ```
 
-**The checks.** The code runs against a list-based model that keeps every booking in a list and recomputes each night's occupancy by scanning, on 400 random operation sequences (reserve, retry with the same or a changed request, confirm, cancel, time passing, 3 to 20 nights, totals 1 to 4, stays up to six nights, some running past the inventory window). After **every** operation the counters must equal the scan, nothing may exceed its total, the booking states must agree, and the return values must match. Fixed cases pin the boundaries: a stay checking out on the 3rd and another checking in on the 3rd both fit; overlapping stays do not; a stay running past the inventory window is refused and leaves no night half-booked; zero nights and zero rooms are errors; confirm at exactly the expiry second fails and one second earlier succeeds; a retry after expiry returns the dead booking, so the client must use a new key; the same key with a changed request is an error (Stripe's idempotency documentation describes the same refusal when parameters differ). Twelve threads then hammer one database file and the counters must still equal what the bookings table implies.
+**The checks.** The code runs against a list-based model that keeps every booking in a list and recomputes each night's occupancy by scanning, on 400 random operation sequences (reserve, retry with the same or a changed request, confirm, cancel, time passing, 3 to 20 nights, totals 1 to 4, stays up to six nights, some running past the inventory window). After **every** operation the counters must equal the scan, nothing may exceed its total, the booking states must agree, and the return values must match. Fixed cases pin the boundaries: a stay checking out on the 3rd and another checking in on the 3rd both fit; overlapping stays do not; a stay running past the inventory window is refused and leaves no night half-booked; zero nights and zero rooms are errors; confirm at exactly the expiry second fails and one second earlier succeeds; a retry after expiry returns the dead booking, so the client must use a new key; the same key with a changed request is an error (Stripe's idempotency documentation describes the same refusal when parameters differ). Twelve threads then hammer one database file and the counters must still equal what the bookings table implies. That test cannot tell the conditional update from check-then-write, because `BEGIN IMMEDIATE` serialises everything; the no-oversell claim is defended by the lock, the conditional update and the `CHECK`, and demonstrated by the model comparison, not by the threads.
 
 **What the constraint adds.** In PostgreSQL, a single-unit listing can also be protected declaratively: a range column plus `EXCLUDE USING GIST (listing WITH =, during WITH &&)` rejects any overlapping row (the PostgreSQL range-type documentation shows this for room reservations, with the `btree_gist` extension for the equality part, and notes that `UNIQUE` is usually unsuitable for range types). It cannot express "up to 6 of this room type", so per-night counters remain the general tool. The `CHECK` in the schema above is the same idea for counters: if some code path forgets the condition, the database refuses the write instead of overselling quietly.
 
@@ -225,7 +234,7 @@ def expected_profit(L, C, p, r, c):
 
 ## 7. Deep Dive 3: Search Versus Booking, and the Flow With Crash Points
 
-**Search is a read of a copy.** For single-unit listings a bitmap of free nights per listing answers "is this whole range free?" with one mask and compare: bit `d` set means night `d` is free. Python integers are not limited to a machine word, so a 365-night bitmap is one integer; the checks use widths of 8, 31, 64, 65, 120, 365 and 400 against a night-by-night loop, because a shift written for 64 bits fails exactly at the width where it stops fitting. Keep the brackets in `(avail & m) == m`: Python's bitwise operators bind tighter than comparisons, so here they are optional (a mutation test that removed them survived, which is how this lesson's first draft, which claimed otherwise, was caught), but in C, Java and JavaScript `==` binds tighter than `&` and the bracket-free form is a different, wrong test. The index can lag the record, so the user may see a room that is gone; the booking step rechecks, and the page must say "no longer available" or "price changed", not fail silently.
+**Search is a read of a copy.** For single-unit listings a bitmap of free nights per listing answers "is this whole range free?" with one mask and compare: bit `d` set means night `d` is free. Python integers are not limited to a machine word, so a 365-night bitmap is one integer; the checks use widths of 8, 31, 64, 65, 120, 365 and 400 against a night-by-night loop, because a shift written for 64 bits fails exactly at the width where it stops fitting. Keep the brackets in `(avail & m) == m`: Python's bitwise operators bind tighter than comparisons, so here they are optional (a mutation test that removed them survived, which is how this lesson's first draft, which claimed otherwise, was caught), but in C, Java and JavaScript `==` binds tighter than `&`, so the bracket-free form is a different test in C and JavaScript and a compile error in Java (`int & boolean`). The index can lag the record, so the user may see a room that is gone; the booking step rechecks, and the page must say "no longer available" or "price changed", not fail silently.
 
 ```python
 def night_mask(d_in, d_out):
@@ -285,19 +294,20 @@ def book(conn, psp, idem, guest, rtype, d_in, d_out, rooms, amount, now, ttl=600
         raise Crash()
     return 'CONFIRMED'
 
-def reconcile(conn, psp, now):
-    """Periodic job: a charge whose reservation can no longer be confirmed is refunded, and its rooms released."""
+def reconcile(conn, psp, now, after_read=None):
+    """Periodic job. A charge whose reservation is dead is refunded. A pending reservation is given up only through
+    expire(), so a guest who confirms between our read and our decision wins: the conditional update then changes nothing."""
     for idem in list(psp.charges):
         if idem in psp.refunded:
             continue
-        row = conn.execute("SELECT id, state, expires FROM bookings WHERE idem = ?", (idem,)).fetchone()
-        if row is None or row[1] in ('EXPIRED', 'CANCELLED') or (row[1] == 'PENDING' and row[2] <= now):
-            if row is not None and row[1] == 'PENDING':
-                cancel(conn, row[0])
+        row = conn.execute("SELECT id, state FROM bookings WHERE idem = ?", (idem,)).fetchone()
+        if after_read:
+            after_read(idem)                              # test seam: lets a retry run between the read and the decision
+        if row is None or row[1] in ('EXPIRED', 'CANCELLED') or (row[1] == 'PENDING' and expire(conn, row[0], now)):
             psp.refund(idem)
 ```
 
-**The checks.** Every crash point is run with and without a retry; after each, with a reconciliation pass, two things must hold: a charge is kept if and only if its booking is confirmed (so the guest is never charged for nothing, and never given a room for free), and the inventory counters equal the occupancy the bookings table implies. A fuzz of 250 sequences adds random crashes, retries, slow payments and time passing, and ends with the same invariants. Writing it found one real hazard: a retry that arrives at a time earlier than a refund already issued can confirm a booking the provider has refunded. Real time does not run backwards, so the fuzz advances the clock by the payment delay; but the lesson is that **refund and confirm must be ordered by one clock, the database's**, which is why confirm re-checks the expiry in the same statement that changes the state.
+**The checks.** Every crash point is run with and without a retry; after each, with a reconciliation pass, two things must hold: a charge is kept if and only if its booking is confirmed (so the guest is never charged for nothing, and never given a room for free), and the inventory counters equal the occupancy the bookings table implies. A fuzz of 250 sequences adds random crashes, retries, slow payments and time passing, and ends with the same invariants. The first version of `reconcile` had two flaws that these checks now pin. It cancelled with a plain `cancel`, which accepts a confirmed booking, so a reconcile that had read `PENDING` could cancel and refund a booking whose guest had just been told `CONFIRMED` (a retry from a worker whose clock read 599 against an expiry of 600); and the first fuzz hid the hazard by never letting time go backwards. Now `reconcile` gives a reservation up only through `expire`, one conditional update that changes nothing unless the booking is still pending and past its time, so `confirm` and `expire` cannot both win. A second check runs `reconcile` while the reservation is still alive and requires it to leave a charged pending booking alone, so the retry confirms. **What is not solved:** the model takes `now` from the caller, so two callers with skewed clocks can disagree about expiry; the conditional transitions make the outcome consistent (one winner), not the clocks agree. Production code should take the time from the database inside the transaction.
 
 Airbnb's description of its payments framework shows the same shape from the other side: record the request and take a lease on its key in a transaction, do the network call outside any database transaction, record the result in another; classify errors as retryable or not; do not read idempotency data from a lagging replica, because a retry could then miss the first response and charge twice.
 
@@ -335,7 +345,7 @@ Airbnb's description of its payments framework shows the same shape from the oth
 1. **Inclusive end date.** The check-out day is not a night.
 2. **Updating nights one at a time without undoing.** Count the rows changed and compare with the nights.
 3. **Letting an empty range through.** Zero rows changed equals zero nights, and the check passes.
-4. **`avail & m == m` in C, Java or JavaScript.** There `==` binds tighter than `&`; write `(avail & m) == m` everywhere.
+4. **`avail & m == m` in C, Java or JavaScript.** There `==` binds tighter than `&` (a wrong test in C and JavaScript, a compile error in Java); write `(avail & m) == m` everywhere.
 5. **Trusting search availability at booking time.** It is a copy.
 6. **Calling the provider inside a database transaction.** Reserve, then call, then confirm.
 7. **A charge without a way to give it back.** Every crash point needs a retry or a reconciliation.

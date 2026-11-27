@@ -15,12 +15,19 @@ SCHEMA, reserve, confirm, cancel, rooms_left = ns['SCHEMA'], ns['reserve'], ns['
 IdempotencyMismatch = ns['IdempotencyMismatch']
 overflow_prob, best_limit, expected_profit = ns['overflow_prob'], ns['best_limit'], ns['expected_profit']
 night_mask, is_free, take = ns['night_mask'], ns['is_free'], ns['take']
-Psp, Crash, book, reconcile = ns['Psp'], ns['Crash'], ns['book'], ns['reconcile']
+Psp, Crash, book, reconcile, expire = ns['Psp'], ns['Crash'], ns['book'], ns['reconcile'], ns['expire']
 
 
 def need(*phrases):
     for p in phrases:
         assert p in src, 'lesson text is missing the checked figure: %r' % p
+
+
+def forbid_claims(subject, verbs):
+    """no un-negated sentence may have the company as subject with one of the claim verbs"""
+    for sentence in re.split(r"(?<=[.!?])\s+|\n", src.split('## Further reading')[0]):
+        if re.search(subject, sentence) and re.search(verbs, sentence) and not re.search(r"\b(not|no|nor|never|without|neither|none)\b|n't", sentence, re.I):
+            raise AssertionError('unsourced claim about a company: %r' % sentence[:160])
 
 
 def forbid(*phrases):
@@ -339,6 +346,45 @@ for crash_at in (None, 'after_reserve', 'after_charge', 'after_confirm'):
         if not retry and crash_at == 'after_reserve':                          # never charged; the rooms free up lazily, at the next reserve
             assert not psp.charges and reserve(conn, 'next', 'h', 'R', 0, 3, 1, 1000, 600) is not None
         flows += 1
+# review I3: a reconcile that runs while the reservation is still alive must leave a charged pending booking alone, and the retry then confirms
+conn, psp = new_db(inventory=[('R', 6, 1)]), Psp()
+try:
+    book(conn, psp, 'k', 'g', 'R', 0, 2, 1, 100, 0, ttl=600, crash_at='after_charge')
+except Crash:
+    pass
+reconcile(conn, psp, 1)
+assert not psp.refunded and conn.execute("SELECT state FROM bookings").fetchone()[0] == 'PENDING'
+assert book(conn, psp, 'k', 'g', 'R', 0, 2, 1, 100, 10) == 'CONFIRMED' and not psp.refunded
+invariants(conn, psp, 'early reconcile')
+# review I2: reconcile reads PENDING, then the guest's retry (a slow worker whose clock reads 599) confirms; reconcile must not
+# cancel or refund a booking the guest was told is CONFIRMED
+conn, psp = new_db(inventory=[('R', 6, 1)]), Psp()
+try:
+    book(conn, psp, 'k', 'g', 'R', 0, 2, 1, 100, 0, ttl=600, crash_at='after_charge')
+except Crash:
+    pass
+told = []
+reconcile(conn, psp, 601, after_read=lambda idem: told.append(book(conn, psp, idem, 'g', 'R', 0, 2, 1, 100, 599)))
+assert told == ['CONFIRMED']
+assert conn.execute("SELECT state FROM bookings").fetchone()[0] == 'CONFIRMED' and not psp.refunded and sold_table(conn)[('R', 0)] == 1
+invariants(conn, psp, 'stale reconcile')
+# the other order: reconcile wins first, then the retry must be told EXPIRED and the charge is refunded
+conn, psp = new_db(inventory=[('R', 6, 1)]), Psp()
+try:
+    book(conn, psp, 'k', 'g', 'R', 0, 2, 1, 100, 0, ttl=600, crash_at='after_charge')
+except Crash:
+    pass
+reconcile(conn, psp, 601)
+assert book(conn, psp, 'k', 'g', 'R', 0, 2, 1, 100, 602) == 'EXPIRED' and psp.refunded == {'k'} and sold_table(conn)[('R', 0)] == 0
+invariants(conn, psp, 'reconcile first')
+# expire() is one conditional transition: only a pending reservation at or past its time, and only once
+conn = new_db(inventory=[('R', 6, 1)])
+b1 = reserve(conn, 'a', 'g', 'R', 0, 2, 1, 0, 10)
+assert expire(conn, b1, 9.9) is False and sold_table(conn)[('R', 0)] == 1
+assert expire(conn, b1, 10) is True and sold_table(conn)[('R', 0)] == 0 and expire(conn, b1, 11) is False
+b2 = reserve(conn, 'b', 'g', 'R', 0, 2, 1, 20, 10); assert confirm(conn, b2, 21)
+assert expire(conn, b2, 1000) is False and sold_table(conn)[('R', 0)] == 1               # a confirmed booking is never expired
+
 # a retry after the reservation died: no new charge, 'EXPIRED', the key is spent
 conn, psp = new_db(inventory=[('R', 6, 1)]), Psp()
 try:
@@ -385,6 +431,7 @@ assert flows > 300
 
 need('400 random operation sequences', 'Twelve threads', '250 sequences', '120 random parameter sets', '20,000 simulated nights',
      'limit %d' % L, '%.2f to **%.2f**' % (no_over, with_over), '**%.2f**' % bumped, '**%.3f**' % p_over, '%.2f to %.2f' % (empty, empty_over),
-     '**%.2f**' % shock_bumped, '**%.3f**' % shock_pover, '85% on half the nights')
-forbid('limit 108', 'limit 110', 'Redlock')
+     '**%.2f**' % shock_bumped, '**%.3f**' % shock_pover, '85% on half the nights', 'one conditional update that changes nothing unless', 'What is not solved', 'leave a charged pending booking alone')
+forbid('limit 108', 'limit 110', 'Redlock', 'one clock decides')
+forbid_claims(r'Booking\.com|Expedia|Airbnb stores|Airbnb keeps|Airbnb allocates|Airbnb sets', r'(stores|keeps|uses|allocates|sets|overbooks|runs)')
 print('sy58 code checks passed (%d booking operations, %d payment flows)' % (ops, flows))
