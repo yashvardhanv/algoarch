@@ -32,7 +32,7 @@ def sy63(src):
         t += min(10800, 1800 * 2 ** (n - 1)); n += 1
     assert n == 43 and t >= 5 * 86400
     need(src, '34,722 per second', '231,481 per second', '196,759', '675 TB per day', '821 MB per year', '5,787 per second',
-         '1.25 million messages', '43 tries', '3 billion per day')
+         '1.25 million messages', '43 tries, the last one at or after the give-up time', '3 billion per day')
     forbid(src, '41 tries', '114 duplicate')
     return 'sy63'
 
@@ -52,9 +52,10 @@ def sy64(src):
     assert couriers / ping_s == 800
     p_acc, wasted_s = 0.7, 15
     assert round(1 / p_acc, 2) == 1.43 and round((1 / p_acc - 1) * wasted_s, 1) == 6.4
+    assert round(0.3 ** 3, 3) == 0.027 and 3 * wasted_s == 45 and round((1 / p_acc - 1) * wasted_s / window_s, 2) == 0.32
     assert round(held / 1500, 1) == 1.7                            # the prose's counterfactual: 1,500 couriers carrying everything
-    need(src, '100 per minute', 'about 33', '2,500', '62.5%', '49,500 cells', '660 cells', '800 per second', '1.43 offers', '6.4 seconds', '1.7 orders per courier')
-    forbid(src, '1,182 of 2,000', '63 of 1,000', '1,380 of 1,500')
+    need(src, '100 per minute', 'about 33', '2,500', '62.5%', '49,500 cells', '660 cells', '800 per second', '1.43 offers', '6.4 seconds', '1.7 orders per courier', '2.7% of orders need four or more offers', '45 seconds or more')
+    forbid(src, '1,182 of 2,000', '63 of 1,000', '1,380 of 1,500', 'more than a window')
     return 'sy64'
 
 
@@ -72,12 +73,15 @@ def sy65(src):
     assert cap * V == 20_000_000 and round(cap * V * size * 8 / 1e9) == 24
     assert round(24 / (V * mbps / 1e6 * 1000), 3) == 0.008
     assert cap * size == 3000 and V // per_node == 10
+    frame = cap * size
+    assert frame == 3000 and 120 * frame == 360_000 and 100_000 * 10 * frame == 3_000_000_000
+    assert 1000 / msgs == 2                                          # a 1,000-message ring is 2 s of the 500 per second room
     d = 1.5
     assert (3 * 2 + d, 4 * 2 + d) == (7.5, 9.5) and (3 * 6 + d, 4 * 6 + d) == (19.5, 25.5)
     need(src, '3 Tbps', '500,000 per second', '0.75 MB', '6.75 GB per hour', '10,000 per second', '250 per second',
          '500 million deliveries per second, 600 Gbps', '20% of the video egress', '24 Gbps, 0.8% of the video',
-         '1 million frames per second', '10 nodes', '7.5 to 9.5 seconds', '19.5 to 25.5 seconds')
-    forbid(src, '1,000 join instants', 'many HLS examples', 'reloads at least every')
+         '1 million frames per second', '10 nodes', '360 KB per room', '3 GB of resume traffic', 'two minutes of history', '7.5 to 9.5 seconds', '19.5 to 25.5 seconds')
+    forbid(src, '1,000 join instants', 'many HLS examples', 'reloads at least every', 'A message costs one hop')
     return 'sy65'
 
 

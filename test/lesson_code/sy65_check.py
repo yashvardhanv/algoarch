@@ -49,11 +49,13 @@ for n in range(40):
     ms = o.media_sequence()
     assert ms >= prev and ms - prev <= 1 and (n < 5 or ms == n - 4)
     prev = ms
-# removed segments stay fetchable for the playlist duration (the RFC minimum): newest - 2W < seq
+# RFC 8216 6.2.2: a removed segment stays for its own duration plus the playlist's duration: W + 1 segments after removal.
+# Segment s leaves the playlist when s + W is published; the period ends when s + 2W + 1 is published (not guaranteed from then on).
 o = LiveOrigin(2, 4)
 for _ in range(30):
     o.publish()
-assert o.newest == 29 and o.fetchable(29) and o.fetchable(22) and not o.fetchable(21) and not o.fetchable(30) and not o.fetchable(-1)
+assert o.newest == 29 and o.fetchable(29) and o.fetchable(22) and o.fetchable(21) and not o.fetchable(20) and not o.fetchable(30) and not o.fetchable(-1)
+assert 29 - 21 == 2 * 4 and (4 + 1) * o.target == 10        # 21 left the playlist when 25 appeared: 10 s (5 segments) later it is still owed until 29
 assert 29 - 4 + 1 == 26 == o.media_sequence()                        # 22..25 are out of the playlist but still served
 
 # latency behind live at join: segment n is available at (n + 1) * T + d (encode and package delay d); the player starts at the
@@ -81,8 +83,8 @@ for W in range(3, 12):
             if ok:
                 best = k
         assert best == pause_budget(W, retained), (W, retained, best, pause_budget(W, retained))
-assert [pause_budget(6, False), pause_budget(6, True)] == [3, 9]
-need('3 segments', '9 segments')
+assert [pause_budget(6, False), pause_budget(6, True)] == [3, 10]
+need('3 segments', '10 segments')
 
 # ---- 2. coalescing at a cache tier -------------------------------------------------------------------------------------
 def run_single(arrivals, lat, coalesce):
@@ -134,86 +136,131 @@ for E_, per in [(1, 1), (5, 30), (50, 200), (200, 5)]:
         edges, _ = tiers(E_, per, False, True, seed)
         assert sum(e.fetches for e in edges) == E_
 
-# ---- 3. live comments: a room, a resume buffer ------------------------------------------------------------------------
-r = Room(ring=5)
-assert r.since(0) == ('ok', [])
+# ---- 3. live comments: a room of frames, a resume ring -----------------------------------------------------------------
+def pub(rm, rng, k=1, prio=0):
+    for _ in range(k):
+        rm.post('u', 'x', prio)
+    return rm.tick(rng)
+
+
+rng0 = random.Random(1)
+r = Room(ring=5, cap=1000)
+assert r.since(0) == ('ok', []) and r.tick(rng0) is None and r.seq == 0
 for i in range(1, 4):
-    assert r.publish('u', 'm%d' % i) == i
-assert r.since(0)[0] == 'ok' and [m['seq'] for m in r.since(0)[1]] == [1, 2, 3]
-assert [m['seq'] for m in r.since(2)[1]] == [3] and r.since(3) == ('ok', [])
+    assert pub(r, rng0)['seq'] == i
+assert [f['seq'] for f in r.since(0)[1]] == [1, 2, 3] and [f['seq'] for f in r.since(2)[1]] == [3] and r.since(3) == ('ok', [])
+assert r.tick(rng0) is None and r.seq == 3                           # an empty tick uses no frame number
 for i in range(4, 9):
-    r.publish('u', 'm%d' % i)
-# ring of 5 holds seq 4..8: asking from 3 is still complete (needs 4), from 2 is a gap
-assert r.since(3)[0] == 'ok' and [m['seq'] for m in r.since(3)[1]] == [4, 5, 6, 7, 8]
-assert r.since(2) == ('gap', 4) and r.since(0) == ('gap', 4)
-assert r.since(8) == ('ok', []) and r.since(99) == ('ok', [])
-# brute-force reference on random rings
+    pub(r, rng0)
+assert [f['seq'] for f in r.since(3)[1]] == [4, 5, 6, 7, 8] and r.since(3)[0] == 'ok'     # ring of 5 holds 4..8
+assert r.since(2) == ('gap', 4) and r.since(0) == ('gap', 4) and r.since(8) == ('ok', []) and r.since(99) == ('ok', [])
 rng = random.Random(71)
 for _ in range(500):
     ring = rng.randint(1, 12)
-    rm, allm = Room(ring=ring), []
+    rm, allf = Room(ring=ring, cap=1000), []
     for _ in range(rng.randint(0, 40)):
-        allm.append(rm.publish('u', 'x'))
-    for last in range(0, len(allm) + 3):
+        f = pub(rm, rng0, rng.randint(0, 2))
+        if f is not None:
+            allf.append(f['seq'])
+    assert allf == list(range(1, len(allf) + 1))
+    for last in range(0, len(allf) + 3):
         kind, got = rm.since(last)
-        want = [s for s in allm if s > last]
-        held = allm[-ring:] if allm else []
+        want = [s_ for s_ in allf if s_ > last]
+        held = allf[-ring:] if allf else []
         if not want:
             assert (kind, got) == ('ok', [])
         elif want[0] in held:
-            assert kind == 'ok' and [m['seq'] for m in got] == want
+            assert kind == 'ok' and [f['seq'] for f in got] == want
         else:
             assert kind == 'gap' and got == held[0]
 
-# hub: hops follow edges, deliveries follow connections
-hub = Hub(ring=100)
+# hub: hops follow edges, deliveries follow connections, and neither depends on how many messages were posted
+hub = Hub(ring=100, cap=1000)
 for e, c in [('e1', 'a'), ('e1', 'b'), ('e2', 'c'), ('e3', 'd')]:
     hub.join('room', e, c)
-res = hub.publish('room', 'u', 'hi')
-assert res == {'seq': 1, 'hops': 3, 'deliveries': 4}
+assert hub.tick('room', rng0) is None                                 # nothing posted: no frame
+hub.post('room', 'u', 'hi')
+assert hub.tick('room', rng0) == {'seq': 1, 'hops': 3, 'deliveries': 4}
 hub.leave('room', 'e3', 'd')
-assert hub.publish('room', 'u', 'x')['hops'] == 2                    # an edge with no viewers is no longer a hop
+hub.post('room', 'u', 'x')
+assert hub.tick('room', rng0)['hops'] == 2                            # an edge with no viewers is no longer a hop
 hub.leave('room', 'e1', 'a')
-assert hub.publish('room', 'u', 'x') == {'seq': 3, 'hops': 2, 'deliveries': 2}
-assert hub.publish('empty', 'u', 'x') == {'seq': 1, 'hops': 0, 'deliveries': 0}
-# a closed form: with V viewers on E edges and R messages per second, the room costs R * E hops and R * V deliveries
-hub = Hub(ring=10)
+hub.post('room', 'u', 'x')
+assert hub.tick('room', rng0) == {'seq': 3, 'hops': 2, 'deliveries': 2}
+hub.post('empty', 'u', 'x')
+assert hub.tick('empty', rng0) == {'seq': 1, 'hops': 0, 'deliveries': 0}
+hub = Hub(ring=10, cap=20)
 V, E = 1000, 10
 for i in range(V):
     hub.join('big', 'e%d' % (i % E), 'c%d' % i)
-tot = [hub.publish('big', 'u', 'm') for _ in range(7)]
+tot = []
+for _ in range(7):
+    for _ in range(500):
+        hub.post('big', 'u', 'm')
+    tot.append(hub.tick('big', rng0))
 assert sum(t['hops'] for t in tot) == 7 * E and sum(t['deliveries'] for t in tot) == 7 * V
+assert hub.rooms['big'].n == 3500 and all(len(f['msgs']) == 20 for f in hub.rooms['big'].buf)
 
-
-# a first-time viewer starts from now, not from the beginning of the ring; a live message with a hole triggers a resume
-rm = Room(ring=50)
-for _ in range(5):
-    rm.publish('u', 'x')
-cl = Client('new')
+# THE COMBINATION: thinning together with the real client.  Numbering messages and thinning them makes holes by design.
+def naive_numbered_messages(ticks=10, per_tick=500, cap=20, seed=3):
+    rng = random.Random(seed)
+    n, last, resyncs, received = 0, 0, 0, 0
+    for _ in range(ticks):
+        batch = [{'n': n + i + 1, 'prio': 0} for i in range(per_tick)]
+        n += per_tick
+        for m in select(batch, cap, rng):
+            if m['n'] <= last:
+                continue
+            if m['n'] == last + 1:
+                received += 1
+                last = m['n']
+            else:                                                       # a hole: resume pulls everything after `last`
+                resyncs += 1
+                received += n - last
+                last = n
+    return resyncs, received
+assert naive_numbered_messages() == (10, 5000)
+need('10 resyncs and 5,000 messages received instead of 200')
+rm = Room(ring=120, cap=20)
+cl = Client('v')
 cl.connect(rm)
-assert (cl.last, cl.start, cl.received) == (5, 5, [])
-cl.sync(rm)
-assert cl.received == [] and cl.last == 5
-rm.publish('u', 'x'); rm.publish('u', 'x'); rm.publish('u', 'x')           # 6, 7, 8; the live copies of 6 and 7 are lost
-cl.on_live(rm, rm.buf[-1])                                                   # 8 arrives: a hole, so resume fills 6 and 7 first
-assert cl.received == [6, 7, 8] and cl.last == 8
-cl.on_live(rm, rm.buf[-1]); cl.on_live(rm, rm.buf[0])                        # duplicates and stale ones change nothing
-assert cl.received == [6, 7, 8]
-# clients: in-order, no duplicates, gaps detected, resume after reconnect -------------------------------------------------
+for t in range(10):
+    for _ in range(499):
+        rm.post('u', 'x')
+    pn = rm.post('mod', 'x', 1)
+    fr = rm.tick(rng0)
+    assert len(fr['msgs']) == 20 and pn in [m['n'] for m in fr['msgs']]
+    cl.on_live(rm, fr)
+assert (cl.syncs, len(cl.received), cl.shown, cl.gaps) == (0, 10, 200, [])
+rm = Room(ring=120, cap=20)
+cl = Client('v')
+cl.connect(rm)
+for t in range(10):
+    for _ in range(500):
+        rm.post('u', 'x')
+    fr = rm.tick(rng0)
+    if t != 4:                                                          # frame 5 is lost on the wire
+        cl.on_live(rm, fr)
+assert (cl.syncs, cl.received, cl.shown, cl.gaps) == (1, list(range(1, 11)), 200, [])     # one resume, thinned frames, 200 not 5,000
+
+
 def fuzz_chat(seed, ring):
     rng = random.Random(seed)
-    room = Room(ring=ring)
+    room = Room(ring=ring, cap=rng.choice([1, 3, 20]))
     clients = [Client('c%d' % i) for i in range(4)]
     online = set()
-    allseq = 0
     for _ in range(150):
         op = rng.random()
         c = rng.choice(clients)
         if op < 0.45:
-            allseq = room.publish('u', 'm')
-            for x in clients:
-                if x.name in online and rng.random() > 0.2:                  # a live delivery that may be lost on the wire
-                    x.on_live(room, room.buf[-1])
+            for _ in range(rng.randint(0, 40)):
+                room.post('u', 'm', 1 if rng.random() < 0.05 else 0)
+            frame = room.tick(rng)
+            if frame is not None:
+                assert len(frame['msgs']) <= room.cap
+                for x in clients:
+                    if x.name in online and rng.random() > 0.2:             # a live frame that may be lost on the wire
+                        x.on_live(room, frame)
         elif op < 0.65:
             c.connect(room); online.add(c.name)
         elif op < 0.8:
@@ -226,52 +273,69 @@ def fuzz_chat(seed, ring):
             assert c.last == room.seq, (seed, c.name, c.last, room.seq)
         seqs = c.received
         assert seqs == sorted(set(seqs)), 'out of order or duplicated'
+        assert c.shown <= room.cap * len(seqs)
         if c.start is not None:
             lost = sum(b - a + 1 for a, b in c.gaps)
-            hi = c.last
-            assert len(seqs) + lost == hi - c.start, (seed, c.name, len(seqs), lost, c.start, hi)
+            assert len(seqs) + lost == c.last - c.start, (seed, c.name, len(seqs), lost, c.start, c.last)
             for a, b in c.gaps:
-                assert not any(a <= s <= b for s in seqs)
+                assert not any(a <= s_ <= b for s_ in seqs)
     return sum(len(c.gaps) for c in clients)
 
 
 gaps_small = sum(fuzz_chat(s, 3) for s in range(300))
 gaps_big = sum(fuzz_chat(s, 10_000) for s in range(300))
 assert gaps_big == 0 and gaps_small > 0
+# a first-time viewer starts from now, not from the beginning of the ring; duplicates and stale frames change nothing
+rm = Room(ring=50, cap=20)
+for _ in range(5):
+    pub(rm, rng0)
+cl = Client('new')
+cl.connect(rm)
+assert (cl.last, cl.start, cl.received) == (5, 5, [])
+cl.sync(rm)
+assert cl.received == [] and cl.last == 5
+f6, f7, f8 = pub(rm, rng0), pub(rm, rng0), pub(rm, rng0)                # live copies of 6 and 7 are lost
+cl.on_live(rm, f8)
+assert cl.received == [6, 7, 8] and cl.last == 8
+before = cl.syncs
+cl.on_live(rm, f8); cl.on_live(rm, f6)
+assert cl.received == [6, 7, 8] and cl.syncs == before          # a duplicate is dropped, it does not trigger a resume
+nn = Client('n')                                                       # a client that never connected ignores live frames
+nn.on_live(rm, f8)
+assert nn.received == [] and nn.syncs == 0
 
 # ---- 4. thinning a hot room ---------------------------------------------------------------------------------------------
-batch = [{'seq': i, 'prio': 1 if i in (3, 7) else 0} for i in range(1, 11)]
+batch = [{'n': i, 'prio': 1 if i in (3, 7) else 0} for i in range(1, 11)]
 rng = random.Random(81)
 for _ in range(500):
     cap = rng.randint(1, 12)
     pick = select(batch, cap, rng)
-    assert len(pick) == min(cap, len(batch)) and [m['seq'] for m in pick] == sorted(m['seq'] for m in pick)
-    assert all(m in batch for m in pick) and len({m['seq'] for m in pick}) == len(pick)
+    assert len(pick) == min(cap, len(batch)) and [m['n'] for m in pick] == sorted(m['n'] for m in pick)
+    assert all(m in batch for m in pick) and len({m['n'] for m in pick}) == len(pick)
     if cap >= 2:
-        assert 3 in [m['seq'] for m in pick] and 7 in [m['seq'] for m in pick]        # priority always survives
-# priority alone exceeds the cap: the newest priority messages win
-pb = [{'seq': i, 'prio': 1} for i in range(1, 8)]
-assert [m['seq'] for m in select(pb, 3, random.Random(1))] == [5, 6, 7]
+        assert 3 in [m['n'] for m in pick] and 7 in [m['n'] for m in pick]        # priority always survives
+pb = [{'n': i, 'prio': 1} for i in range(1, 8)]
+assert [m['n'] for m in select(pb, 3, random.Random(1))] == [5, 6, 7]            # priority alone over the cap: the newest win
 assert select([], 5, random.Random(1)) == [] and select(batch, 0, random.Random(1)) == []
-assert [m['seq'] for m in select(batch, 99, random.Random(1))] == list(range(1, 11))
-# uniform: 8 ordinary messages, 2 priority, cap 5 -> 3 ordinary slots, each ordinary message kept with probability 3/8
+assert [m['n'] for m in select(batch, 99, random.Random(1))] == list(range(1, 11))
 cnt, T = collections.Counter(), 40_000
 rng = random.Random(91)
 for _ in range(T):
     for m in select(batch, 5, rng):
-        cnt[m['seq']] += 1
+        cnt[m['n']] += 1
 for i in range(1, 11):
     if i in (3, 7):
         assert cnt[i] == T
     else:
         assert abs(cnt[i] / T - 3 / 8) < 0.01, (i, cnt[i] / T)
-# newer messages are not favoured over older ones among the ordinary ones
 assert abs(cnt[1] - cnt[10]) / T < 0.015
 
 # ---- 5. text locks ------------------------------------------------------------------------------------------------------
 need('Do this after', 'Last reviewed: 27 November 2026', 'RFC 8216', 'three target durations', 'Edge', 'Pubsub', 'Clue', 'Room',
      '3-second HLS segments', '98 percent', 'nearly a hundred PoPs')
 assert len(re.findall(r'^\d+\. ', src.split('## Drills')[1].split('## Homework')[0], re.M)) == 8, 'eight drills'
+need('plus the duration of the longest playlist', 'Caching Patterns and Consistent Hashing', '`2W - 2`', 'a cold herd can be far worse')
+forbid("at least the playlist's duration", '2W - 3', '9 segments', '3 or 9', 'Hub.publish', 'ring buffer of the last N messages')
 for bad in ('lakh', 'crore', 'LPA'):
     forbid(bad)
 print('sy65 code checks passed')
