@@ -50,7 +50,7 @@ A track is a few megabytes, the same few tracks are played constantly, and the l
 | audio | Ogg Vorbis, quality 5 averaging roughly 160 kbps; quality 9 roughly 320 kbps for premium *(paper)* |
 | where playback data came from | 8.8% servers, 35.8% peers, 55.4% local cache *(paper, one measurement period)* |
 | concentration | 88% of plays in the top 12% of the library *(paper)* |
-| client cache | at least 50 MB, at most 10 GB by default; 56% of clients had 5 GB or more, about 1,000 tracks *(paper)* |
+| client cache | at least 50 MB, at most 10 GB by default; 56% of clients had a maximum cache size of 5 GB or more, which fits about 1,000 tracks *(paper)* |
 | average track | 4 minutes *(assumed)* |
 | renditions stored per track | 96, 160 and 320 kbps *(assumed)* |
 | concurrent listeners | 1,000,000, each at 160 kbps *(assumed)* |
@@ -68,7 +68,7 @@ A track is a few megabytes, the same few tracks are played constantly, and the l
 | plays started per second | 1,000,000 / 240 | 4,167 plays per second |
 | cost of switching off prefetch (paper) | median start 390 ms against 265 ms; stutter 1.8% against 1.0% | 47% slower median start; 80% more stutter |
 
-Five conclusions. **The catalogue is small by modern standards:** 138.24 TB for three renditions of an 8 million track library fits on a few dozen servers' disks; the 4.6 TB head fits in memory and flash across a modest cache tier. **The bandwidth bill is a hit-ratio question,** not a catalogue question: the paper's mix made servers 8.8% of the data, and the same mix with no peer network would be 5.07 times as much (applying a share of counted data to a playback rate is a rough scaling, not something the paper computed; it also assumes the cache share is unchanged). **Start latency is the number to defend:** the paper's own experiment turned off prefetching for a week and saw the median start go from 265 ms to 390 ms. **Skips make the worst case:** 39% of playbacks in the paper were random access (the user picked a track), which cannot be prefetched. **Event volume is small:** about 4,167 plays per second at the assumed 1,000,000 listeners.
+Five conclusions. **The catalogue is small by modern standards:** 138.24 TB for three renditions of an 8 million track library is small next to modern disk sizes (the number of servers depends on replication and per-server capacity, which this lesson does not assume); the 4.6 TB head fits in memory and flash across a modest cache tier. **The bandwidth bill is a hit-ratio question,** not a catalogue question: the paper's mix made servers 8.8% of the data, and the same mix with no peer network would be 5.07 times as much (applying a share of counted data to a playback rate is a rough scaling, not something the paper computed; it also assumes the cache share is unchanged). **Start latency is the number to defend:** the paper's own experiment turned off prefetching for a week and saw the median start go from 265 ms to 390 ms. **Skips make the worst case:** 39% of playbacks in the paper were random access (the user picked a track), which cannot be prefetched. **Event volume is small:** about 4,167 plays per second at the assumed 1,000,000 listeners.
 
 ---
 
@@ -310,7 +310,7 @@ This section is the general approach for a service today, not a description of a
 
 1. **Catalogue and metadata** in a database with search (see Distributed Search Engine (Elasticsearch at Scale)); playlists and the library in a store keyed by user.
 2. **Playback service:** checks rights and plan, returns a short-lived signed manifest (the list of segments and offsets of section 8) and a license reference.
-3. **Audio delivery from a CDN** with HTTP range or segment requests: the standard route for adaptive streaming (RFC 8216 describes HTTP Live Streaming as playlists of media segments fetched over HTTP; read in part). A cache tier in front of the object store serves the head of the catalogue; the tail goes to the origin. Origin load is `egress x (1 - hit ratio)`: at an assumed 90% hit ratio, the 160 Gbps of section 3 leaves 16 Gbps at the origin, at 99% 1.6 Gbps.
+3. **Audio delivery from a CDN** with HTTP range or segment requests: the standard route for adaptive streaming (RFC 8216 describes HTTP Live Streaming as playlists of media segments fetched over HTTP; read in part). A cache tier in front of the object store serves the head of the catalogue; the tail goes to the origin. Bytes played from the device's own cache never reach the CDN, so start from the network share: with the paper's 55.4% local-cache share kept as an assumption, the CDN carries 160 x 44.6% = 71.36 Gbps, and origin load is that times (1 - edge hit ratio): at an assumed 90% hit ratio 7.14 Gbps at the origin, at 99% 0.71 Gbps. (Charging the CDN for the full 160 Gbps would overstate both by 2.24 times.)
 4. **Client behaviour from sections 6 to 8:** keep a connection warm, prefetch the next track, cache, seek by index.
 5. **Events** into a log (see Kafka I: The Log & Producers), counted idempotently.
 
@@ -366,7 +366,7 @@ What a CDN does not replace: the first-byte latency of a track nobody has played
 4. Why is seeking by `time x average bitrate` wrong for variable bitrate, and what lands where in the lesson's example?
 5. Insert a track between playlist keys `1` and `2`, then between `1V` and `2`, then between `z` and the end. What property must each answer have?
 6. Two people drop a track into the same gap of a shared playlist at the same moment. What happens with fractional keys, and what do you do about it?
-7. Compute the head of a catalogue of 8 million tracks (12% at 4.8 MB) and the origin load for 1,000,000 listeners at 160 kbps with a 95% edge hit ratio.
+7. Compute the head of a catalogue of 8 million tracks (12% at 4.8 MB) and the origin load for 1,000,000 listeners at 160 kbps, given that 55.4% of played data comes from the device cache and the CDN has a 95% edge hit ratio.
 8. Why is the tracker allowed to be approximate, and what does the client do when it is wrong?
 
 ---

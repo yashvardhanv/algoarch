@@ -97,11 +97,15 @@ def sy62(src):
     assert round(listeners / track_s) == 4167
     assert round((390 - 265) / 265 * 100) == 47 and round((1.8 - 1.0) / 1.0 * 100) == 80
     # origin load with a CDN: egress x (1 - hit ratio)
-    assert round(gbps * (1 - 0.90), 1) == 16.0 and round(gbps * (1 - 0.99), 1) == 1.6
+    cdn = gbps * (1 - mix['cache'] / 100)               # bytes played from the device cache never reach the CDN
+    assert round(cdn, 2) == 71.36 and round(gbps / cdn, 2) == 2.24
+    assert round(cdn * 0.10, 2) == 7.14 and round(cdn * 0.01, 2) == 0.71 and round(cdn * 0.05, 2) == 3.57
+    assert cdn * 0.10 < gbps * 0.10                    # the old figure (16 Gbps) charged the CDN for device-cache bytes
     # sanity: the head cannot be larger than the library and 12% of 8M tracks fits what 960,000 x 4.8 MB says
     assert head < tracks and head * mb < lib_tb * 1e6
     need(src, '4.8 MB', '38.4 TB', '138.24 TB', '4.608 TB', '1,041 tracks', '160 Gbps', '14.08 Gbps', '71.36 Gbps', '5.07 times', '4,167 plays per second',
-         '47% slower median start; 80% more stutter', '16 Gbps at the origin', '1.6 Gbps')
+         '47% slower median start; 80% more stutter', '7.14 Gbps at the origin', '0.71 Gbps', '2.24 times')
+    forbid(src, '16 Gbps at the origin', '1.6 Gbps', 'few dozen servers')
     forbid(src, 'Spotify uses peer-to-peer today', 'Spotify still uses')
     return 'sy62'
 
