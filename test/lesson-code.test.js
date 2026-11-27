@@ -387,3 +387,26 @@ test('sy54-sy56 capacity estimates are reproduced by script', { skip: py ? false
   assert.match(r.stdout, /capacity checks passed/);
   for (const f of CAPACITY_LESSONS_C) assert.match(r.stdout, new RegExp(f.slice(0, 4)));
 });
+
+test('sy68 lesson code matches an independent lock reference, random interleavings of the recipe client, herd closed forms, fencing and a pause-then-resume simulation', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'sy68_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'sy68-distributed-lock-service.md'),
+  ], { encoding: 'utf8', timeout: 180000 });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /sy68 code checks passed/);
+});
+
+const CAPACITY_LESSONS_D = [
+  'sy68-distributed-lock-service.md',
+];
+
+test('sy68 capacity estimates are reproduced by script', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'capacity_check_d.py'),
+    ...CAPACITY_LESSONS_D.map((f) => path.join(__dirname, '..', 'data', 'new_lessons', f)),
+  ], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /capacity checks passed/);
+  for (const f of CAPACITY_LESSONS_D) assert.match(r.stdout, new RegExp(f.slice(0, 4)));
+});
