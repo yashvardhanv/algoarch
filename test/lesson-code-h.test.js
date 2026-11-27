@@ -34,10 +34,19 @@ test('sy67 lesson code matches RFC 9111 arithmetic, an exact second-hit referenc
 });
 // wave3 task5 sy67 end
 
+// wave3 task5 sy69 begin
+test('sy69 lesson code matches quorum enumeration, hinted-handoff fuzz, Merkle brute force and cart merge laws', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [check('sy69_check.py'), lesson('sy69-dynamo-key-value-store.md')], { encoding: 'utf8', timeout: 300000 });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /sy69 code checks passed/);
+});
+// wave3 task5 sy69 end
+
 const CAPACITY_LESSONS_H = [
   // wave3 task5 capacity begin
   'sy66-log-aggregation-search.md',
   'sy67-content-delivery-network.md',
+  'sy69-dynamo-key-value-store.md',
   // wave3 task5 capacity end
 ];
 
