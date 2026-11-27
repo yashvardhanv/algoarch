@@ -25,10 +25,12 @@ function codeTest(id, file, title) {
   });
 }
 
+codeTest('sy75', 'sy75-feature-flags-config.md', 'a nested-ramp, independence and ordering suite, a never-throw client and a propagation simulation');
 codeTest('sy77', 'sy77-dns-at-scale.md', 'a packet parser, resolver boundary cases, coalescing and a Poisson simulation');
 
-test('sy77 capacity estimates are reproduced by script', { skip: py ? false : 'python not installed' }, () => {
-  const r = spawnSync(py, [check('capacity_check_j.py'), lesson('sy77-dns-at-scale.md')], { encoding: 'utf8', timeout: 180000 });
+test('sy75 and sy77 capacity estimates are reproduced by script', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [check('capacity_check_j.py'), lesson('sy77-dns-at-scale.md'), lesson('sy75-feature-flags-config.md')], { encoding: 'utf8', timeout: 180000 });
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.match(r.stdout, /capacity_check_j \(sy77\) passed/);
+  assert.match(r.stdout, /capacity_check_j \(sy75\) passed/);
 });

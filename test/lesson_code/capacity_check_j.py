@@ -2,6 +2,7 @@
 capacity number in the lesson and fails if stale wording or a wrong figure appears in the text."""
 import sys, re
 text = open(sys.argv[1], encoding='utf-8').read()
+text75 = open(sys.argv[2], encoding='utf-8').read() if len(sys.argv) > 2 else None
 
 # ---- sy77: DNS at scale ---------------------------------------------------------------------------------------------
 N, TOTAL, TTL = 1_000_000, 20_000, 60
@@ -40,3 +41,29 @@ for must_not in ('12x authoritative', 'a 12x increase', 'five queries, five upst
 for op in ('Cloudflare', 'Route 53', 'Route53', 'Google Public DNS', 'Akamai', 'Verisign', 'Quad9', 'OpenDNS'):
     assert op not in text, op
 print("capacity_check_j (sy77) passed")
+
+# ---- sy75: feature flags and config service --------------------------------------------------------------------------
+if text75 is not None:
+    SERVERS, SNAP, UNCHANGED, PUBLISHES = 50_000, 200_000, 300, 10
+    polls30, polls5 = SERVERS / 30, SERVERS / 5
+    evals = 100_000 * 20
+    assert round(polls30) == 1667 and round(polls5) == 10000
+    assert evals == 2_000_000 and round(evals / polls30) == 1200
+    full_bw = polls30 * SNAP / 1e6
+    short_bw = polls30 * UNCHANGED / 1e6
+    assert round(full_bw) == 333 and short_bw == 0.5 and round(full_bw / short_bw) == 667
+    publish = SERVERS * SNAP / 1e9
+    assert publish == 10.0 and round(SERVERS * SNAP / 30 / 1e6) == 333     # the whole fleet fetches inside one interval
+    assert PUBLISHES * publish == 100.0 and round(PUBLISHES * publish * 1e9 / 3600 / 1e6, 1) == 27.8
+    relay = 100 * SNAP / 1e6
+    assert relay == 20.0 and round(publish * 1e3 / relay) == 500
+    assert (30 / 2, 30, 5 / 2, 5) == (15, 30, 2.5, 5) and polls5 / polls30 == 6
+    for must in ('1,667 per second (10,000 per second at 5 s)', '2,000,000, all local: 1,200 times more than the polls',
+                 '333 MB/s', '0.5 MB/s: 667 times less', '10 GB, spread over one polling interval', '27.8 MB/s on average',
+                 '20 MB: 500 times less', '15 s mean, 30 s max / 2.5 s mean, 5 s max', 'a 6x shorter interval is 6x the polls'):
+        assert must in text75, must
+    for must_not in ('capacity_check_k', 'guarantee that every server'):
+        assert must_not not in text75, must_not
+    for vendor in ('LaunchDarkly', 'Unleash', 'Split.io', 'Optimizely', 'Flagsmith', 'Statsig', 'GrowthBook', 'Netflix', 'Facebook'):
+        assert vendor not in text75, vendor
+    print("capacity_check_j (sy75) passed")
