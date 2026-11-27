@@ -59,12 +59,12 @@ if text75 is not None:
     assert PUBLISHES * publish == 100.0 and round(PUBLISHES * publish * 1e9 / 3600 / 1e6, 1) == 27.8
     relay = 100 * SNAP / 1e6
     assert relay == 20.0 and round(publish * 1e3 / relay) == 500
-    assert (30 / 2, 30, 5 / 2, 5) == (15, 30, 2.5, 5) and polls5 / polls30 == 6
+    assert polls5 / polls30 == 6
     for must in ('1,667 per second (10,000 per second at 5 s)', '2,000,000, all local: 1,200 times more than the polls',
                  '333 MB/s', '0.5 MB/s: 667 times less', '10 GB, spread over one polling interval', '27.8 MB/s on average',
                  '20 MB: 500 times less', '15 s mean, 30 s max / 2.5 s mean, 5 s max', 'a 6x shorter interval is 6x the polls'):
         assert must in text75, must
-    for must_not in ('capacity_check_k', 'guarantee that every server'):
+    for must_not in ('capacity_check_k', 'guarantee that every server', 'two flags with the same salt expose identical', 'Two flags become one flag', 'Different flags need different salts', 'only because of the salt'):
         assert must_not not in text75, must_not
     for vendor in ('LaunchDarkly', 'Unleash', 'Split.io', 'Optimizely', 'Flagsmith', 'Statsig', 'GrowthBook', 'Netflix', 'Facebook'):
         assert vendor not in text75, vendor

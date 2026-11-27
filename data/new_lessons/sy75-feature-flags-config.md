@@ -16,7 +16,7 @@ A feature flag is a function from a request to a value, decided by configuration
 
 - **A flag evaluation must never fail the request.** If the snapshot is missing, stale or malformed, the caller's own default is the answer.
 - **A percentage rollout is a hash, not a coin.** The same user must land in the same bucket every time, on every server, and growing from 5% to 25% must add users, never swap them.
-- **Different flags need different salts,** or the same unlucky 5% of users see every experiment.
+- **The hashed string is salt, flag key and user id.** Two different flags split independently because their keys differ, even under one salt; if a design hashed only the salt and the user id, flags sharing a salt would expose identical sets and the same unlucky 5% of users would see every experiment. The salt's own job is to re-randomise one flag: keep it fixed while ramping, change it to reshuffle.
 - **The time to turn something off is the time to distribute a snapshot,** which is set by the polling interval, not by how fast the operator clicks.
 - **The service's load is polls, not evaluations:** thousands per second against millions.
 
@@ -28,12 +28,12 @@ A feature flag is a function from a request to a value, decided by configuration
 
 | If the prompt says... | Reach for |
 |---|---|
-| "roll out to 5%, then 25%, then everyone" | hash the user id with a per-flag salt into 10,000 buckets; serve if the bucket is below the percentage (section 4) |
-| "turn it off immediately if errors spike" | a kill switch checked before everything else; time to take effect is the propagation interval (section 6) |
-| "the flag service is down" | clients keep the last good snapshot and fall back to a default compiled into the caller; never let evaluation throw (section 5) |
+| "roll out to 5%, then 25%, then everyone" | hash the flag key, a salt and the user id into 10,000 buckets; serve if the bucket is below the percentage (section 5) |
+| "turn it off immediately if errors spike" | a kill switch checked before everything else; time to take effect is the propagation interval (section 7) |
+| "the flag service is down" | clients keep the last good snapshot and fall back to a default compiled into the caller; never let evaluation throw (section 6) |
 | "a million flag checks per second" | evaluate in-process from a local snapshot; the service sees polls |
 | "the same user must see the same experience" | stable hashing on a user id, and for anonymous visitors a stable device or cookie id |
-| "two experiments must not interfere" | distinct salts per flag, and check the overlap is about the product of the percentages |
+| "two experiments must not interfere" | distinct flag keys in the hashed string (the key is part of what `bucket` hashes), and check the overlap is about the product of the percentages |
 | "a bad config reached everyone at once" | stage the rollout of the config itself and validate before publishing |
 
 ---
@@ -71,7 +71,25 @@ Three conclusions. **Conditional polling makes steady state nearly free and a pu
 
 ---
 
-## 4. Evaluation: Rules, Hashing and a Kill Switch
+## 4. API and Data Model
+
+This is the lesson's own design, not any product's, and it matches the code below.
+
+```
+get(flag_key, ctx, default) -> (value, reason)        in-process, never raises, no network (section 6)
+GET /snapshot  If-None-Match: <version>   -> 304 | 200 {version, flags}                 ConfigServer.fetch
+PUT /snapshot  {flags}                    -> new version                                 ConfigServer.publish (the operator's side)
+
+ctx      {id, attribute: value, ...}      id is the unit that is bucketed; a missing id means no rollout
+flag     {key, salt, enabled, default, rules[{when{attribute: [allowed]}, serve}], rollout{percent, serve}}
+snapshot {version, flags{key -> flag}}    the version doubles as the entity tag
+```
+
+Evaluation reads only the snapshot and the context, so it has no read path to the service at all; the service has one read (`GET /snapshot`) and one write (publish). Sizes are those of section 3.
+
+---
+
+## 5. Evaluation: Rules, Hashing and a Kill Switch
 
 ```python
 import hashlib
@@ -101,12 +119,12 @@ What the check proves, with a deterministic hash so it can use exact tests:
 
 - **A ramp only adds users.** For 0, 1, 5, 25, 50 and 100 percent over 60,000 ids, each exposed set contains the previous one, and each size is within five binomial standard deviations of the target. 0% exposes nobody and 100% everybody. Swapping `<` for `<=` would put bucket 0 into a 0% rollout.
 - **The hash is uniform enough.** 200,000 ids fall into 100 groups of buckets, none further than five standard deviations from 2,000.
-- **Flags are independent only because of the salt.** Two flags at 50% with different salts overlap in about 25% of users (within 1%); two flags with the same salt expose identical sets. Dropping the salt or the flag key from the hash string is caught.
+- **Independence comes from the flag key; the salt re-randomises one flag.** Two different flags at 50% overlap in about 25% of users (within 1%), whether their salts differ or are shared. The same key and the same salt give identical sets (it is the same flag). The same key with a new salt gives a fresh 50%, overlapping the old one in about 25%. Dropping the salt or the flag key from the hash string is caught.
 - **The order is the contract.** A matching rule beats the rollout; a rule needs every one of its attributes; a missing user id cannot be bucketed and falls to the default; the kill switch beats every rule, including a targeted VIP; a rule with no conditions matches everyone (a trap, listed in the pitfalls).
 
 ---
 
-## 5. Distribution: Conditional Polling and a Client That Never Throws
+## 6. Distribution: Conditional Polling and a Client That Never Throws
 
 ```python
 class ConfigServer:
@@ -162,11 +180,11 @@ class FlagClient:
 
 The conditional fetch is the standard HTTP one: RFC 9110 describes `If-None-Match` as the way a client updates a stored response using its entity tags, so that the server can reply `304 Not Modified` when the stored copy still matches. Here the entity tag is the integer version, the lesson's simplification of an opaque tag.
 
-The client's guarantees follow the OpenFeature specification's rules for a client: evaluation takes a flag key, a required default value and a context; abnormal execution (network failure, unhandled error) must return the default and must not throw. The `STALE` reason is the specification's "non-authoritative or possibly out of date"; using it whenever the last poll failed is this lesson's choice. The check shows: before the first fetch the caller's default comes back with reason `ERROR`; an unknown key does the same; three conditional polls send no repeated body; during an outage the last good value is served as `STALE`; after recovery the new value is seen and the label clears; and a snapshot whose flag is malformed never raises out of `get`.
+The client's guarantees follow the OpenFeature specification's rules for a client: evaluation takes a flag key, a required default value and an optional context; abnormal execution (network failure, unhandled error) must return the default and must not throw. The `STALE` reason is the specification's "non-authoritative or possibly out of date"; using it whenever the last poll failed is this lesson's choice. The check shows: before the first fetch the caller's default comes back with reason `ERROR`; an unknown key does the same; three conditional polls send no repeated body; during an outage the last good value is served as `STALE` and a failed client retries once per interval, not once per tick; after recovery the new value is seen and the label clears; and a snapshot whose flag is malformed never raises out of `get`.
 
 ---
 
-## 6. Deep Dive: How Fast Can You Turn Something Off
+## 7. Deep Dive: How Fast Can You Turn Something Off
 
 The kill switch is a published snapshot with `enabled` false. It reaches each server at that server's next poll, so the delay is the time from the publish to a uniformly random point in the polling cycle:
 
@@ -175,13 +193,13 @@ The kill switch is a published snapshot with `enabled` false. It reaches each se
 | 30 s | 15 s | 30 s | 1,667 |
 | 5 s | 2.5 s | 5 s | 10,000 |
 
-The check simulates 600 clients with random phases, publishes a kill switch and measures when each returns the `DISABLED` reason; the mean is within 5% of half the interval and no client exceeds one interval (plus the quarter-second simulation step). It assumes no failures: a client in an outage keeps the old snapshot until it can poll, which is the price of "never throw". If a flag must turn off faster than polling allows, the options are a push channel from the service (not modelled here and not sourced) or a second, much shorter poll for a small set of kill switches only. Both add load and failure modes; say so rather than claim the number.
+The check simulates 600 clients with random phases, publishes a kill switch and measures when each returns the `DISABLED` reason; the mean is within 5% of half the interval and no client exceeds one interval (plus the quarter-second simulation step, which is what the assert allows). It assumes no failures: a client in an outage keeps the old snapshot until it can poll, which is the price of "never throw". If a flag must turn off faster than polling allows, the options are a push channel from the service (not modelled here and not sourced) or a second, much shorter poll for a small set of kill switches only. Both add load and failure modes; say so rather than claim the number.
 
-**A bad config.** The fleet applies whatever snapshot it receives. Two defences matter more than speed: validate before publishing (the model has no validator) and publish the config itself in stages, so a bad snapshot meets a fraction of servers first. The nested ramp of section 4 is the same idea for users; staging the snapshot is not modelled.
+**A bad config.** The fleet applies whatever snapshot it receives. Two defences matter more than speed: validate before publishing (the model has no validator) and publish the config itself in stages, so a bad snapshot meets a fraction of servers first. The nested ramp of section 5 is the same idea for users; staging the snapshot is not modelled.
 
 ---
 
-## 7. Failure Modes
+## 8. Failure Modes
 
 | Failure | What goes wrong | What the design does |
 |---|---|---|
@@ -189,24 +207,24 @@ The check simulates 600 clients with random phases, publishes a kill switch and 
 | snapshot corrupt or flag malformed | an evaluation might raise | `get` catches it and returns the caller's default with reason `ERROR` |
 | unknown flag key | typo or flag not yet published | the caller's default and `ERROR` |
 | rollout percent changed downward | users who had the feature lose it | nested buckets make this a clean cut, but it is a visible change for those users |
-| same salt on two flags | experiments are perfectly correlated | distinct salts per flag |
+| same flag key and same salt on two definitions (or a hash input that omits the key) | the two are one flag: identical sets, perfectly correlated | distinct keys, which `bucket` hashes; fresh salt to re-randomise |
 | rule with no conditions | matches everybody | the check pins this behaviour; validate rules before publishing |
 | whole fleet fetches a big snapshot at once | origin bandwidth burst after each publish | a relay tier or jittered polling (relay modelled only as arithmetic) |
 | polling too slow for a kill switch | harm continues for up to one interval | shorten the interval for a small set of kill switches |
 
 ---
 
-## 8. What Real Systems Did
+## 9. What Real Systems Did
 
 No flag vendor's or company's engineering material was read for this lesson. The two standards it uses are the OpenFeature specification (the client rules on defaults, no exceptions, reasons and error codes) and RFC 9110 (conditional requests). The bucketing, the rule order, the relay tier, the polling model and every number are this lesson's own design and assumptions; they are labelled as such and are not claims about how any product works.
 
 ---
 
-## 9. Pitfalls Checklist
+## 10. Pitfalls Checklist
 
 1. **A flag check that can throw.** The caller's default must be the answer to any failure.
 2. **A random number instead of a hash.** The same user flips between experiences on every request.
-3. **Reusing one salt.** Two flags become one flag.
+3. **Leaving the flag key out of the hash, or copying a flag's key and salt.** Hash only the salt and the user id and every flag sharing a salt becomes one flag; copy both and the copy is the same flag. This lesson's `bucket` hashes the key, so two different flags under one salt are independent.
 4. **Re-bucketing on every ramp step.** Users swap instead of being added; keep the salt fixed while ramping.
 5. **A rule with no conditions.** It is "everyone", and it silently overrides the rollout.
 6. **Treating the interval as free.** Shorter polling multiplies load and does not help a client in an outage.
@@ -220,7 +238,7 @@ No flag vendor's or company's engineering material was read for this lesson. The
 1. 50,000 servers poll every 10 seconds. How many polls per second, and what is the mean and worst-case time for a change to arrive?
 2. A snapshot is 500 KB and 20,000 servers poll every 20 seconds. Bandwidth if every poll returned the body; bandwidth if unchanged polls return 300 bytes; bandwidth during the 20 seconds after a publish.
 3. Explain, using the nested-ramp check, why growing a rollout from 5% to 25% adds users and never moves anyone out. What changes if the salt is regenerated at each step?
-4. Two experiments, each at 20%, use distinct salts. About what share of users sees both? What if they share a salt?
+4. Two experiments, each at 20%, have different flag keys and different salts. About what share of users sees both? What if they share a salt (keys still different)? What if they share both key and salt?
 5. The service is unreachable at server start. What does the first evaluation return, with which reason, and how does a team make that default safe?
 6. Change `<` to `<=` in the bucket comparison. What does a 0% rollout do, and which check fails?
 7. A kill switch must take effect within 2 seconds at 50,000 servers. Price the polling answer and name one alternative with its cost.
@@ -241,7 +259,7 @@ No flag vendor's or company's engineering material was read for this lesson. The
 
 All read on 27 November 2026.
 
-- OpenFeature, *Specification: Section 1, Flag Evaluation* (github.com/open-feature/spec, `specification/sections/01-flag-evaluation.md`, read in part: the client's typed evaluation methods taking a flag key, a required default value and an evaluation context; the rule that a client must not throw and must return the default value on abnormal execution; the reason and error code fields of evaluation details).
+- OpenFeature, *Specification: Section 1, Flag Evaluation* (github.com/open-feature/spec, `specification/sections/01-flag-evaluation.md`, read in part: the client's typed evaluation methods taking a flag key, a required default value and an optional evaluation context; the rule that a client must not throw and must return the default value on abnormal execution; the reason and error code fields of evaluation details).
 - OpenFeature, *Specification: Types* (`specification/types.md`, read in full): the list of reason values (including `TARGETING_MATCH`, `SPLIT`, `DEFAULT`, `DISABLED`, `STALE`, `ERROR`) and the error codes.
 - IETF, *RFC 9110, HTTP Semantics* (rfc-editor.org/rfc/rfc9110.txt, read in part: the `If-None-Match` section and its use in conditional GET with a `304 (Not Modified)` response).
 - Not read: any feature-flag or configuration product's documentation or engineering writing, the OpenFeature provider specification beyond its list of reasons, and any study of rollout practice.

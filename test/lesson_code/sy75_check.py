@@ -38,11 +38,16 @@ for p in (0, 1, 5, 25, 50, 100):
     assert abs(len(cur) - len(ids) * p / 100) <= 5 * (len(ids) * p / 100 * (1 - p / 100)) ** 0.5 + 1, (p, len(cur))
     prev = cur
 assert exposed(0) == set() and len(exposed(100)) == len(ids)              # 0% is nobody, 100% is everybody
-# two flags with different salts split independently; the same salt would correlate them completely
+# the flag key is in the hashed string, so two DIFFERENT flags split independently even when they share a salt
 a, b = exposed(50, 'fa', 'sa'), exposed(50, 'fb', 'sb')
 assert abs(len(a & b) / len(ids) - 0.25) < 0.01, len(a & b)
-c, d = exposed(50, 'fa', 'same'), exposed(50, 'fa', 'same')
-assert c == d and len(c & d) == len(c)
+c, d = exposed(50, 'fa', 'same'), exposed(50, 'fb', 'same')              # different keys, one shared salt
+assert c != d and abs(len(c & d) / len(ids) - 0.25) < 0.01, len(c & d)     # still about the product of the shares
+# the same key and the same salt is the same flag: identical sets, however it is evaluated
+assert exposed(50, 'fa', 'same') == exposed(50, 'fa', 'same') == c
+# the salt re-randomises ONE flag: same key, new salt, about a quarter of users in both the old and the new 50% set
+e = exposed(50, 'fa', 'fresh')
+assert e != c and abs(len(c & e) / len(ids) - 0.25) < 0.01, len(c & e)
 
 # ---- evaluation order -----------------------------------------------------------------------------------------------
 rule_vip = {'when': {'tier': ['vip']}, 'serve': 'vip-value'}
@@ -107,5 +112,20 @@ for period in (30, 5):
     lag = propagation(period, 600, seed=period)
     mean = sum(lag) / len(lag)
     assert abs(mean - period / 2) < period * 0.05, (period, mean)
-    assert max(lag) <= period + 0.5, (period, max(lag))
+    assert max(lag) <= period + 0.25, (period, max(lag))   # one interval plus the quarter-second simulation step
+
+# ---- an outage does not multiply polls: a failed client still waits its interval before retrying -----------------
+class CountingServer(ConfigServer):
+    attempts = 0
+    def fetch(self, etag, now):
+        self.attempts += 1
+        return super().fetch(etag, now)
+srv = CountingServer({'f': flag('f', percent=100, serve='on', default='off')}, outages=[(10, 400)])
+cl = FlagClient(srv, poll_interval=30, phase=0)
+cl.tick(0)
+before = srv.attempts
+for t in range(10, 400):                                                  # a tick every second through the outage
+    cl.tick(t)
+assert srv.attempts - before <= 390 / 30 + 1, srv.attempts - before       # about one attempt per interval, not one per tick
+assert cl.get('f', {'id': 1}, 'builtin') == ('on', 'STALE')
 print("sy75 code checks passed")
