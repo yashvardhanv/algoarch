@@ -25,7 +25,7 @@ def forbid(*phrases):
         assert p not in src, 'lesson text still contains stale wording: %r' % p
 
 
-# ---- 1. Glicko (Glickman 1995, "The Glicko system") --------------------------------------------------------------------
+# ---- 1. Glicko (Glickman, "The Glicko system") --------------------------------------------------------------------
 assert [round(g(x), 4) for x in (30, 100, 300)] == [0.9955, 0.9531, 0.7242]        # the paper's table
 games = [(1400, 30, 1), (1550, 100, 0), (1700, 300, 0)]
 assert [round(expected(1500, rj, rdj), 3) for rj, rdj, _ in games] == [0.639, 0.432, 0.303]
@@ -61,9 +61,10 @@ for _ in range(200):
     stale = update(pb[0], pb[1], [(na[0], na[1], 1 - s)])                            # the sequential bug
     assert abs(stale[0] - nb[0]) > 1e-9
 # RD floor of 30
-assert rate_game((1500, 30), (1500, 30), 1)[0][1] == 30
+assert rate_game((1500, 30), (1500, 30), 1)[0][1] == 30 and rate_game((1500, 30), (1500, 30), 1)[1][1] == 30
 for _ in range(200):
-    assert rate_game((1500, 31), (1500, 31), 1)[0][1] >= 30
+    ra, rb = rate_game((1500, 31), (1500, rng.uniform(30, 40)), 1)
+    assert ra[1] >= 30 and rb[1] >= 30
 
 # ---- 2. matchmaking ---------------------------------------------------------------------------------------------------
 assert window(0) == 50 and window(10) == 100 and window(70) == 400 and window(1000) == 400
@@ -231,13 +232,13 @@ for trial in range(300):
         now += rng.randint(1, 30)
         if rng.random() < 0.3 and ply + 1 < len(plan):
             s2, c2 = plan[ply + 1]
-            assert gm.submit(s2, ply + 1, c2, now) in ('future', 'not_your_turn')    # next move arrives first
+            assert gm.submit(s2, ply + 1, c2, now) == 'future'                      # next move arrives first: refused, nothing changes
         assert gm.submit(side, ply, cell, now, lag=rng.randint(0, 80)) == 'ok'
         history.append((side, cell))
         for _ in range(rng.randint(0, 2)):                                       # duplicates, delivered after
             st = state(gm)
             now += rng.randint(0, 3)
-            assert gm.submit(side, ply, cell, now) in ('dup', 'over')
+            assert gm.submit(side, ply, cell, now) == 'dup'                         # even after the game ended: the retry is acknowledged
             assert state(gm) == st
         ply += 1
     assert [(m[0], m[1]) for m in gm.moves] == plan and gm.result is not None
@@ -245,9 +246,53 @@ for trial in range(300):
     for side, cell in plan:
         ref[cell] = side
     assert gm.board == ref
-    # recovery from the move log alone reproduces the whole state, clocks included
-    rg = Game.replay(gm.moves, clock_ms=1000, inc_ms=100, lag_cap_ms=50)
+    assert all(m[3] <= 50 for m in gm.moves)                                   # the log holds the lag actually credited (capped)
+    # recovery from the log alone reproduces the whole state, clocks included, even under a different cap in the config
+    rg = Game.replay(gm.log, clock_ms=1000, inc_ms=100, lag_cap_ms=50)
     assert state(rg) == state(gm)
+    assert state(Game.replay(gm.log, clock_ms=1000, inc_ms=100, lag_cap_ms=500)) == state(gm)
+
+
+# failover: a new owner takes over a game 30 s after the last move; the outage is charged to nobody
+def crashed_game():
+    gm = Game(clock_ms=10_000, inc_ms=0, lag_cap_ms=50)
+    assert gm.submit('X', 0, 4, 1000) == 'ok'
+    return gm
+
+
+old = crashed_game()
+bad = Game.replay(old.log, clock_ms=10_000, inc_ms=0, lag_cap_ms=50)              # replayed without a resume: the old turn clock
+assert bad.flag_check(31_500) is True and bad.result == ('X', 'timeout')          # the outage is charged to the player on move (O loses on time)
+new = Game.replay(old.log, clock_ms=10_000, inc_ms=0, lag_cap_ms=50)
+new.resume(31_500)                                                                 # the new owner's own clock
+assert new.flag_check(31_500) is False and new.result is None and new.t0 == 31_500
+assert new.left == old.left                                                        # nobody lost or gained time
+assert new.flag_deadline() == 31_500 + 10_000 + 50 and new.flag_check(41_550) is False and new.flag_check(41_551) is True
+new = Game.replay(old.log, clock_ms=10_000, inc_ms=0, lag_cap_ms=50)
+new.resume(31_500)
+again = Game.replay(new.log, clock_ms=10_000, inc_ms=0, lag_cap_ms=50)             # a second failover replays the resume marker too
+assert state(again) == state(new) and again.log == new.log
+assert again.submit('O', 1, 0, 31_900) == 'ok' and again.left['O'] == 10_000 - 400    # 400 ms after the resume, on the new owner's clock
+done = Game(clock_ms=1000, inc_ms=0, lag_cap_ms=50)
+for ply, (sd, c) in enumerate([('X', 0), ('O', 3), ('X', 1), ('O', 4), ('X', 2)]):
+    done.submit(sd, ply, c, 10 * (ply + 1))
+done.resume(99_999)
+assert done.result == ('X', 'win') and done.t0 == 50                                # resuming a finished game changes nothing
+# fuzz with owner changes: after each resume the clock jumps to another machine's time base
+for trial in range(200):
+    plan = random_game(rng)
+    gm = G()
+    now, ply = 0, 0
+    while ply < len(plan):
+        if rng.random() < 0.3:
+            now = rng.randint(-5000, 5000)                                          # another machine's clock, any offset
+            gm.resume(now)
+        now += rng.randint(1, 30)
+        assert gm.submit(plan[ply][0], ply, plan[ply][1], now) == 'ok'
+        ply += 1
+    assert state(Game.replay(gm.log, clock_ms=1000, inc_ms=100, lag_cap_ms=50)) == state(gm)
+    assert gm.left['X'] > 0 and gm.left['O'] > 0
+
 # replay refuses a log that would not have been accepted
 try:
     Game.replay([('X', 0, 10, 0), ('X', 1, 20, 0)], clock_ms=1000, inc_ms=100, lag_cap_ms=50)
@@ -255,6 +300,6 @@ try:
 except AssertionError:
     pass
 
-need('1,385 couples with a largest rating gap of 187', 'median wait of 0 seconds and a 95th-percentile wait of 5', '129 of them', 'median wait of 6 seconds and a 95th percentile of 43', 'none was still waiting', '5,478 distinct positions', 'Visual (planned)', '255,168', '131,184', '77,904', '46,080', '1464', '151.4', '0.376', '63.2')
-forbid('Lichess uses Glicko-2 for', 'chess.com uses')
+need('Failover must not cost anyone time', 'flags O', 'caps of 50 and 500', 'Caching Patterns and Consistent Hashing', 'Distributed Lock Service (Chubby / ZooKeeper)', '1,385 couples with a largest rating gap of 187', 'median wait of 0 seconds and a 95th-percentile wait of 5', '129 of them', 'median wait of 6 seconds and a 95th percentile of 43', 'none was still waiting', '5,478 distinct positions', 'Visual (planned)', '255,168', '131,184', '77,904', '46,080', '1464', '151.4', '0.376', '63.2')
+forbid('Lichess uses Glicko-2 for', 'chess.com uses', "Glickman's 1995 paper", 'Caching and Consistent Hashing', 'millions of WebSocket', 'millions of spectators')
 print('sy72 code checks passed')

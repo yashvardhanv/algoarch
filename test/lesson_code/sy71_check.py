@@ -42,11 +42,14 @@ assert elevation_gain([20, 15, 10, 5, 0], 3) == 0                           # a 
 assert elevation_gain([0, 10, 0, 10], 3) == 20                              # two real ups
 assert elevation_gain([0, 2, 0, 2, 0, 2], 3) == 0                           # wobble below the threshold counts nothing
 assert elevation_gain([0, 3], 3) == 3 and elevation_gain([0, 2.99], 3) == 0   # the threshold itself counts
-assert elevation_gain([5, 0, 5], 3) == 5                                    # drop first, then climb: the reference follows the drop
+assert elevation_gain([5, 0, 5], 3) == 5
+assert elevation_gain([5, 2, 5], 3) == 3                                    # a drop of exactly the threshold moves the reference
+assert elevation_gain([0, 1, 2, 3, 4, 5, 6, 7], 5) == 5                      # a 7 m climb in 1 m steps reports 5: up to thr is lost from every climb                                    # drop first, then climb: the reference follows the drop
 rng = random.Random(71)
 noisy_flat = [100 + rng.uniform(-2, 2) for _ in range(3600)]
 naive = sum(max(0, b - a) for a, b in zip(noisy_flat, noisy_flat[1:]))
-assert naive > 1000 and elevation_gain(noisy_flat, 5) == 0, naive          # 1 Hz noise of +-2 m: thousands of metres of fake climb
+assert naive > 1000 and elevation_gain(noisy_flat, 5) == 0, naive
+assert round(naive) == 2401          # 1 Hz noise of +-2 m: thousands of metres of fake climb
 NAIVE_FIG = round(naive)
 for trial in range(50):                                                     # a true 300 m ramp under noise of +-2 m, threshold 5
     ramp = [i * 300 / 3599 + rng.uniform(-2, 2) for i in range(3600)]
@@ -69,6 +72,10 @@ for trial in range(300):
     assert decode_polyline(encode_polyline(pts)) == pts, pts
 walk = [(round(40 + rng.random() * 1e-3 * i, 5), round(-75 + rng.random() * 1e-3 * i, 5)) for i in range(50)]
 assert decode_polyline(encode_polyline(walk)) == walk
+for trial in range(200):                                                      # rounding moves a point by less than 0.8 m
+    pt = (rng.uniform(-80, 80), rng.uniform(-180, 180))
+    back = decode_polyline(encode_polyline([pt]))[0]
+    assert haversine(pt[0], pt[1], back[0], back[1]) < 0.8, (pt, back)
 big = [(-89.99999, 179.99999), (89.99999, -179.99999), (0, 0)]               # large deltas need several 5-bit chunks
 assert decode_polyline(encode_polyline(big)) == big
 assert all(63 <= ord(c) <= 126 for c in encode_polyline(big))
@@ -129,16 +136,25 @@ TOL, CELL = 25.0, 100.0
 
 
 def match_brute(track, segs, tol):
+    """Specification, written as a search over every (start, end) pair. An effort is a pair i < j with: point i near the
+    segment's first vertex, point j near its last, every point from i to j within tol of the polyline, and the intermediate
+    vertices each matched by some point in [i, j], in order (non-decreasing indices). Best = smallest (elapsed, i, j)."""
     best = {}
+    n = len(track)
     for sid, poly in segs.items():
-        near = [pdist((x, y), poly) <= tol for (_, x, y) in track]
-        for i in range(len(track)):
-            if math.dist(track[i][1:], poly[0]) > tol:
+        m = len(poly) - 1
+        near_poly = [pdist((x, y), poly) <= tol for (_, x, y) in track]
+        near_v = [[math.dist(track[t][1:], poly[k]) <= tol for t in range(n)] for k in range(m + 1)]
+        for i in range(n):
+            if not near_v[0][i]:
                 continue
-            for j in range(i + 1, len(track)):
-                if math.dist(track[j][1:], poly[-1]) > tol:
+            for j in range(i + 1, n):
+                if not near_v[m][j] or not all(near_poly[i:j + 1]):
                     continue
-                if all(near[i:j + 1]):
+                prev = {t for t in range(i, j + 1)}
+                for k in range(1, m):                                     # chain through the intermediate vertices
+                    prev = {t for t in range(i, j + 1) if near_v[k][t] and any(q <= t for q in prev)}
+                if prev or m <= 1:
                     cand = (track[j][0] - track[i][0], i, j)
                     if sid not in best or cand < best[sid]:
                         best[sid] = cand
@@ -169,8 +185,11 @@ for trial in range(60):
         if rng.random() < 0.3:
             poly = poly[::-1]                                               # a segment ridden the other way
         segs[sid] = poly
-    for sid in range(8, 12):
+    for sid in range(8, 11):
         segs[sid] = [(rng.uniform(0, 1500), rng.uniform(0, 1500)), (rng.uniform(0, 1500), rng.uniform(0, 1500))]
+    a = rng.randint(0, 40)
+    b = a + rng.randint(4, 12)
+    segs[11] = [(x, y) for (_, x, y) in base[a:b + 1]] + [(base[a][1], base[a][2])]                         # a loop cut from the track
     index = SegmentIndex(segs, TOL, CELL)
     track = base if trial % 2 == 0 else walk_track(rng, 60)
     got = match_efforts(track, index)
@@ -194,6 +213,20 @@ assert match_efforts([(0, 0.0, 0.0), (5, 150.0, 150.0), (10, 300.0, 300.0)], ind
 assert match_efforts([(0, 300.0, 300.0), (5, 300.0, 0.0), (10, 0.0, 0.0)], index) == {}
 ok = match_efforts([(0, 0.0, 0.0), (5, 300.0, 0.0), (9, 300.0, 300.0)], index)
 assert ok[1][0] == 9 and ok[1][1:] == (0, 2)
+# a loop (start and end within tol of each other) is not matched by a track that merely sits at the start
+loop = [(0.0, 0.0), (300.0, 0.0), (300.0, 300.0), (0.0, 300.0), (0.0, 0.0)]
+li = SegmentIndex({1: loop}, TOL, CELL)
+assert match_efforts([(0, 0.0, 0.0), (1, 5.0, 5.0), (2, 0.0, 0.0)], li) == {}
+assert match_efforts([(0, 0.0, 0.0), (2, 300.0, 0.0), (4, 300.0, 300.0), (6, 0.0, 300.0), (8, 0.0, 0.0)], li) == {1: (8, 0, 4)}
+assert match_efforts([(0, 0.0, 0.0), (2, 300.0, 0.0), (4, 300.0, 300.0), (8, 0.0, 0.0)], li) == {}        # skipped a corner by cutting across
+oab = [(0.0, 0.0), (500.0, 0.0), (0.0, 0.0)]                                                              # out and back
+oi = SegmentIndex({1: oab}, TOL, CELL)
+assert match_efforts([(0, 0.0, 0.0), (50, 500.0, 0.0), (100, 0.0, 0.0)], oi) == {1: (100, 0, 2)}
+assert match_efforts([(0, 0.0, 0.0), (1, 3.0, 0.0)], oi) == {} and match_efforts([(0, 0.0, 0.0), (50, 250.0, 0.0), (100, 0.0, 0.0)], oi) == {}
+spur = [(0.0, 0.0), (200.0, 0.0), (200.0, 100.0), (200.0, 0.0), (400.0, 0.0)]                             # a spur: the tip must be visited
+si = SegmentIndex({1: spur}, TOL, CELL)
+assert match_efforts([(0, 0.0, 0.0), (20, 200.0, 0.0), (40, 400.0, 0.0)], si) == {}
+assert match_efforts([(0, 0.0, 0.0), (20, 200.0, 0.0), (30, 200.0, 100.0), (40, 200.0, 0.0), (60, 400.0, 0.0)], si) == {1: (60, 0, 4)}
 laps = [(0, 0.0, 0.0), (5, 300.0, 0.0), (9, 300.0, 300.0), (20, 0.0, 0.0), (23, 300.0, 0.0), (26, 300.0, 300.0)]
 assert match_efforts(laps, index)[1][0] == 6                                   # two laps: the better one is kept
 
@@ -223,6 +256,6 @@ for k in (1, 2, 3):
     assert s.efforts == clean.efforts and len(s.efforts) == 3 and s.activities[aid]['state'] == 'done'
 
 print('polyline of a 5000-point sine: kept %s percent' % RDP_KEPT)
-need('_p~iF~ps|U_ulLnnqC_mqNvxq`@', '111,194.93', 'Visual (planned)', '2,401 metres', 'within 12 m of 300', '60 random cases', 'more than 50 efforts', 'all 500 points', '7,208 bytes', '64 points and 252 bytes', 'fewer than a quarter')
+need('_p~iF~ps|U_ulLnnqC_mqNvxq`@', '111,194.93', 'Visual (planned)', '2,401 metres', 'within 12 m of 300', '60 random cases', 'more than 50 efforts', 'all 500 points', '7,208 bytes', '4.0 times', 'up to the threshold from every climb', 'a loop', 'about 0.56 m', '64 points and 252 bytes', 'fewer than a quarter')
 forbid('Strava uses ', 'Strava stores each', 'Strava runs ', 'Strava matches segments by', 'Strava simplifies')
 print('sy71 code checks passed')

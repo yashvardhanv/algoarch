@@ -28,10 +28,15 @@ def sy70(src):
     m = math.ceil(-n * math.log(0.01) / math.log(2) ** 2)
     assert round(n * 8 / 1024) == 855 and round(m / 8 / 1024) == 128
     assert 5000 / 100 == 50 and 50000 / 100 == 500 and 8000 / 100 == 80
+    m1, _ = (math.ceil(-1500 * math.log(0.01 / 3) / math.log(2) ** 2), 0)
+    assert 3 * math.ceil(m1 / 8) == 6678 and round(3 * math.ceil(m1 / 8) / 1024, 1) == 6.5      # 45-day window, 3 generations of 1,500
+    assert 4500 == 45 * 100 and 3 * 15 == 45 and 45 < 5000 / 100                                  # window shorter than the 50-day exhaustion time
+    fleet_bloom = math.ceil(m / 8) * dau
+    assert round(fleet_bloom / 1e12, 1) == 1.3 and round(n * 8 * dau / 1e12, 1) == 8.8
     # a pool can never be larger than the users who exist near the viewer: an assumed 5,000 profiles is under 0.1% of the 10M
     assert 5000 < dau * 0.001
     need(src, '11,574 per second', '34,722 per second', '3,472 per second', '10,417', '174 per second', '7.2 GB per day',
-         '2.6 TB per year', '855 KiB', '128 KiB', '109,500', '50 days or 500 days')
+         '2.6 TB per year', '855 KiB', '128 KiB', '6.5 KiB', '1.3 TB as Bloom filters, 8.8 TB as exact ids', '11,574 per second average', '109,500', '50 days or 500 days')
     forbid(src, 'Tinder uses', 'Tinder stores', 'Tinder runs')
     return 'sy70'
 
@@ -63,15 +68,17 @@ def sy71(src):
         lat += 3 * math.cos(h) / 111195
         lon += 3 * math.sin(h) / (111195 * math.cos(math.radians(40)))
     enc = ns['encode_polyline'](ll)
-    assert len(enc) == 7208 and round(raw / len(enc), 1) == 8.0
+    assert len(enc) == 7208 and round(raw / len(enc), 1) == 8.0              # NOT like for like: the raw record has five fields
+    latlon = pts * 8
+    assert latlon == 28_800 and round(latlon / len(enc), 1) == 4.0
     xy = [((b + 75) * 111195 * math.cos(math.radians(40)), (a - 40) * 111195) for a, b in ll]
     kept = ns['rdp'](xy, 5)
     assert len(kept) == 64
     keptll = [ll[xy.index(q)] for q in kept]
     assert len(ns['encode_polyline'](keptll)) == 252
-    need(src, '58 per second', '579 per second', '57,600 bytes', '288 GB', '7,208 bytes', '8.0 times', '64 of 3,600 points', '252 bytes',
+    need(src, '58 per second', '579 per second', '57,600 bytes', '288 GB', '7,208 bytes', '4.0 times smaller', '28,800 bytes', 'credits it for dropping three fields', '64 of 3,600 points', '252 bytes',
          '1,157', '72 billion', '162,000', '444,444')
-    forbid(src, 'Strava uses ', 'Strava stores each', 'Strava runs ')
+    forbid(src, 'Strava uses ', 'Strava stores each', 'Strava runs ', '7,208 bytes (8.0 times smaller', '7,208 bytes, 8.0 times smaller')
     return 'sy71'
 
 
