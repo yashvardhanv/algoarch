@@ -117,7 +117,7 @@ def stale_cost(weights, ivs):
     return sum(w * i / 2 for w, i in zip(weights, ivs))
 ```
 
-Worked example (budget one poll per hour in total, four products with weights 1, 4, 16 and 100): the intervals are 17, 8.5, 4.25 and 1.7 hours, the cost is 144.5, and polling all four equally every 4 hours (the same budget) costs 242, which is 40 percent more. The check pins those numbers, and then tests optimality on 120 random instances: 400 random feasible allocations per instance (same total rate, inside the bounds) never beat it, and moving a small amount of poll rate from any product to any other never helps. It also shows that equal intervals and intervals proportional to `1 / w` cost more on a five-product instance, so the square root matters: dividing by `w` over-polls the hot product and starves the rest.
+Worked example (budget one poll per hour in total, four products with weights 1, 4, 16 and 100): the intervals are 17, 8.5, 4.25 and 1.7 hours, the cost is 144.5, and polling all four equally every 4 hours (the same budget) costs 242, which is about 67 percent more (equivalently, the optimum is about 40 percent cheaper). The check pins those numbers, and then tests optimality on 120 random instances: 400 random feasible allocations per instance (same total rate, inside the bounds) never beat it, and moving a small amount of poll rate from any product to any other never helps. It also shows that equal intervals and intervals proportional to `1 / w` cost more on a five-product instance, so the square root matters: dividing by `w` over-polls the hot product and starves the rest.
 
 **Bounds.** Intervals are clamped to a minimum (do not hammer a site; one poll per 15 minutes at most) and a maximum (every product is looked at at least daily). With the clamps the optimum is still `clamp(K / sqrt(w))`, with K chosen so the total rate equals the budget, which is what the bisection does. The check includes an instance where both clamps bind: weights 1, 1,000 and 1,000,000, budget 3 polls per hour, bounds 0.5 and 24 hours gives intervals 24, 1.043 and 0.5 hours, the quietest product at the maximum and the hottest at the minimum. The function refuses a budget that cannot be spent inside the bounds.
 
@@ -156,11 +156,16 @@ class Tracker:
         return None
 
 
+def rearm_level(threshold, pct):
+    return threshold + (threshold * pct + 99) // 100                 # integer cents, rounded up
+
+
 class Alert:
-    """Fire once when the confirmed price is at or below the target; re-arm when it climbs back by `pct` percent."""
+    """The definition: fire once when the confirmed price is at or below the target; re-arm when it climbs back by `pct` percent."""
     def __init__(self, threshold, pct=5):
+        assert pct >= 1, 'with no margin a price sitting on the target would flap'
         self.thr = threshold
-        self.rearm_at = threshold + (threshold * pct + 99) // 100     # integer cents, rounded up
+        self.rearm_at = rearm_level(threshold, pct)
         self.armed = True
 
     def on_price(self, p):
@@ -174,50 +179,112 @@ class Alert:
 
 **The filter** is checked against a direct definition (after a first valid price, a new price is confirmed once the last `confirm` valid observations all agree on it) over 1,500 random observation sequences with `confirm` of 1, 2 and 3, including invalid readings. Hand cases pin the rest: a one-sample glitch (100, 1, 100) is ignored; a flapping one (100, 1, 100, 1, 100) is ignored; zeros and missing values neither confirm nor reset a pending change; going back to the known price clears a pending one.
 
-**The cost of confirming** is one extra poll of delay: a real drop from 102.00 to 95.00 is confirmed at the second poll, so the alert is one poll interval later than a naive one. That is the trade, and it is why the interval allocation matters: the hot, volatile products have short intervals, so the delay is short where it hurts most.
+**The cost of confirming** is one extra poll of delay, and it has an honest limit. A price that changes at every poll never repeats, so it is never confirmed (the check pins 100, 90, 95, 85, 92, 88 giving only the baseline). That is the opposite of what you want for the hot, volatile products, which this section later says suffer least. A tolerance (prices within a small percentage count as the same, homework 3) or a confirm count of 1 for sources you trust is the usual answer.
 
-**The alert** fires when the confirmed price is at or below the target, then disarms until the price climbs back to the re-arm level, here 5 percent above the target (rounded up in whole cents). With a target of 100.00: prices 120.00, 99.00, 98.00, 101.00, 99.00 fire once (at 99.00); 101.00 does not re-arm because the level is 105.00. Prices 99.00, 106.00, 99.00 fire twice. A price of exactly 100.00 fires; 100.01 does not; exactly 105.00 re-arms; 104.99 does not. The check compares the machine with a second definition written as a scan (fire when at or below the target and, since the last firing, a price at or above the re-arm level has been seen) over 2,000 random sequences and four re-arm percentages including 0.
+**The delay itself:** a real drop from 102.00 to 95.00 is confirmed at the second poll, so the alert is one poll interval later than a naive one. That is the trade, and it is why the interval allocation matters: heavily watched products have short intervals, so the delay is short where it hurts most.
+
+**The alert** fires when the confirmed price is at or below the target, then disarms until the price climbs back to the re-arm level, here 5 percent above the target (rounded up in whole cents). With a target of 100.00: prices 120.00, 99.00, 98.00, 101.00, 99.00 fire once (at 99.00); 101.00 does not re-arm because the level is 105.00. Prices 99.00, 106.00, 99.00 fire twice. A price of exactly 100.00 fires; 100.01 does not; exactly 105.00 re-arms; 104.99 does not. The check compares the machine with a second definition written as a scan (fire when at or below the target and, since the last firing, a price at or above the re-arm level has been seen) over 2,000 random sequences and four re-arm percentages (1, 3, 5 and 10). A margin of 0 is refused by the class: with the re-arm level equal to the target, a price sitting on the target would flap.
 
 **Through the whole pipeline.** With the series 102.00, 102.00, 1.00, 102.00, 102.00, 95.00, 95.00, 95.00 and a target of 100.00, an alert fed the raw readings fires on the 1.00 glitch and then, never re-armed because the price stays below 105.00, stays silent for the real drop at 95.00. The filtered pipeline ignores the glitch and fires once, with 95.00, at the second reading of the real drop. That is two defects in one series, a false alert and a missed one, both from the unfiltered reading.
 
-**Product decisions the code does not make.** What happens when a user sets a target above the current price (fire at once, or wait for a crossing); whether to alert on a drop to any lower price (a "percent off" alert); currency conversion; out-of-stock products whose price vanishes (the filter ignores them, which is a choice).
+**Product decisions.** A target set while the price is already at or below it fires at once (`PriceBook.add` returns True; `Alert` given the current price does the same); the alternative is to wait for the next crossing, which silently drops the alert if the price never rises. Not decided by the code: whether to alert on a drop to any lower price (a "percent off" alert); currency conversion; out-of-stock products whose price vanishes (the filter ignores them, which is a choice).
 
 ---
 
-## 7. Deep Dive 3: Finding the Alerts a Drop Affects
+## 7. Deep Dive 3: Finding the Alerts a Price Change Affects
 
-For a popular product, hundreds of thousands of users have a target. When the confirmed price falls from `old` to `new`, the alerts that become true are exactly those with a target `t` where `new <= t < old`: targets at or above `old` were already satisfied before, and targets below `new` are still not met. Keep each product's alerts in a sorted list and the band is two binary searches.
+For a popular product, hundreds of thousands of users have a target. When the confirmed price falls from `old` to `new`, the alerts that become true are exactly those with a target `t` where `new <= t < old`: targets at or above `old` were already satisfied, and targets below `new` are still not met. But the alert is a two-state machine (section 6), and the other half of its life, re-arming, is a **rise**: a disarmed alert comes back when the price climbs to its re-arm level. An index that is consulted only on drops never sees rises, so alerts would fire once in their lives. The design therefore keeps two sorted indexes per product, and both bands are two binary searches.
+
+- **Armed alerts**, keyed by target. A drop from `old` to `new` fires the armed band `[new, old)` and moves those alerts to the other index.
+- **Disarmed alerts**, keyed by re-arm level. A rise from `old` to `new` re-arms the band `old < level <= new`, moving them back.
 
 ```python
 class ThresholdIndex:
-    """Per product: alerts sorted by (threshold in cents, user id). A price drop from old to new crosses exactly
-    the thresholds t with new <= t < old: those were not met before and are met now."""
+    """Entries sorted by (key in cents, user id). band(lo, hi) is every entry with lo <= key < hi, found by two binary searches."""
     def __init__(self):
         self.t = []
 
-    def add(self, thr, uid):
-        bisect.insort(self.t, (thr, uid))
+    def add(self, key, uid):
+        bisect.insort(self.t, (key, uid))
 
-    def remove(self, thr, uid):
-        i = bisect.bisect_left(self.t, (thr, uid))
-        if i < len(self.t) and self.t[i] == (thr, uid):
+    def remove(self, key, uid):
+        i = bisect.bisect_left(self.t, (key, uid))
+        if i < len(self.t) and self.t[i] == (key, uid):
             del self.t[i]
 
-    def crossed(self, old, new):
-        if new >= old:
+    def band(self, lo, hi):
+        if lo >= hi:
             return []
-        lo = bisect.bisect_left(self.t, (new, -1))
-        hi = bisect.bisect_left(self.t, (old, -1))
-        return [uid for _, uid in self.t[lo:hi]]
+        i = bisect.bisect_left(self.t, (lo, -1))
+        j = bisect.bisect_left(self.t, (hi, -1))
+        return [uid for _, uid in self.t[i:j]]
+
+    def crossed(self, old, new):
+        """A drop from old to new crosses exactly the targets t with new <= t < old: not met before, met now."""
+        return self.band(new, old)
 
 
+class PriceBook:
+    """All alerts of one product. An armed alert sits in `armed`, keyed by its target; a disarmed one sits in `disarmed`,
+    keyed by its re-arm level. A drop fires the armed band it crosses; a rise re-arms the disarmed band it climbs through."""
+    def __init__(self, pct=5):
+        self.pct, self.price = pct, None
+        self.armed, self.disarmed, self.alerts = ThresholdIndex(), ThresholdIndex(), {}   # alerts: uid -> (target, re-arm level)
+
+    def add(self, uid, thr):
+        """Returns True if the alert fires at once because the price is already at or below the target."""
+        assert uid not in self.alerts
+        rearm = rearm_level(thr, self.pct)
+        self.alerts[uid] = (thr, rearm)
+        if self.price is not None and self.price <= thr:
+            self.disarmed.add(rearm, uid)
+            return True
+        self.armed.add(thr, uid)
+        return False
+
+    def remove(self, uid):
+        if uid in self.alerts:
+            thr, rearm = self.alerts.pop(uid)
+            self.armed.remove(thr, uid)
+            self.disarmed.remove(rearm, uid)
+
+    def on_change(self, new):
+        """Called with each confirmed price change. Returns the users to notify."""
+        old = float('inf') if self.price is None else self.price
+        self.price = new
+        fired = self.armed.crossed(old, new)
+        for uid in fired:
+            thr, rearm = self.alerts[uid]
+            self.armed.remove(thr, uid)
+            self.disarmed.add(rearm, uid)
+        for uid in self.disarmed.band(old + 1, new + 1):             # rise: old < re-arm level <= new
+            thr, rearm = self.alerts[uid]
+            self.disarmed.remove(rearm, uid)
+            self.armed.add(thr, uid)
+        return fired
+```
+
+`Alert` stays as the definition of one alert's behaviour; `PriceBook` is the same behaviour for all of a product's alerts at once. The check holds them to each other end to end. It feeds 1,500 random scripts of raw observations (including failed parses and glitches) and alert creations and deletions through `Tracker` and `PriceBook`, and compares every firing, with its position, against one independent `Alert` per user fed the confirmed prices, so neither the index nor the filter can be wrong without the comparison noticing. The lesson's earlier draft, where the index passed only drops to the alert, is the failure this guards against: with a target of 100.00 and confirmed prices 120.00, 99.00, 110.00, 99.00, the machine alone fires twice but an index-driven pipeline that never sees the rise fires once. The check pins the two-alert answer. It also pins an alert created while the price is already below its target (fires at once), an alert created before any price is known, deletion from whichever index holds the alert, and that every live alert is in exactly one index.
+
+The index alone is compared with a scan of its rows over 300 random indexes of up to 40 entries with keys in a narrow range (80 to 120, so ties are everywhere), including random removals and 30 random `(old, new)` pairs each. Edge cases fixed by hand tests: `crossed(100, 90)` excludes the alert at 100 (met before) and includes 90; no drop returns nothing; removing twice is harmless; user ids 9 and 10 at one target come back in numeric order. In the sizing table the hot product with 200,000 targets spread evenly over half its price loses 5 percent: the band holds 20,000 alerts instead of the 200,000 a scan would touch, and the disarmed index is touched only by rises.
+
+This is the same structure as a sorted set with a score-range query; see Real-Time Gaming Leaderboard for the Redis form of that. At the scale in the table it fits in memory per product, and products can be sharded by product id.
+
+---
+
+## 8. Deep Dive 4: The Price History
+
+A price over time is a step function: constant between changes. Storing every poll writes the same number millions of times (the table: 1.6 GB a day against 9.6 MB). Storing only changes is small, but it makes "price at time t" and "lowest in a window" slightly subtle.
+
+```python
 class History:
     """Store a price only when it changes; the price at any time is the last change at or before it."""
     def __init__(self):
         self.ts, self.ps, self.last_seen = [], [], None
 
     def record(self, t, price):
-        assert self.last_seen is None or t >= self.last_seen, 'observations must arrive in time order'
+        if self.last_seen is not None and t < self.last_seen:
+            raise ValueError('observation older than the last one stored')
         self.last_seen = t
         if self.ps and self.ps[-1] == price:
             return False
@@ -236,17 +303,7 @@ class History:
         return min(cands) if cands else None
 ```
 
-The check compares `crossed` with a scan of the stored rows over 300 random indexes of up to 40 alerts each, with prices in a narrow range (80 to 120) so that ties are everywhere, including after random removals, and across 30 random `(old, new)` pairs per index. Hand cases pin the edges: `crossed(100, 90)` excludes the alert at 100 (met before) and includes 90 (met now); no drop returns nothing; removing twice is harmless; user ids 9 and 10 at one target come back in numeric order. In the sizing table the hot product with 200,000 targets spread evenly over half its price loses 5 percent: the band holds 20,000 alerts instead of the 200,000 a scan would touch. The index returns candidates; the alert's own armed flag (section 6) decides who is notified, because a user who was notified earlier and has not re-armed is inside the band but must stay quiet.
-
-This is the same structure as a sorted set with a score range query; see Real-Time Gaming Leaderboard for the Redis form of that. At the scale in the table it fits in memory per product, and products can be sharded by product id.
-
----
-
-## 8. Deep Dive 4: The Price History
-
-A price over time is a step function: constant between changes. Storing every poll writes the same number millions of times (the table: 1.6 GB a day against 9.6 MB). Storing only changes is small, but it makes "price at time t" and "lowest in a window" slightly subtle.
-
-The `History` class above records a change only when the price differs from the last one, refuses out-of-order observations, and answers `at(t)` with a binary search for the last change at or before `t`. `lowest(t0, t1)` is where bugs live: the lowest price in a window must include the price **carried in** at `t0`, not just the changes inside the window. If a product dropped to 90 a month ago and has not changed since, the lowest price over the last week is 90 though there is no change row in that week. The check compares `at` and `lowest` against a full per-tick series on 400 random histories with 40 random windows each, including windows that contain no change.
+The `History` class records a change only when the price differs from the last one, raises an error for an observation older than the last one stored (an explicit check, which `python -O` does not strip; equal timestamps are accepted), and answers `at(t)` with a binary search for the last change at or before `t`. `lowest(t0, t1)` is where bugs live: the lowest price in a window must include the price **carried in** at `t0`, not just the changes inside the window. If a product dropped to 90 a month ago and has not changed since, the lowest price over the last week is 90 though there is no change row in that week. The check compares `at` and `lowest` against a full per-tick series on 400 random histories with 40 random windows each, including windows that contain no change.
 
 Chart downsampling (one point per day, or the minimum and maximum per bucket) belongs on top of this log, not in it; the log stays exact so alerts and statistics can be recomputed.
 
@@ -265,7 +322,9 @@ Chart downsampling (one point per day, or the minimum and maximum per bucket) be
 | Budget cut | intervals lengthen for everyone | the allocation preserves the order of importance; set the maximum interval |
 | Burst of changes in a hot product | notification spike | per-user rate limits, batching (see Notification System) |
 | History query ignores carried-in price | wrong lowest price | include `at(t0)` (tested) |
-| Clock skew between fetchers | out-of-order observations | refuse older timestamps (tested in `History`) |
+| Clock skew between fetchers | out-of-order observations | stamp readings with the time the result is stored, on one clock per product; `History` raises on an older stamp and the caller logs it and re-queues the poll rather than silently dropping a real price (tested) |
+| Index sees only drops | alerts fire once in their lives | second index for re-arming; end-to-end test (section 7) |
+| Every poll shows a new price | the filter never confirms | tolerance or confirm count 1 (section 6) |
 
 ---
 
@@ -279,7 +338,7 @@ No engineering source for a price-tracking product was read for this lesson, and
 
 1. Believing a single scrape.
 2. Treating a failed parse as a price of zero.
-3. Alerting on every reading at or below the target instead of on a crossing.
+3. Alerting on every reading at or below the target instead of on a crossing, or indexing only the drops so nothing ever re-arms.
 4. Re-arming at the target itself, so a price hovering at 99.99 and 100.01 spams.
 5. Equal polling for all products, or polling in proportion to the weight instead of its square root.
 6. Scanning every watcher of a hot product on each change.

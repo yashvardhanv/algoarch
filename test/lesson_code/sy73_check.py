@@ -11,7 +11,7 @@ ns = {}
 for b in blocks:
     exec(b, ns)
 intervals, stale_cost = ns['intervals'], ns['stale_cost']
-Tracker, Alert, ThresholdIndex, History = ns['Tracker'], ns['Alert'], ns['ThresholdIndex'], ns['History']
+Tracker, Alert, ThresholdIndex, History, PriceBook = ns['Tracker'], ns['Alert'], ns['ThresholdIndex'], ns['History'], ns['PriceBook']
 
 
 def need(*phrases):
@@ -31,7 +31,10 @@ w = [1, 4, 16, 100]
 iv = intervals(w, 1.0, 0.25, 24)
 assert [round(x, 4) for x in iv] == [17.0, 8.5, 4.25, 1.7], iv                     # I = K / sqrt(w), K = sum(sqrt w) / budget
 assert abs(sum(1 / x for x in iv) - 1.0) < 1e-9
-assert round(stale_cost(w, iv), 6) == 144.5 and stale_cost(w, [4, 4, 4, 4]) == 242.0          # 40 percent less than polling everything equally
+assert round(stale_cost(w, iv), 6) == 144.5 and stale_cost(w, [4, 4, 4, 4]) == 242.0
+MORE = round(100 * (242.0 / 144.5 - 1))                                             # equal polling costs 67 percent MORE ...
+LESS = round(100 * (1 - 144.5 / 242.0))                                             # ... the optimum is 40 percent LESS
+assert (MORE, LESS) == (67, 40)
 try:
     intervals(w, 100.0, 0.25, 24)                                                    # 4 / 0.25 = 16 polls per hour is the most you can spend
     raise SystemExit('an unspendable budget must be refused')
@@ -156,13 +159,11 @@ assert run_alert([12000, 9900, 10600, 9900], 10000, 5) == [1, 3]
 assert run_alert([10000], 10000, 5) == [0] and run_alert([10001], 10000, 5) == []    # the threshold itself fires
 assert run_alert([9000, 10500, 9000], 10000, 5) == [0, 2]                            # exactly the re-arm level re-arms
 assert run_alert([9000, 10499, 9000], 10000, 5) == [0]
-assert run_alert([9000, 9500, 9000], 10000, 0) == [0]                                # re-arm level equals the threshold: 95.00 is still at or below it
-assert run_alert([9000, 10000, 9000], 10000, 0) == [0, 2]
 assert Alert(10000, 5).rearm_at == 10500 and Alert(999, 5).rearm_at == 999 + 50       # ceil(49.95)
 for trial in range(2000):
     n = rng.randint(0, 30)
     prices = [rng.choice([9000, 9500, 9900, 10000, 10100, 10400, 10500, 10600, 12000]) for _ in range(n)]
-    pct = rng.choice([0, 3, 5, 10])
+    pct = rng.choice([1, 3, 5, 10])
     assert run_alert(prices, 10000, pct) == alert_ref(prices, 10000, pct), (prices, pct)
 
 # glitches through the whole pipeline: one bad sample fires a naive alert but not the confirmed one
@@ -217,8 +218,10 @@ assert h.lowest(-9, -1) is None
 try:
     h.record(15, 50)
     raise SystemExit('an observation older than the last change must be refused')
-except AssertionError:
+except ValueError:
     pass
+assert h.record(20, 96) and h.at(20) == 96 and h.ts == [0, 10, 20, 20]               # equal timestamps are accepted (not out of order)
+assert h.lowest(20, 20) == 96
 for trial in range(400):
     hist, full, price = History(), {}, None
     for t in range(60):
@@ -234,6 +237,97 @@ for trial in range(400):
         assert hist.lowest(a, b) == min(full[t] for t in range(a, b + 1)), (a, b)
 CHANGES = len(hist.ts)
 
-need('Visual (planned)', '144.5', '242', '40 percent more', '17, 8.5, 4.25 and 1.7 hours', 'intervals 24, 1.043 and 0.5 hours', 'fire once (at 99.00)', 'fire twice', 'RFC 9309', 'RFC 9110', '120 random instances', '1,500 random observation sequences', '2,000 random sequences', '300 random indexes', '400 random histories')
+# ---- 6. the whole pipeline: raw observations -> Tracker -> PriceBook (two sorted indexes), against one Alert machine per user ----
+def book_run(events, pct):
+    """events: ('obs', raw price) or ('add', uid, thr) or ('del', uid). Returns [(event index, uid)] in firing order."""
+    trk, book, out = Tracker(2), PriceBook(pct), []
+    for k, ev in enumerate(events):
+        if ev[0] == 'obs':
+            c = trk.observe(ev[1])
+            if c is not None:
+                out += [(k, u) for u in sorted(book.on_change(c))]
+        elif ev[0] == 'add':
+            if book.add(ev[1], ev[2]):
+                out.append((k, ev[1]))
+        else:
+            book.remove(ev[1])
+    return out
+
+
+def ref_run(events, pct):
+    """One independent Alert machine per user, fed the price in force when it was created and every later confirmed change."""
+    changes = confirmed_ref([e[1] for e in events if e[0] == 'obs'], 2)
+    obs_pos = [k for k, e in enumerate(events) if e[0] == 'obs']
+    change_at = {obs_pos[i]: p for i, p in changes}                  # event index -> confirmed price
+    cur, alerts, out = None, {}, []
+    for k, ev in enumerate(events):
+        if ev[0] == 'add':
+            alerts[ev[1]] = Alert(ev[2], pct)
+            if cur is not None and alerts[ev[1]].on_price(cur):
+                out.append((k, ev[1]))
+        elif ev[0] == 'del':
+            alerts.pop(ev[1], None)
+        elif k in change_at:
+            cur = change_at[k]
+            for u in sorted(alerts):
+                if alerts[u].on_price(cur):
+                    out.append((k, u))
+    return out
+
+
+# the reviewer's probe: target 100.00, confirmed prices 120.00, 99.00, 110.00, 99.00 -> two alerts, not one
+ev = [('add', 1, 10000)] + [('obs', p) for p in (12000, 12000, 9900, 9900, 11000, 11000, 9900, 9900)]
+assert book_run(ev, 5) == [(4, 1), (8, 1)] == ref_run(ev, 5), book_run(ev, 5)
+# an alert created while the price is already at or below its target fires at once
+ev = [('obs', 9000), ('obs', 9000), ('add', 1, 10000)]
+assert book_run(ev, 5) == [(2, 1)] == ref_run(ev, 5)
+b = PriceBook(5)
+assert b.add(1, 10000) is False and b.on_change(9000) == [1] and b.add(2, 9000) is True and b.add(3, 8999) is False
+assert b.on_change(10499) == [] and b.on_change(10500) == []                      # re-arming fires nothing by itself
+# an alert added before any price is known fires on the first price at or below it
+ev = [('add', 1, 10000), ('add', 2, 8000), ('obs', 9500), ('obs', 9500)]
+assert book_run(ev, 5) == [(2, 1)] == ref_run(ev, 5)         # the first valid reading is the baseline, so it fires at once
+# a deleted alert never fires; a re-armed alert that is deleted while disarmed leaves no index entry behind
+ev = [('add', 1, 10000), ('obs', 9000), ('obs', 9000), ('del', 1), ('obs', 11000), ('obs', 11000), ('obs', 9000), ('obs', 9000)]
+assert book_run(ev, 5) == [(1, 1)] == ref_run(ev, 5)
+b = PriceBook(5)
+b.add(1, 10000)
+b.on_change(9000)
+b.remove(1)
+assert b.armed.t == [] and b.disarmed.t == [] and b.alerts == {}
+for trial in range(1500):
+    pct = rng.choice([1, 3, 5, 10])
+    events, live = [], []
+    for _ in range(rng.randint(1, 40)):
+        r = rng.random()
+        if r < 0.22:
+            u = rng.randint(0, 7)
+            if u not in live:
+                live.append(u)
+                events.append(('add', u, rng.choice([9000, 9500, 10000, 10000, 10500])))
+        elif r < 0.28 and live:
+            events.append(('del', live.pop(rng.randrange(len(live)))))
+        else:
+            p = rng.choice([8900, 9000, 9500, 9900, 10000, 10100, 10500, 10600, 11000, None, 0])
+            events += [('obs', p)] * rng.choice([1, 2, 2, 3])
+    assert book_run(events, pct) == ref_run(events, pct), (events, pct)
+# index entries are consistent: every live alert is in exactly one of the two indexes
+b = PriceBook(5)
+for u in range(6):
+    b.add(u, 9000 + 300 * u)
+for p in (9500, 9000, 11000, 8000, 10600, 9800):
+    b.on_change(p)
+    assert sorted([u for _, u in b.armed.t] + [u for _, u in b.disarmed.t]) == sorted(b.alerts)
+    assert len(b.armed.t) + len(b.disarmed.t) == len(b.alerts)
+try:
+    Alert(10000, 0)
+    raise SystemExit('a zero re-arm margin must be refused')
+except AssertionError:
+    pass
+
+# honest limit: a price that changes at every poll never confirms
+assert run_tracker([100, 90, 95, 85, 92, 88], 2) == [(0, 100)]
+
+need('Visual (planned)', '144.5', '242', '67 percent more', 'about 40 percent cheaper', '17, 8.5, 4.25 and 1.7 hours', 'intervals 24, 1.043 and 0.5 hours', 'fire once (at 99.00)', 'fire twice', 'RFC 9309', 'RFC 9110', '120 random instances', '1,500 random observation sequences', '2,000 random sequences', '300 random indexes', '400 random histories')
 forbid('CamelCamelCamel uses', 'Keepa uses', 'Amazon blocks', 'Google Shopping uses')
 print('sy73 code checks passed')
