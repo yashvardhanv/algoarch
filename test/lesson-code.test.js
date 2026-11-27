@@ -410,3 +410,28 @@ test('sy68 capacity estimates are reproduced by script', { skip: py ? false : 'p
   assert.match(r.stdout, /capacity checks passed/);
   for (const f of CAPACITY_LESSONS_D) assert.match(r.stdout, new RegExp(f.slice(0, 4)));
 });
+
+// wave3 task2 begin
+test('sy57 lesson code matches Floyd-Warshall on random directed graphs, a hierarchy built in any order, brute-force time-dependent paths and a decayed-sample estimator', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'sy57_check.py'),
+    path.join(__dirname, '..', 'data', 'new_lessons', 'sy57-maps-routing-eta.md'),
+  ], { encoding: 'utf8', timeout: 180000 });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /sy57 code checks passed/);
+});
+
+const CAPACITY_LESSONS_E = [
+  'sy57-maps-routing-eta.md',
+];
+
+test('sy57-sy57 capacity estimates are reproduced by script', { skip: py ? false : 'python not installed' }, () => {
+  const r = spawnSync(py, [
+    path.join(__dirname, 'lesson_code', 'capacity_check_e.py'),
+    ...CAPACITY_LESSONS_E.map((f) => path.join(__dirname, '..', 'data', 'new_lessons', f)),
+  ], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /capacity checks passed/);
+  for (const f of CAPACITY_LESSONS_E) assert.match(r.stdout, new RegExp(f.slice(0, 4)));
+});
+// wave3 task2 end
