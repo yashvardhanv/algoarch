@@ -1,6 +1,7 @@
 """Reproduces every capacity and sizing number in the wave 3 task 5 case studies (sy66, sy67, sy69) and checks that each
 lesson states the same figures. Usage: capacity_check_h.py <lesson.md> [...]; each file is matched to its section by id prefix."""
 import sys, os
+import math
 from math import comb
 
 
@@ -47,10 +48,18 @@ def sy66(src):
     chunk_day = raw_day / compress
     assert chunk_day == 324e9 and round(chunk_day * 365 / 1e12) == 118
     assert round(full_day / chunk_day, 1) == 19.2
-    per_pod_indices = pods * 365
-    assert per_pod_indices == 1_825_000 and round(per_pod_indices / 3000, 1) == 608.3
-    assert round(raw_day / pods / 1e6, 1) == 518.4 and round(10e9 / (raw_day / pods)) == 19
-    assert shards_day * 30 == 3120 and round(shards_day * 30 / 3000, 2) == 1.04
+    # like-for-like retention: the full-text store keeps 30 days searchable (3 hot, 27 on cheaper tiers, indices still counted)
+    days_ft = 30
+    assert round(full_day * days_ft / 1e12) == 187
+    per_pod_indices = pods * days_ft                   # one index per pod per day, one primary shard each
+    assert per_pod_indices == 150_000 and per_pod_indices / 3000 == 50.0
+    shard_b = primary_day / pods
+    assert round(shard_b / 1e6, 1) == 622.1 and round(10e9 / shard_b) == 16
+    assert shards_day * days_ft == 3120 and round(shards_day * days_ft / 3000, 2) == 1.04      # one primary per index
+    assert round(per_pod_indices / (shards_day * days_ft), 1) == 48.1
+    # what the 19x is made of: index 1.2x, compression 8x, one replica counted for one store only
+    assert round(expand * compress, 1) == 9.6 and round(expand * (1 + replicas) * compress, 1) == 19.2
+    assert abs(full_day / chunk_day - expand * (1 + replicas) * compress) < 1e-9
     assert pods * levels == 25_000
     lines_day = lines_s * 86_400
     assert lines_day == 8_640_000_000
@@ -59,10 +68,10 @@ def sy66(src):
     full_scan = raw_day / scan_bps
     assert round(full_scan) == 5184 and round(full_scan / 100, 1) == 51.8
     need(src, '2.592 TB per day', '30 MB per second average, 90 MB per second at peak', '1.94 TB (5.83 TB with three copies)',
-         '6.22 TB; 18.7 TB for 3 hot days', '| 104 |', '324 GB; 118 TB for a year', '1,825,000 indices, 608 GB of master heap',
-         '518 MB, 19 times', '3,120 shards', '25,000 streams', '8.64 billion a day', '540 MB, about 1.1 s', '5,184 worker-seconds, 52 s on 100 workers',
-         'about 19 times')
-    forbid(src, 'searchable immediately', 'delete the old lines one by one')
+         '6.22 TB; 18.7 TB for 3 hot days, 187 TB for 30 days', '| 104 (one primary per index) |', '324 GB; 118 TB for a year', '150,000 indices, 50 GB of master heap',
+         '622 MB (stored primary size), 16 times', '3,120 shards', '48 times', '25,000 streams', '8.64 billion a day', '540 MB, about 1.1 s',
+         '5,184 worker-seconds, 52 s on 100 workers', '1.2 x 8 = 9.6', '1.2 x 2 x 8 = 19.2')
+    forbid(src, 'searchable immediately', 'delete the old lines one by one', '1,825,000', '608 GB', 'the cost gap between the designs is the index', 'the index is most of the cost')
     return 'sy66'
 
 

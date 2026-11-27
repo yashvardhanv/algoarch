@@ -133,7 +133,7 @@ def run(seed, make_receiver):
     sent, agents = [], {n: Agent(n) for n in ('web', 'db', 'cache')}
     rx = make_receiver()
     pending = {n: r.randint(5, 45) for n in agents}
-    dup_seen = 0
+    got_ = {n: set() for n in agents}
     for rnd in range(400):
         for name, ag in agents.items():
             if pending[name] and r.random() < .6:
@@ -146,7 +146,12 @@ def run(seed, make_receiver):
             for m in msgs:
                 if r.random() < .5:                                  # a lost message is simply never delivered
                     for _ in range(2 if r.random() < .25 else 1):    # some are delivered twice
+                        got_[m[0]].add(m[1])
                         ack = rx.accept(*m)
+                        prefix = 0
+                        while prefix in got_[m[0]]:
+                            prefix += 1
+                        assert ack == prefix, (seed, m, ack, prefix)         # the ack is exactly the contiguous prefix received: not lagging, not ahead
                         if r.random() < .5:                           # a lost ack is simply never delivered
                             ag.on_ack(ack)
         if not any(pending.values()) and not any(a.unacked for a in agents.values()):

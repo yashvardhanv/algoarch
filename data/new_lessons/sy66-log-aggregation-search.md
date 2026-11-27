@@ -45,7 +45,7 @@ A log system takes a firehose of small, append-only lines, keeps them for weeks 
 |---|---|
 | average and peak ingest | 100,000 lines per second average, three times that at peak *(assumed)*; 300 bytes per line *(assumed)* |
 | buffer retention | 6 hours of peak *(assumed)* |
-| full-text store | stored size 1.2 times raw including the index, one replica *(assumed)* |
+| full-text store | stored size 1.2 times raw including the index, one replica, 30 days searchable (3 hot, the rest on cheaper tiers, indices still counted) *(assumed)* |
 | label-and-chunk store | chunks compress 8 to 1 *(assumed)*, one copy in object storage |
 | shard size target | 30 GB *(docs: aim for 10 GB to 50 GB per shard, fewer than 200 million documents)* |
 | master heap rule | fewer than 3,000 indices per GB of heap *(docs, a rule of thumb for master nodes)* |
@@ -56,17 +56,19 @@ A log system takes a firehose of small, append-only lines, keeps them for weeks 
 |---|---|---|
 | raw volume | 100,000 x 300 B x 86,400 | 2.592 TB per day (30 MB per second average, 90 MB per second at peak) |
 | buffer for a 6 hour indexer outage | 90 MB/s x 21,600 s | 1.94 TB (5.83 TB with three copies) |
-| full-text store, one day | 2.592 TB x 1.2 x 2 | 6.22 TB; 18.7 TB for 3 hot days |
-| primary shards per day | 3.11 TB / 30 GB | 104 |
+| full-text store, one day | 2.592 TB x 1.2 x 2 | 6.22 TB; 18.7 TB for 3 hot days, 187 TB for 30 days |
+| primary shards per day | 3.11 TB / 30 GB | 104 (one primary per index) |
 | label-and-chunk store, one day | 2.592 TB / 8 | 324 GB; 118 TB for a year |
-| one index per pod per day, a year | 5,000 x 365 | 1,825,000 indices, 608 GB of master heap by the rule; each shard about 518 MB, 19 times under the 10 GB floor |
-| daily rollover at 30 GB, 30 days | 104 x 30 | 3,120 shards, about 1 GB of heap by the same rule |
+| one index per pod per day, 30 days, one primary each | 5,000 x 30 | 150,000 indices, 50 GB of master heap by the rule; each shard about 622 MB (stored primary size), 16 times under the 10 GB floor |
+| daily rollover at 30 GB, the same 30 days | 104 x 30 | 3,120 shards, about 1 GB of heap by the same rule: 48 times fewer |
+| the gap between the designs, per copy | 1.2 x 8 = 9.6 | full-text 1.2 of raw against chunks at one eighth of raw |
+| and with the replica counted for the full-text store only | 1.2 x 2 x 8 = 19.2 | the 19.2 times of the first rows |
 | streams if the label set adds pod and level | 5,000 pods x 5 levels | 25,000 streams |
 | streams if a request id becomes a label | up to one per line | up to 8.64 billion a day: more entries than the data is worth |
 | one service for one hour | 2.592 TB / 200 / 24 | 540 MB, about 1.1 s on one worker |
 | scanning one whole day | 2.592 TB / 500 MB/s | 5,184 worker-seconds, 52 s on 100 workers |
 
-Five conclusions. **Volume, not search, sizes the cluster:** 2.6 TB a day raw. **The buffer is cheap insurance:** under two terabytes for six hours of peak. **The cost gap between the designs is the index:** 6.2 versus 0.32 terabytes a day with these assumed factors (about 19 times); it is an illustration of the shape and not a measured ratio. **Shard count is a design variable:** per pod per day gives 1.8 million indices and 19 times undersized shards; rollover by size gives about 3,000 shards a month. **Cardinality is the label design's failure mode:** labels turn into streams, and a label with a value per request makes the index as large as the data. The Loki documentation says plainly that a good set of labels is key to efficient queries; the arithmetic is this lesson's.
+Five conclusions. **Volume, not search, sizes the cluster:** 2.6 TB a day raw. **The buffer is cheap insurance:** under two terabytes for six hours of peak. **The cost gap is made of assumptions, and most of it is compression:** 6.2 versus 0.32 terabytes a day is 19.2 times, which is 1.2 (stored size with the index) times 2 (a replica counted for one store only) times 8 (chunk compression). At equal replication it is 9.6; the index itself adds 20% in these inputs. How large a real inverted index is relative to the data depends on the mappings and the data and is not measured here: measure it. **Shard count is a design variable:** at the same 30 days of retention, an index per pod per day gives 150,000 indices (50 GB of master heap by the rule, shards 16 times too small) against 3,120 shards from size-based rollover. **Cardinality is the label design's failure mode:** labels turn into streams, and a label with a value per request makes the index as large as the data. The Loki documentation says plainly that a good set of labels is key to efficient queries; the arithmetic is this lesson's.
 
 ---
 
@@ -87,7 +89,7 @@ A line is `(timestamp, stream, text)`. A **stream** is the set of lines that sha
 
 **The pipeline.** Agents on each host tail files, batch lines, label them and ship them. A buffer decouples them from the indexers: the Kafka paper (LinkedIn's log-processing system) stores each partition as a log of segment files of about 1 GB, addresses messages by offset instead of an id, has consumers pull and keep their own offset so they can rewind, and guarantees at-least-once delivery, which is what log shipping needs. Indexers consume from the buffer and write the store. Queries go to a coordinator that fans out to shards and merges, as in the Distributed Search Engine lesson. Facebook's Scribe and Cloudera's Flume are named in the Kafka paper as earlier aggregators that dump to HDFS or similar; nothing else about them was read.
 
-**Two store designs.** Elasticsearch documents that a document is searchable in near real time, within one second, because Lucene writes a new segment cheaply into the filesystem cache and opens it without a full commit. By default it refreshes every second, only on indices that received a search in the last 30 seconds. So "how fresh is a search" has an answer in seconds, set by the refresh interval and the queue ahead of the indexer. Loki's documentation describes the other design: it does not index log contents, only a set of labels per stream; lines are compressed into chunks in object storage; writes are hashed per stream onto a consistent hash ring (see Caching Patterns and Consistent Hashing) to ingesters with a replication factor, acknowledged when a quorum answers; reads split a query into sub-queries and read in-memory data from ingesters plus chunks from the store.
+**Two store designs.** Elasticsearch documents that a document is searchable in near real time, within one second, because Lucene writes a new segment cheaply into the filesystem cache and opens it without a full commit. By default it refreshes every second, only on indices that received a search in the last 30 seconds. (The Distributed Search Engine lesson covers freshness and time-based indices for search generally; this lesson uses them for logs.) So "how fresh is a search" has an answer in seconds, set by the refresh interval and the queue ahead of the indexer. Loki's documentation describes the other design: it does not index log contents, only a set of labels per stream; lines are compressed into chunks in object storage; writes are hashed per stream onto a consistent hash ring (see Caching Patterns and Consistent Hashing) to ingesters with a replication factor, acknowledged when a quorum answers; reads split a query into sub-queries and read in-memory data from ingesters plus chunks from the store.
 
 **The model.** An append buffer; `refresh` turns it into an immutable segment with an inverted index and its time and stream summary; search reads segments only.
 
@@ -150,7 +152,7 @@ def written_formula(n, m):                 # every size-m^t segment is written o
     return sum((n // m ** t) * m ** t for t in range(0, 64) if m ** t <= n)
 ```
 
-The check asserts `merge_sim` equals both forms for every n below 700 and m in 2, 3, 4, 10. The consequences you can quote: after 1,000 flushes with m = 10 there is one segment and each flushed unit has been written 4 times in total (once at the flush, three times by merges); after 999 flushes there are 27 segments (the digit sum 9 + 9 + 9). **Write amplification is about log base m of the number of flushes**, and a larger `m` means fewer rewrites and more segments per query. This is why a log system wants large, infrequent refreshes on cold data and cheap ones on hot data. Reality adds deletes and size caps (the documentation notes a maximum merged segment size), which the model ignores.
+The check asserts `merge_sim` equals both forms for every n below 700 and m in 2, 3, 4, 10. The consequences you can quote: after 1,000 flushes with m = 10 there is one segment and each flushed unit has been written 4 times in total (once at the flush, three times by merges); after 999 flushes there are 27 segments (the digit sum 9 + 9 + 9). **Write amplification is about log base m of the number of flushes**, and a larger `m` means fewer rewrites and more segments per query. This lesson's inference: once an index is no longer written (after rollover), merging it into fewer, larger segments (a larger `m`, or a force-merge) cuts the segments every query opens at the cost of one more rewrite. Reality adds deletes and size caps (the documentation notes a maximum merged segment size), which the model ignores.
 
 ---
 
@@ -223,7 +225,7 @@ What this guarantees is delivery from the agent's memory to the receiver. If the
 
 ## 10. Pitfalls Checklist
 
-1. **Indexing everything by default.** The index is most of the cost; decide what search must be fast.
+1. **Indexing everything by default.** Every indexed term costs write time and storage; decide what search must be fast and measure what the index costs on your logs.
 2. **Labels with unbounded values.** Cardinality is the index size.
 3. **One index per host or pod.** Tiny shards, a master that runs out of heap.
 4. **Deleting by query for retention.** Drop whole partitions.
@@ -240,10 +242,10 @@ What this guarantees is delivery from the agent's memory to the receiver. If the
 1. A query for 10:00 to 11:00 opens 1 of 10 hourly segments, but a late-arriving line widens one of them. Walk through why pruning gets worse and what you would do.
 2. The merge model gives 27 live segments after 999 flushes with m = 10. Where does 27 come from, and what is the write cost of the 1,000th flush?
 3. Compute the daily raw volume for 100,000 lines per second at 300 bytes, and the buffer needed to ride out a 6 hour indexer outage at triple that rate.
-4. Why is "one index per pod per day" wrong at 5,000 pods, and what does the master-heap rule say about it?
+4. Why is "one index per pod per day" wrong at 5,000 pods, and what does the master-heap rule say about 30 days of them against 30 days of size-based rollover?
 5. An agent sends lines 0 to 4, the receiver gets 0, 1, 3 and acknowledges. What does it acknowledge, and what does the agent resend?
 6. Why does a cumulative acknowledgement survive a lost or reordered ack, and what would a per-line ack cost you?
-7. Contrast a full-text index with a label index on cost, on the query "find this request id" and on the query "all errors from service X yesterday".
+7. The table shows a 19.2 times cost gap. Which three factors make it up, and what is it at equal replication? Then contrast a full-text index with a label index on cost, on the query "find this request id" and on the query "all errors from service X yesterday".
 8. A team asks to add `request_id` as a label "so we can search it". What do you say, with numbers?
 
 ---
