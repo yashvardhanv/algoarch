@@ -49,10 +49,16 @@ assert q.due(1799) == [] and q.due(1800) == [('m1', 'b@y')]            # exactly
 q.report('m1', 'b@y', 451, 1800)
 assert q.due(1800 + 3599) == [] and q.due(1800 + 3600) == [('m1', 'b@y')]
 assert q.attempts('m1', 'b@y') == 2
-# a bounce is never bounced: the null reverse-path gets no DSN even on a permanent failure (RFC 5321 6.2 / 4.5.5)
+# a bounce is never bounced: the null reverse-path gets no DSN even on a permanent failure (RFC 5321 6.1)
 q.submit('dsn1', ['me@home'], 0, '')
 q.report('dsn1', 'me@home', 550, 5)
 assert q.state('dsn1', 'me@home') == 'bounced' and all(d['mid'] != 'dsn1' for d in q.dsns)
+# the same on the give-up path: a null sender whose 4yz outlasts five days is dropped silently as well
+q.submit('dsn2', ['gone@dead'], 0, '')
+q.report('dsn2', 'gone@dead', 451, 5 * 86400 - 1)
+assert q.state('dsn2', 'gone@dead') == 'queued'
+q.report('dsn2', 'gone@dead', 451, 5 * 86400)
+assert q.state('dsn2', 'gone@dead') == 'bounced' and all(d['mid'] != 'dsn2' for d in q.dsns)
 # a finished recipient never comes back, and a late report on it changes nothing
 q.report('m1', 'a@x', 451, 99999)
 assert q.state('m1', 'a@x') == 'delivered' and q.due(10 ** 7) == [('m1', 'b@y')]
@@ -127,6 +133,7 @@ mb = Mailbox(7)
 u1, u2, u3 = mb.append(), mb.append(), mb.append()
 assert (u1, u2, u3) == (1, 2, 3)
 mb.expunge(3)
+assert mb.set_flags(3, {'\\Seen'}) is False and 3 not in mb.snapshot()      # a late STORE on an expunged UID does nothing
 assert mb.append() == 4                                  # RFC 3501: a UID is never reused, even the highest one
 mb.expunge(4); mb.expunge(1)
 assert mb.append() == 5 and sorted(mb.snapshot()) == [2, 5]
@@ -229,6 +236,8 @@ assert aligned('example.com', 'badexample.com', 'r', SUF) is False
 assert aligned('a.co.uk', 'b.co.uk', 'r', SUF) is False                                         # different registrants under one public suffix
 assert aligned('x.me.github.io', 'y.me.github.io', 'r', SUF) is True
 assert aligned('me.github.io', 'you.github.io', 'r', SUF) is False
+assert org_domain('a.mailer.net', SUF) == 'mailer.net' and org_domain('net', SUF) is None       # an unlisted TLD is a one-label suffix
+assert aligned('a.mailer.net', 'b.other.net', 'r', SUF) is False and aligned('a.mailer.net', 'b.mailer.net', 'r', SUF) is True
 
 
 def ref_org(d, suffixes):
@@ -259,7 +268,7 @@ def ref_pass(frm, spf, dkims, ms, md, suffixes):
     return 'fail'
 
 
-names = ['example.com', 'news.example.com', 'a.news.example.com', 'evil-example.com', 'badexample.com', 'example.co.uk',
+names = ['a.mailer.net', 'b.other.net', 'mailer.net', 'net', 'example.com', 'news.example.com', 'a.news.example.com', 'evil-example.com', 'badexample.com', 'example.co.uk',
          'mail.example.co.uk', 'other.co.uk', 'com', 'co.uk', 'me.github.io', 'you.github.io', 'x.me.github.io', 'EXAMPLE.com', 'org']
 for a in names:
     for b in names:
@@ -282,8 +291,9 @@ assert dmarc_result('example.com', ('pass', 'mail.example.com'), [], 's', 's', S
 
 # ---- 7. stale-wording locks and cited figures --------------------------------------------------------------------------
 need('Do this after', 'Last reviewed: 27 November 2026', 'RFC 5321', 'RFC 3501', 'RFC 7489', 'RFC 8620', 'RFC 7162', 'RFC 3464',
-     'at least 30 minutes', '4-5 days', '5,000 messages per day', '0.3%', 'Message-ID')
+     '43 tries including the final one', 'cannot resurrect the message', 'Reads, Writes and Contention', 'at least 30 minutes', '4-5 days', '5,000 messages per day', '0.3%', 'Message-ID')
 assert len(re.findall(r'^\d+\. ', src.split('## Drills')[1].split('## Homework')[0], re.M)) == 8, 'eight drills'
+forbid('Hot Keys')
 for bad in ('lakh', 'crore', 'LPA'):
     forbid(bad)
 print('sy63 code checks passed')

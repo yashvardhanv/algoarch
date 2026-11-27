@@ -2,7 +2,7 @@
 
 > **Priority:** ★★★☆☆ (proposed; the curriculum data holds the final rating) — email is the classic "store and forward with no central owner" system, and an answer that treats it as a single database with an inbox table misses delivery, trust and sync.
 >
-> **Study time:** 85 minutes. **Do this after:** Scaling Patterns I: Reads, Writes and Hot Keys; Scaling Patterns II: Large Blobs, Long-Running Tasks and Real-Time Updates; Distributed Search (for the search box); Overload, Load Shedding and Cascading Failures.
+> **Study time:** 85 minutes. **Do this after:** Scaling Patterns I: Reads, Writes and Contention; Scaling Patterns II: Large Blobs, Long-Running Tasks and Real-Time Updates; Distributed Search (for the search box); Overload, Load Shedding and Cascading Failures.
 >
 > **Level:** extended.
 
@@ -61,7 +61,7 @@ A mail system is three problems under one name. Moving a message between organis
 | one user's mailbox growth | 30 x 75 KB x 365 | 821 MB per year |
 | outbound mail | 100 M x 5 / 86,400 | 5,787 per second |
 | retry queue depth | 3% x 500 M x 2 h / 24 h | 1.25 million messages in flight |
-| tries before giving up | the schedule of section 5, 5 days | 43 tries |
+| tries before giving up | the schedule of section 5, 5 days | 43 tries, the last one at or after the give-up time |
 
 Four conclusions. **The edge is mostly saying no:** 196,759 of 231,481 attempts per second never reach storage, so every check must be cheap and must come before the data (the "refuse early" lesson of Overload, Load Shedding and Cascading Failures). **Storage is attachments:** 675 TB per day replicated is blob storage, not database rows; the metadata is a rounding error beside it. **Sizing the queue is a residence-time question:** 1.25 million messages in flight is small; the risk is not size but a destination that stays down for days while mail piles up (backoff and give-up bound it). **One mailbox is small:** 821 MB a year per user, so a mailbox is one shard's worth of work and never needs cross-shard transactions.
 
@@ -125,7 +125,7 @@ class OutQueue:
             it['next'] = now + retry_delay(it['tries'])
 ```
 
-The check pins the edges: a try due at exactly 1,800 seconds and not at 1,799; the give-up one second before five days (still retried) and at five days (bounced); the give-up clock starts at submission, not at the first failure; a bounced recipient and a delivered one stay finished. With this schedule a recipient that always answers 4yz is tried **43 tries** before the give-up, the figure in the capacity table. A shorter retry cap multiplies that count and with it the load on a destination that is already down.
+The check pins the edges: a try due at exactly 1,800 seconds and not at 1,799; the give-up one second before five days (still retried) and at five days (bounced); the give-up clock starts at submission, not at the first failure; a bounced recipient and a delivered one stay finished. With this schedule a recipient that always answers 4yz gets **43 tries including the final one** (the try at or after five days, whose failure triggers the bounce), the figure in the capacity table. A shorter retry cap multiplies that count and with it the load on a destination that is already down.
 
 **The duplicate.** The window the standard cannot close: the receiver stores the message and sends 250, and the 250 is lost. The sender sees a timeout, treats it as a failure and retries; the receiver stores it again. RFC 5321 (6.1) says a receiver must "seek to minimize the time required to respond to the final dot" to avoid duplicates after timeouts, which reduces the window and does not remove it. Experiment, in the check: 1,000 messages, 10% of the final replies lost, sender retrying as above. A receiver with no memory ends with 1,000 messages plus **120 duplicate copies**; one with the window below stores exactly 1,000. (Illustrative: a seeded simulation.)
 
@@ -146,7 +146,7 @@ class Inbox:
 
 The key choices are each a test: **Message-ID alone is not enough**, because RFC 5322 says a message "SHOULD" have one and that the identifier is meant to be unique, which a sloppy sender or a copy-and-edit does not honour, so the hash separates two different bodies that share an id; **the recipient is part of the key**, since one message to two recipients is two deliveries; **the window must be at least the sender's give-up time**, or a retry on day five lands outside it. The honest hole: a retry later than the window, and a sender that regenerates the Message-ID on each try, are stored twice. Duplicates are a user-visible annoyance, so the trade is correct: losing a message is worse.
 
-**What 5yz and 4yz mean for the user.** A 5yz at the first hop is cheap and immediate (the sender's own server tells the user). A bounce after acceptance goes out as a new message to the return path, with one report per failed recipient, and the check asserts that a bounce for a bounce is never generated. Accepting mail you will later bounce is the "backscatter" problem: the bounce goes to a forged sender who never wrote the message, which is another reason to refuse early (section 7).
+**What 5yz and 4yz mean for the user.** A 5yz at the first hop is cheap and immediate (the sender's own server tells the user). A bounce after acceptance goes out as a new message to the return path, with one report per failed recipient, and the check asserts that a bounce for a bounce is never generated, on both paths: a permanent 5yz and a 4yz still failing at the five-day give-up. Accepting mail you will later bounce is the "backscatter" problem: the bounce goes to a forged sender who never wrote the message, which is another reason to refuse early (section 7).
 
 ---
 
@@ -169,7 +169,10 @@ class Mailbox:
         self.msgs[uid] = (frozenset(flags), self._bump())
         return uid
     def set_flags(self, uid, flags):
+        if uid not in self.msgs:
+            return False                                             # a STORE racing an EXPUNGE must not resurrect the message
         self.msgs[uid] = (frozenset(flags), self._bump())
+        return True
     def expunge(self, uid):
         del self.msgs[uid]
         self.tombs[uid] = self._bump()
@@ -204,7 +207,7 @@ class Replica:
 
 What the check does to it: 400 seeded random runs of appends, flag changes, expunges, compactions, new mailboxes with a higher UIDVALIDITY and three replicas syncing at random moments must always equal the mailbox's own snapshot; UIDs are never reused over 500 operations that expunge the highest message (the `max(uid) + 1` bug appears the moment the newest message is deleted and a new one arrives: a client holding the old UID now sees different mail under it); a client at exactly the compaction floor gets a delta and one just below it gets `None` and then a full resync that includes the expunge the tombstone no longer remembers; and a mailbox re-created with UIDVALIDITY 11 replaces the cache of UIDVALIDITY 10 rather than merging into it. UIDs and mod-sequences above 100 are used so a string-ordered comparison ("9" above "10") fails.
 
-**Costs and limits.** A tombstone per expunged message costs a row until compaction, which is why compaction exists and why "resync from scratch" must be a supported, rare path: with the 821 MB a year of section 3 and a full-state listing of every UID and its flags, a resync is a few hundred kilobytes of metadata, not the bodies. The model is single-writer: read `highest_modseq` and compute the delta under the same snapshot, or a change landing in between is lost to the next sync. Sorting and threading are client or index work above the log.
+**Costs and limits.** A tombstone per expunged message costs a row until compaction, which is why compaction exists and why "resync from scratch" must be a supported, rare path: with the 821 MB a year of section 3 and a full-state listing of every UID and its flags, a resync is a few hundred kilobytes of metadata, not the bodies. `set_flags` on an unknown UID does nothing and the check asserts it, so a flag change racing an expunge cannot resurrect the message. The model is single-writer: read `highest_modseq` and compute the delta under the same snapshot, or a change landing in between is lost to the next sync. Sorting and threading are client or index work above the log.
 
 ---
 
