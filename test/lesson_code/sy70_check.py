@@ -134,6 +134,23 @@ for g in range(5):
         rs.rotate()
 assert all(x in rs for x in range(4000, 4100)), 'current generation'
 assert all(x in rs for x in range(3000, 3100)) and all(x in rs for x in range(2000, 2100))   # within 3 generations
+# the union of three full generations: sized for p / gens each, so about p in total (three filters at p each would give about 3 p)
+un = RotatingSeen(gens=3, n=1000, p=0.01)
+for g_ in range(3):
+    for x in range(g_ * 10_000, g_ * 10_000 + 1000):
+        un.add(x)
+    if g_ < 2:
+        un.rotate()
+assert all(x in un for g_ in range(3) for x in range(g_ * 10_000, g_ * 10_000 + 1000))
+UNION_FP = sum(1 for x in range(100_000, 150_000) if x in un) / 50_000
+assert 0.005 < UNION_FP < 0.016, UNION_FP
+naive_gens = [Bloom(*bloom_size(1000, 0.01)) for _ in range(3)]
+for g_, bf_ in enumerate(naive_gens):
+    for x in range(g_ * 10_000, g_ * 10_000 + 1000):
+        bf_.add(x)
+naive_fp = sum(1 for x in range(100_000, 150_000) if any(x in b_ for b_ in naive_gens)) / 50_000
+assert naive_fp > 0.02, naive_fp                                           # the unadjusted union is about 3 percent
+assert round(100 * naive_fp, 2) == 2.75, naive_fp
 gone = sum(1 for x in range(0, 100) if x in rs) + sum(1 for x in range(1000, 1100) if x in rs)
 assert gone <= 4, gone                                                      # forgotten, apart from rare false positives
 
@@ -156,6 +173,6 @@ assert simulate_exposure(cap=None, seed=7) == res_u                          # d
 print('exposure top-10-percent share: uncapped %.0f percent, capped %.0f percent' % (100 * res_u['top10_share'], 100 * res_c['top10_share']))
 EXPO = (round(100 * res_u['top10_share']), round(100 * res_c['top10_share']))
 assert round(100 * fp, 2) == 1.16 and round(100 * fp1, 1) == 9.7 and EXPO == (60, 29) and res_u['max_per_round'] == 599
-need('60 percent of impressions', '29 percent and the maximum is 30', '599 viewers', '1.16 percent', '9.7 percent', '60,000 impressions', '855 KiB', '128 KiB', 'Visual (planned)', 'Two clients', '4 of 6', '6 of 6')
-forbid('Tinder uses', 'Tinder stores', 'Tinder runs')
+need('2.75 percent measured', 'all 599 other viewers', '6.5 KiB', 'of 15 days remember between 30 and 45 days', 'at most the exhaustion time', '60 percent of impressions', '29 percent and the maximum is 30', '1.16 percent', '9.7 percent', '60,000 impressions', '855 KiB', '128 KiB', 'Visual (planned)', 'Two clients', '4 of 6', '6 of 6')
+forbid('Tinder uses', 'Tinder stores', 'Tinder runs', '(every other viewer)', 'geosharded recommendations posts', 'long compared with the time to exhaust')
 print('sy70 code checks passed')

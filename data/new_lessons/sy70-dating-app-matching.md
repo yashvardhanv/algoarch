@@ -52,10 +52,13 @@ You swipe right on someone; if they already swiped right on you, both of you mus
 | Reverse lookups | one per right swipe | about 3,472 per second average, about 10,417 at the peak |
 | Matches | assumed 5 percent of right swipes find a prior like | 15 million per day, about 174 per second |
 | Right-swipe index | 24 bytes per entry (two 8-byte ids, 8-byte timestamp) | 7.2 GB per day, about 2.6 TB per year |
-| Seen set for one heavy user | 100 swipes per day for 3 years = 109,500 ids | exact ids 855 KiB; Bloom filter at 1 percent 128 KiB |
+| Seen set for one heavy user who never forgets | 100 swipes per day for 3 years = 109,500 ids | exact ids 855 KiB; Bloom filter at 1 percent 128 KiB |
+| The same user with a 45-day window | 4,500 ids in 3 generations of 1,500, each sized for 0.33 percent | about 6.5 KiB |
+| Fleet seen-set store, upper bound | 10 million users, every one as heavy as above and never forgetting | about 1.3 TB as Bloom filters, 8.8 TB as exact ids |
+| Seen-set updates | every swipe, left or right | the full swipe rate: about 11,574 per second average |
 | Pool exhaustion | 100 swipes per day against a pool of 5,000 or 50,000 eligible profiles | 50 days or 500 days |
 
-Two consequences. First, only right swipes need an index for reverse lookup, so the durable write volume is about a third of the swipe rate. Left swipes only feed the seen filter. Second, the pool-exhaustion row says the seen set must forget: after about 50 days a user in a sparse area has seen everyone, and the feed is empty unless old entries expire (section 6).
+Two consequences. First, only right swipes need an index for reverse lookup, so that durable like index grows at about a third of the swipe rate (3,472 per second). Left swipes do not go there, but they do update the seen set, so the seen set is written at the full swipe rate; if those updates are batched per session and lost in a crash, the last few judged profiles reappear, which is a visible bug, so keep a short exact log of recent swipes durable. Second, the pool-exhaustion row says the seen set must forget: after about 50 days a user in a sparse area has seen everyone, and the feed is empty unless old entries expire (section 6, which also says how long to remember).
 
 ---
 
@@ -175,9 +178,10 @@ class Bloom:
 
 
 class RotatingSeen:
-    """A Bloom filter cannot delete, so keep several generations and drop the oldest whole."""
+    """A Bloom filter cannot delete, so keep several generations and drop the oldest whole. A lookup asks every
+    generation, so the false-positive rates add up: each generation is sized for p / gens, which makes the union about p."""
     def __init__(self, gens=3, n=1000, p=0.01):
-        self.size = bloom_size(n, p)
+        self.size = bloom_size(n, p / gens)
         self.gens = deque([Bloom(*self.size)], maxlen=gens)
 
     def add(self, key):
@@ -196,7 +200,8 @@ What the check pins down:
 - No false negatives: all 2,000 members are found. This is the property the product depends on, and it holds by construction.
 - Measured false positives on 20,000 never-added ids are 1.16 percent (asserted between 0.5 and 1.6 percent), and a one-hash filter of the same size is 9.7 percent, more than three times worse. Every hash position is set on `add` (a filter that set only the first position would pass the no-false-negative test and fail the rate test).
 - **What a false positive costs here.** A false positive hides a profile the user never saw. At 1 percent, a user with a 5,000-profile pool loses about 50 candidates, and they were never judged, so nobody can tell. The opposite error, showing a judged profile, cannot happen. This asymmetry is why a Bloom filter fits; for a "has this payment been processed" check it would not.
-- `RotatingSeen` keeps three generations. After four rotations, keys from the oldest two generations are gone (at most 4 of 200 sampled ones still answer yes, from false positives) and keys from the latest three generations are always found. Rotation is how the pool recycles: choose the generation length so that the forgetting window is long compared with the time to exhaust the pool (50 to 500 days in the table), then a user sees old profiles again only after a long gap.
+- `RotatingSeen` keeps three generations and answers yes if any of them does, so the rates add: three filters each sized for 1 percent give about 3 percent (2.75 percent measured on 50,000 never-added ids, a case the first draft of this lesson used as if it were 1 percent). The class sizes each generation for `p / gens`, and the check fills all three with 1,000 keys and requires the union rate to land between 0.5 and 1.6 percent. After four rotations, keys from the oldest two generations are gone (at most 4 of 200 sampled ones still answer yes, from false positives) and keys from the latest three generations are always found.
+- **How long to remember.** Rotation is how the pool recycles, and the window decides which failure you get. A window **longer** than the time to exhaust the pool guarantees an empty feed from the day the pool runs out until the first entries expire; a window shorter than it guarantees unseen profiles exist, at the cost of showing old ones again. So choose the window at most the exhaustion time (50 days for a 5,000-profile pool at 100 swipes a day, 500 for a dense one), per pool density. The window is the number of generations times the length of one, and the live window varies between one generation less and the full count, so three generations of 15 days remember between 30 and 45 days: safe for the 50-day pool. The sizing table prices it: 4,500 ids in three generations of 1,500 each sized for 0.33 percent cost about 6.5 KiB, against 128 KiB for a never-forgotten heavy user.
 
 Keep two things outside the filter: an exact short list of the last few dozen swipes (for "undo", which a Bloom filter cannot do), and the deny list for blocks, which must be exact. A blocked profile hidden by a 1-percent chance is a safety bug.
 
@@ -249,7 +254,7 @@ def simulate_exposure(n=600, rounds=10, show=10, cap=None, seed=1):
     return {'impressions': total, 'top10_share': sum(top) / total, 'max_per_round': worst}
 ```
 
-Illustrative result (seed 7, 600 profiles, 10 rounds, 10 cards per viewer per round; invented population, not data from any app): without a cap the most-shown 10 percent of profiles take 60 percent of impressions and one profile is shown to 599 viewers (every other viewer) in a single round; with a cap of 30 per round the share is 29 percent and the maximum is 30. Both runs deliver the same 60,000 impressions, so the cap does not starve the feed. The check asserts the cap as a hard invariant, the share gap of more than 15 points, and that the run is deterministic.
+Illustrative result (seed 7, 600 profiles, 10 rounds, 10 cards per viewer per round; invented population, not data from any app): without a cap the most-shown 10 percent of profiles take 60 percent of impressions and one profile is shown to all 599 other viewers in a single round; with a cap of 30 per round the share is 29 percent and the maximum is 30. Both runs deliver the same 60,000 impressions, so the cap does not starve the feed. The check asserts the cap as a hard invariant, the share gap of more than 15 points, and that the run is deterministic.
 
 This simulation shows only one effect: a single ranked list shared by all viewers concentrates impressions, and a cap spreads them. It does not show that any particular product ranks this way, and it says nothing about what a cap does to match rates. Measure that in an experiment, not in a lesson.
 
@@ -272,7 +277,7 @@ This simulation shows only one effect: a single ranked list shared by all viewer
 
 ## 9. What Real Companies Did
 
-No engineering post from Tinder or any other dating app could be read for this lesson: the Medium-hosted Tinder engineering pages returned HTTP 403 to a plain fetch on 27 November 2026. So this lesson states nothing about how any dating app is built. Sections 5 to 7 are the general design, built from first principles and tested here. The pieces they use are public techniques: Bloom filters, geographic cell indexes (taught in Proximity Service & Location-Based Systems, whose sources are cited there) and rating systems (read in the Glicko papers cited in Multiplayer Game Backend and Matchmaking).
+No engineering post from Tinder or any other dating app could be read for this lesson: the Medium-hosted Tinder engineering pages returned HTTP 403 to a plain fetch on 27 November 2026, so their content is unknown here. So this lesson states nothing about how any dating app is built. Sections 5 to 7 are the general design, built from first principles and tested here. The pieces they use are public techniques: Bloom filters, geographic cell indexes (taught in Proximity Service & Location-Based Systems, whose sources are cited there) and rating systems (read in the Glicko papers cited in Multiplayer Game Backend and Matchmaking).
 
 ---
 
@@ -318,13 +323,13 @@ No engineering post from Tinder or any other dating app could be read for this l
 
 All read on 27 November 2026.
 
-- None for dating-app internals. The Tinder engineering pages on Medium (including the geosharded recommendations posts) returned HTTP 403 and were not read.
-- The Bloom filter formulas in section 6 are derived in the lesson and verified by the check (sizes, measured false-positive rate); no paper was consulted for them.
+- None for dating-app internals. The Tinder engineering pages on Medium returned HTTP 403 and were not read, so nothing is said about their content.
+- The Bloom filter formulas in section 6 are stated in the lesson and checked numerically (sizes, measured false-positive rates of one filter and of three generations); no paper was consulted for them.
 - Capacity figures are assumptions labelled as such in section 3.
 
 ## Further reading (not consulted)
 
-- Tinder's engineering blog posts on geosharding and recommendation infrastructure.
+- Tinder's engineering blog (Medium), not readable in this session.
 - Bloom (1970), *Space/time trade-offs in hash coding with allowable errors*.
 - Literature on reciprocal recommendation and two-sided marketplaces.
 

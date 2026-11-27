@@ -28,10 +28,15 @@ def sy70(src):
     m = math.ceil(-n * math.log(0.01) / math.log(2) ** 2)
     assert round(n * 8 / 1024) == 855 and round(m / 8 / 1024) == 128
     assert 5000 / 100 == 50 and 50000 / 100 == 500 and 8000 / 100 == 80
+    m1, _ = (math.ceil(-1500 * math.log(0.01 / 3) / math.log(2) ** 2), 0)
+    assert 3 * math.ceil(m1 / 8) == 6678 and round(3 * math.ceil(m1 / 8) / 1024, 1) == 6.5      # 45-day window, 3 generations of 1,500
+    assert 4500 == 45 * 100 and 3 * 15 == 45 and 45 < 5000 / 100                                  # window shorter than the 50-day exhaustion time
+    fleet_bloom = math.ceil(m / 8) * dau
+    assert round(fleet_bloom / 1e12, 1) == 1.3 and round(n * 8 * dau / 1e12, 1) == 8.8
     # a pool can never be larger than the users who exist near the viewer: an assumed 5,000 profiles is under 0.1% of the 10M
     assert 5000 < dau * 0.001
     need(src, '11,574 per second', '34,722 per second', '3,472 per second', '10,417', '174 per second', '7.2 GB per day',
-         '2.6 TB per year', '855 KiB', '128 KiB', '109,500', '50 days or 500 days')
+         '2.6 TB per year', '855 KiB', '128 KiB', '6.5 KiB', '1.3 TB as Bloom filters, 8.8 TB as exact ids', '11,574 per second average', '109,500', '50 days or 500 days')
     forbid(src, 'Tinder uses', 'Tinder stores', 'Tinder runs')
     return 'sy70'
 
